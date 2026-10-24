@@ -21,6 +21,7 @@ import {
   BrandGlyph,
   CloseIcon,
   PlusIcon,
+  RefreshIcon,
   RepoIcon,
   SettingsIcon,
   WindowCloseIcon,
@@ -81,11 +82,14 @@ interface TitleBarProps {
   activeId: string | null;
   repo: Repository | null;
   adding: boolean;
+  /** True while a manual reload is in flight; the refresh button spins with it. */
+  refreshing: boolean;
   onSelect: (id: string) => void;
   onAdd: () => void;
   onClose: (id: string) => void;
   /** Move the tab at `from` into position `to`, after a drop. */
   onReorder: (from: number, to: number) => void;
+  onRefresh: () => void;
   onOpenSettings: () => void;
 }
 
@@ -166,10 +170,12 @@ export function TitleBar({
   activeId,
   repo,
   adding,
+  refreshing,
   onSelect,
   onAdd,
   onClose,
   onReorder,
+  onRefresh,
   onOpenSettings,
 }: TitleBarProps) {
   const [maximized, setMaximized] = useState(false);
@@ -323,6 +329,16 @@ export function TitleBar({
           <span className="font-mono text-[11px] font-semibold text-warning-ink">↓{repo.behind}</span>
         )}
 
+        <button
+          type="button"
+          onClick={onRefresh}
+          disabled={refreshing || !repo}
+          aria-label="Refresh"
+          title="Reload the current repository"
+          className={`${GLASS_CONTROL} grid cursor-default place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 disabled:opacity-50 size-7`}
+        >
+          <RefreshIcon width={13} height={13} className={refreshing ? "animate-spin" : undefined} />
+        </button>
         <button
           type="button"
           onClick={onOpenSettings}

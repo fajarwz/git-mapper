@@ -51,6 +51,7 @@ function App() {
   const [allLoadedByRepo, setAllLoadedByRepo] = useState<Record<string, boolean>>({});
   const [filesLoading, setFilesLoading] = useState(false);
   const [opening, setOpening] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   // Bottom panel: closable, and its height is draggable (null = the default percentage).
@@ -241,6 +242,42 @@ function App() {
     }
   }
 
+  // Rows a refresh just touched land here. Clearing first is what restarts the CSS animation
+  // when the same hash flashes twice in a row — saving, looking, saving again while the wash is
+  // still fading. The class has to leave the DOM for an animation to start over.
+  const showFlash = useCallback((hashes: string[]) => {
+    if (hashes.length === 0) return;
+    setFlashHashes([]);
+    window.requestAnimationFrame(() => setFlashHashes(hashes));
+  }, []);
+
+  // The refresh button: the same probe the focus path runs, minus the "nothing changed, return
+  // null" exit, so clicking it always re-reads the working tree. The uncommitted row refetches
+  // through the new worktree digest, and its icon spins while the reads are in flight.
+  const handleRefresh = useCallback(async () => {
+    if (!repo || refreshing) return;
+    const startedAt = performance.now();
+    setRefreshing(true);
+    try {
+      const refreshed = await refreshRepository(repo, true);
+      if (refreshed === null) return;
+      setRepos((previous) =>
+        previous.map((item) => (item.id === refreshed.repo.id ? refreshed.repo : item)),
+      );
+      showFlash(refreshed.touched);
+    } catch (refreshError) {
+      console.error("Could not refresh the repository", refreshError);
+    } finally {
+      // Local reads come back in ~50ms; a spin that short reads as a flicker, so hold the
+      // animation long enough to be seen as "it did something".
+      const elapsed = performance.now() - startedAt;
+      if (elapsed < 550) {
+        await new Promise((resolve) => window.setTimeout(resolve, 550 - elapsed));
+      }
+      setRefreshing(false);
+    }
+  }, [repo, refreshing, showFlash]);
+
   // Repo data changes while the app sits in the background: a commit from a terminal, an
   // editor save, a fetch that brings new remote branches. On window focus we re-check the
   // visible repo only, and refreshRepository does the cheapest thing that is correct: two
@@ -265,7 +302,7 @@ function App() {
         setRepos((previous) =>
           previous.map((item) => (item.id === refreshed.repo.id ? refreshed.repo : item)),
         );
-        if (refreshed.touched.length > 0) setFlashHashes(refreshed.touched);
+        showFlash(refreshed.touched);
       } catch (refreshError) {
         console.error("Could not refresh the repository", refreshError);
       } finally {
@@ -281,7 +318,7 @@ function App() {
       cancelled = true;
       window.removeEventListener("focus", onFocus);
     };
-  }, [repo, opening]);
+  }, [repo, opening, showFlash]);
 
   // The highlight is only a hint: drop it once the animation has played out.
   useEffect(() => {
@@ -313,10 +350,12 @@ function App() {
         activeId={repo?.id ?? null}
         repo={repo}
         adding={opening}
+        refreshing={refreshing}
         onSelect={handleSelectRepo}
         onAdd={handleAdd}
         onClose={handleCloseRepo}
         onReorder={handleReorderRepos}
+        onRefresh={() => void handleRefresh()}
         onOpenSettings={() => setSettingsOpen(true)}
       />
 

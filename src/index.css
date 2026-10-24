@@ -133,23 +133,26 @@
   }
 }
 
-/* A row a refresh just touched fades out of a soft primary wash, no layout shift. */
+/* A row a refresh just touched fades out of a soft amber wash, no layout shift.
+   No `forwards` fill: once the animation ends the row must fall back to its own background,
+   otherwise a selected row would stay washed out. */
 @utility row-flash {
-  animation: row-flash 2.6s ease-out forwards;
+  animation: row-flash 2.4s ease-out;
 
+  /* Motion off must not mean "no feedback": hold a static amber wash instead. */
   @media (prefers-reduced-motion: reduce) {
     animation: none;
-    background-color: var(--color-hover-glass);
+    background-color: color-mix(in srgb, var(--color-warning) 26%, transparent);
   }
 }
 
 @keyframes row-flash {
   0% {
-    background-color: color-mix(in srgb, var(--color-primary) 22%, transparent);
+    background-color: color-mix(in srgb, var(--color-warning) 42%, transparent);
   }
 
-  60% {
-    background-color: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  20% {
+    background-color: color-mix(in srgb, var(--color-warning) 32%, transparent);
   }
 
   100% {
