@@ -39,7 +39,7 @@ export const CommitRow = memo(function CommitRow({
         {/* Lane-coloured segment: ties this message to its graph node. */}
         <span
           aria-hidden="true"
-          className="h-[15px] w-[2px] shrink-0 rounded-full"
+          className="h-3.75 w-0.5 shrink-0 rounded-full"
           style={{ backgroundColor: laneColor(commit.lane) }}
         />
         <span className={`truncate text-[13px] text-ink ${weight}`}>

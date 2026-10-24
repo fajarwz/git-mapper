@@ -33,7 +33,7 @@ export function EmptyState({ onOpen, error, loading, repos }: EmptyStateProps) {
           <PlusIcon />
           {loading ? "Opening…" : "Open folder"}
         </button>
-        {error && <p className="m-0 text-[12px] break-words text-danger-ink">{error}</p>}
+        {error && <p className="m-0 text-[12px] wrap-break-word text-danger-ink">{error}</p>}
       </div>
     </div>
   );

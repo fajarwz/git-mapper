@@ -12,6 +12,8 @@ Guidance for AI agents working in this repo. Written after the full redesign + r
 
 ```bash
 npm run build        # gate for frontend work: tsc && vite build (run this before claiming done)
+npm run lint         # tailwind hygiene autofix over src (eslint-plugin-tailwindcss); run after CSS-class changes
+npm run lint:check   # same rules without fixing (CI-style check)
 npm run dev          # vite dev server on http://localhost:1420
 npm run tauri dev    # desktop window
 cargo check          # in src-tauri/; gate for Rust work
@@ -51,7 +53,7 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
 
 ## Design-system rules (project conventions)
 
-1. **Tokens only.** No hardcoded hex in components (exception: inline SVG strokes in the TitleBar `BrandMark`). Re-point tokens in `.dark`; components follow without `dark:`-variant spans.
+1. **Tokens only.** No hardcoded hex in components; icon markup lives in `src/assets/*.svg` (loaded via svgr `?react` imports through `icons.tsx`) with strokes in `currentColor`. Re-point tokens in `.dark`; components follow without `dark:`-variant spans.
 2. **Use `panel-shadow` / `soft-shadow`** (custom `@utility` in index.css), never Tailwind's `shadow-panel`/`shadow-soft`. Reason: Tailwind v4 inlines `@theme` literals into generated utilities, so `.dark` overrides of shadow vars silently never applied. The custom utilities route through `var()` and theme correctly.
 3. Row heights and type sizes live in code (`graphGeometry.ts`, component classes) — don't pin them here; they get tuned. Full type/spacing scale lives in `index.css` + component classes; keep hierarchy bouncy (big accents, airy spacing) — density is what made the previous design look dated.
 4. Background depth strategy: vivid full-canvas gradient (light theme gets a linear violet→rose→warm base because radial spots alone measured sat 0.07 and washed out) + subtle shadows. Don't add heavy drop shadows.

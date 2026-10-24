@@ -178,7 +178,7 @@ export function CommitList({ repo, selectedHash, flashHashes, onSelect, loadingM
           if (el.scrollTop + el.clientHeight >= el.scrollHeight - 320) onNearBottom();
         }}
       >
-        <div ref={graphColumnRef} className="w-[var(--graph-width)] shrink-0">
+        <div ref={graphColumnRef} className="w-(--graph-width) shrink-0">
           <CommitGraph commits={repo.commits} selectedHash={selectedHash} />
         </div>
         <div className="min-w-0 flex-1 pl-2 pr-3">
@@ -201,7 +201,7 @@ export function CommitList({ repo, selectedHash, flashHashes, onSelect, loadingM
       <ResizeHandle
         variant="splitter"
         label="Resize graph column"
-        className="left-[var(--graph-width)]"
+        className="left-(--graph-width)"
         min={baseGraphWidth}
         max={baseGraphWidth + MAX_GRAPH_EXTRA}
         value={graphColumnWidth}

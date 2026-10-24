@@ -153,7 +153,7 @@ function SortableTab({ item, active, suppressed, onSelect, onClose }: SortableTa
         }}
         aria-label={`Close ${item.name}`}
         title={`Close ${item.name}`}
-        className="mr-1 grid h-4.5 w-4.5 shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink"
+        className="mr-1 grid shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink size-4.5"
       >
         <CloseIcon size={8} />
       </button>
@@ -287,7 +287,7 @@ export function TitleBar({
               disabled={adding}
               aria-label="Open repository"
               title="Open a repository folder"
-              className="grid h-7 w-7 shrink-0 cursor-default place-items-center rounded-lg border border-dashed border-rule bg-glass-soft text-ink-soft backdrop-blur-md hover:bg-glass-strong hover:text-ink disabled:opacity-60"
+              className="grid shrink-0 cursor-default place-items-center rounded-lg border border-dashed border-rule bg-glass-soft text-ink-soft backdrop-blur-md hover:bg-glass-strong hover:text-ink disabled:opacity-60 size-7"
             >
               <PlusIcon />
             </button>
@@ -298,7 +298,7 @@ export function TitleBar({
           {dragged ? (
             <div
               data-tab-overlay
-              className="flex h-7 min-w-0 scale-[1.03] items-center gap-1.5 rounded-lg border border-hairline bg-glass-strong pl-2.5 pr-1 text-[13px] font-semibold text-ink shadow-panel"
+              className="flex h-7 min-w-0 scale-103 items-center gap-1.5 rounded-lg border border-hairline bg-glass-strong pl-2.5 pr-1 text-[13px] font-semibold text-ink soft-shadow"
             >
               <span className="shrink-0 text-ink-dim">
                 <RepoIcon size={12} />
@@ -311,7 +311,7 @@ export function TitleBar({
 
       <div className="flex shrink-0 items-center gap-1.5">
         {repo && (
-          <span className="inline-flex max-w-[190px] items-center gap-[5px] rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary-ink">
+          <span className="inline-flex max-w-47.5 items-center gap-1.25 rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary-ink">
             <BranchIcon size={11} />
             <span className="truncate">{repo.branch}</span>
           </span>
@@ -328,7 +328,7 @@ export function TitleBar({
           onClick={onOpenSettings}
           aria-label="Open settings"
           title="Settings"
-          className={`${GLASS_CONTROL} grid h-7 w-7 cursor-default place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70`}
+          className={`${GLASS_CONTROL} grid cursor-default place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-7`}
         >
           <SettingsIcon size={13} />
         </button>

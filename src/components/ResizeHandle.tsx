@@ -27,7 +27,7 @@ const VERTICAL_SPLITTER = [
   "hover:after:w-0.5 hover:after:bg-primary focus-visible:after:w-0.5 focus-visible:after:bg-primary",
   "data-[dragging=true]:after:w-0.5 data-[dragging=true]:after:bg-primary",
   "before:pointer-events-none before:absolute before:left-1/2 before:top-1/2 before:h-[26px] before:w-[7px] before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:bg-primary before:opacity-0 before:transition-opacity",
-  "hover:before:opacity-[0.9] focus-visible:before:opacity-[0.9] data-[dragging=true]:before:opacity-[0.9]",
+  "hover:before:opacity-90 focus-visible:before:opacity-90 data-[dragging=true]:before:opacity-90",
 ].join(" ");
 
 const HORIZONTAL_SPLITTER = [
@@ -36,7 +36,7 @@ const HORIZONTAL_SPLITTER = [
   "hover:after:h-0.5 hover:after:bg-primary focus-visible:after:h-0.5 focus-visible:after:bg-primary",
   "data-[dragging=true]:after:h-0.5 data-[dragging=true]:after:bg-primary",
   "before:pointer-events-none before:absolute before:left-1/2 before:top-1/2 before:h-[7px] before:w-[26px] before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:bg-primary before:opacity-0 before:transition-opacity",
-  "hover:before:opacity-[0.9] focus-visible:before:opacity-[0.9] data-[dragging=true]:before:opacity-[0.9]",
+  "hover:before:opacity-90 focus-visible:before:opacity-90 data-[dragging=true]:before:opacity-90",
 ].join(" ");
 
 const COLUMN_VISUALS = [

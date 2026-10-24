@@ -23,7 +23,7 @@ function ThemePreview({ theme }: { theme: Theme }) {
     <span className={`flex h-12 w-full items-end gap-1 rounded-lg border p-1.5 ${frame}`}>
       <span className="h-5 w-8 rounded bg-primary/70" />
       <span className={`h-3 w-6 rounded ${bar}`} />
-      <span className="h-4 w-4 rounded-full bg-success/70" />
+      <span className="rounded-full bg-success/70 size-4" />
     </span>
   );
 }
@@ -97,7 +97,7 @@ export function SettingsModal({ theme, onThemeChange, onClose }: SettingsModalPr
             type="button"
             onClick={onClose}
             aria-label="Close settings"
-            className="grid h-7 w-7 shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70"
+            className="grid shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-7"
           >
             <CloseIcon />
           </button>

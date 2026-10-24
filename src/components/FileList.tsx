@@ -44,9 +44,9 @@ export function FileList({
             onClick={onToggleCollapse}
             aria-expanded={!collapsed}
             title={collapsed ? "Expand file list" : "Collapse file list"}
-            className="grid h-5 w-5 shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70"
+            className="grid shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-5"
           >
-            <ChevronDownIcon size={11} className={collapsed ? "rotate-[-90deg]" : ""} />
+            <ChevronDownIcon size={11} className={collapsed ? "-rotate-90" : ""} />
           </button>
           <span className="truncate">
             {files.length} file{files.length === 1 ? "" : "s"} changed

@@ -79,9 +79,9 @@ export function DetailsPanel({
               onClick={() => setSummaryCollapsed((collapsed) => !collapsed)}
               aria-expanded={!summaryCollapsed}
               title={summaryCollapsed ? "Expand commit details" : "Collapse commit details"}
-              className="grid h-6 w-6 shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70"
+              className="grid shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-6"
             >
-              <ChevronDownIcon className={summaryCollapsed ? "rotate-[-90deg]" : ""} />
+              <ChevronDownIcon className={summaryCollapsed ? "-rotate-90" : ""} />
             </button>
             <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 font-mono text-[11.5px] font-semibold text-primary-ink">
               {commit.hash}
@@ -96,7 +96,7 @@ export function DetailsPanel({
               onClick={onClose}
               title="Hide details panel"
               aria-label="Hide details panel"
-              className="ml-auto grid h-6 w-6 shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70"
+              className="ml-auto grid shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-6"
             >
               <CloseIcon />
             </button>
@@ -104,7 +104,7 @@ export function DetailsPanel({
 
           {!summaryCollapsed && (
             <>
-              <h2 className="m-0 break-words text-[15px] font-bold leading-snug text-ink">
+              <h2 className="m-0 wrap-break-word text-[15px] font-bold leading-snug text-ink">
                 {commit.subject}
               </h2>
 
@@ -113,14 +113,14 @@ export function DetailsPanel({
                 <span className="truncate">{commit.authorEmail}</span>
                 <span>{formatAbsoluteDate(commit.date)}</span>
                 {commit.parents.length > 0 && (
-                  <span className="break-words font-mono text-[10.5px]">
+                  <span className="wrap-break-word font-mono text-[10.5px]">
                     {commit.parents.length > 1 ? "parents" : "parent"}: {commit.parents.join(", ")}
                   </span>
                 )}
               </div>
 
               {commit.body && (
-                <p className="mb-0 mt-0.5 whitespace-pre-wrap break-words text-[12.5px] leading-relaxed text-ink-soft">
+                <p className="mb-0 mt-0.5 whitespace-pre-wrap wrap-break-word text-[12.5px] leading-relaxed text-ink-soft">
                   {commit.body}
                 </p>
               )}
@@ -172,7 +172,7 @@ export function DetailsPanel({
 
       <ResizeHandle
         label="Resize commit details column"
-        className="left-[var(--sidebar-width)]"
+        className="left-(--sidebar-width)"
         min={MIN_SIDEBAR_WIDTH}
         max={MAX_SIDEBAR_WIDTH}
         value={sidebarWidth}
