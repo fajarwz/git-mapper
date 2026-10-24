@@ -1,12 +1,11 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { ChangedFile } from "./types";
 import { CommitList } from "./components/CommitList";
 import { DetailsPanel } from "./components/DetailsPanel";
 import { EmptyState } from "./components/EmptyState";
-import { RepoTabs } from "./components/RepoTabs";
+import { TitleBar } from "./components/TitleBar";
 import { SettingsModal } from "./components/SettingsModal";
-import { Toolbar } from "./components/Toolbar";
 import { applyTheme, initialTheme, storeTheme } from "./lib/theme";
 import type { Theme } from "./lib/theme";
 import {
@@ -45,6 +44,8 @@ function App() {
     applyTheme(theme);
   }, [theme]);
 
+  const hydratedPaths = useRef(false);
+
   // First paint loads the persisted tabs; a fresh install dogfoods on this repo.
   useEffect(() => {
     let cancelled = false;
@@ -60,6 +61,7 @@ function App() {
         }
       }
       if (cancelled) return;
+      hydratedPaths.current = true;
       setRepos(loaded);
       if (loaded[0]) setActiveRepoId(loaded[0].id);
     })();
@@ -69,7 +71,10 @@ function App() {
   }, []);
 
   // Persist the open tab list; the data itself is reloaded on launch.
+  // Skipped until the first load lands: React calls this with an empty list on mount,
+  // which would otherwise wipe the stored paths before they are read back.
   useEffect(() => {
+    if (!hydratedPaths.current) return;
     storePaths(repos.map((repo) => repo.path));
   }, [repos]);
 
@@ -204,47 +209,47 @@ function App() {
   const noRepo = repo === null;
 
   return (
-    <div className="grid h-screen grid-rows-[52px_40px_minmax(0,1fr)] gap-2.5 overflow-hidden p-2.5">
-      <Toolbar
-        repo={repo}
-        detailsOpen={detailsOpen && !noRepo}
-        onToggleDetails={() => setDetailsOpen((open) => !open)}
-        onOpenSettings={() => setSettingsOpen(true)}
-      />
-      <RepoTabs
+    <div className="flex h-screen flex-col overflow-hidden">
+      <TitleBar
         repos={repos}
         activeId={repo?.id ?? null}
+        repo={repo}
+        detailsOpen={detailsOpen && !noRepo}
+        adding={opening}
         onSelect={handleSelectRepo}
         onAdd={handleAdd}
         onClose={handleCloseRepo}
-        adding={opening}
+        onToggleDetails={() => setDetailsOpen((open) => !open)}
+        onOpenSettings={() => setSettingsOpen(true)}
       />
 
-      {noRepo || repo === null ? (
-        <EmptyState onOpen={handleAdd} error={error} loading={opening} repos={repos} />
-      ) : (
-        <div className="relative grid min-h-0 gap-2.5" style={workspaceStyle}>
-          <CommitList
-            repo={repo}
-            selectedHash={selectedCommit?.hash ?? ""}
-            onSelect={handleSelectCommit}
-            loadingMore={loadingMoreByRepo[repo.id] ?? false}
-            onNearBottom={handleNearBottom}
-            onCheckoutBranch={handleCheckoutBranch}
-          />
-          {detailsOpen && selectedCommit !== null && (
-            <DetailsPanel
-              commit={selectedCommit}
-              files={files}
-              filesLoading={filesLoading}
-              selectedFile={selectedFile}
-              onSelectFile={handleSelectFile}
-              onClose={() => setDetailsOpen(false)}
-              onHeightChange={setDetailsHeight}
+      <div className="flex min-h-0 flex-1 flex-col px-2.5 pb-2.5 pt-1">
+        {noRepo || repo === null ? (
+          <EmptyState onOpen={handleAdd} error={error} loading={opening} repos={repos} />
+        ) : (
+          <div className="relative grid min-h-0 flex-1 gap-2.5" style={workspaceStyle}>
+            <CommitList
+              repo={repo}
+              selectedHash={selectedCommit?.hash ?? ""}
+              onSelect={handleSelectCommit}
+              loadingMore={loadingMoreByRepo[repo.id] ?? false}
+              onNearBottom={handleNearBottom}
+              onCheckoutBranch={handleCheckoutBranch}
             />
-          )}
-        </div>
-      )}
+            {detailsOpen && selectedCommit !== null && (
+              <DetailsPanel
+                commit={selectedCommit}
+                files={files}
+                filesLoading={filesLoading}
+                selectedFile={selectedFile}
+                onSelectFile={handleSelectFile}
+                onClose={() => setDetailsOpen(false)}
+                onHeightChange={setDetailsHeight}
+              />
+            )}
+          </div>
+        )}
+      </div>
 
       {settingsOpen && (
         <SettingsModal

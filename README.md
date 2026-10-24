@@ -52,9 +52,8 @@ src/
   lib/format.ts             date, status and diff line-number helpers
   lib/tableLayout.ts        grid templates and min/max sizes for the resizable panels
   lib/theme.ts              light/dark theme resolution, application and storage
-  components/               Toolbar, RepoTabs, CommitList, CommitGraph, CommitRow, RefPill,
-                            ResizeHandle, SettingsModal, DetailsPanel, FileList, DiffViewer,
-                            icons
+  components/               TitleBar, CommitList, CommitGraph, CommitRow, RefPill, ResizeHandle,
+                            SettingsModal, DetailsPanel, FileList, DiffViewer, EmptyState, icons
   App.tsx                   shell layout, per-repository selection, details panel state
   index.css                 Tailwind entry, theme tokens and global base styles
 ```

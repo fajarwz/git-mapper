@@ -116,6 +116,20 @@
   box-shadow: var(--shadow-soft);
 }
 
+/* Chrome-style fade on a tab label that no longer fits; applied only while clipped. */
+@utility tab-fade {
+  mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent);
+}
+
+/* The tab strip scrolls when tabs hit their minimum width, without a visible track. */
+@utility no-scrollbar {
+  scrollbar-width: none;
+
+  &::-webkit-scrollbar {
+    display: none;
+  }
+}
+
 @layer base {
   :root {
     color-scheme: light;

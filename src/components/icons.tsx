@@ -174,3 +174,37 @@ export function CheckIcon({ size = 12, className = "" }: GlyphProps) {
     </svg>
   );
 }
+
+/* Windows caption buttons: thin 1px strokes on a 10x10 grid, like the system chrome. */
+export function WindowMinimizeIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+      <path d="M0 5.5h10" stroke="currentColor" strokeWidth="1" />
+    </svg>
+  );
+}
+
+export function WindowMaximizeIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+      <rect x="0.5" y="0.5" width="9" height="9" stroke="currentColor" strokeWidth="1" />
+    </svg>
+  );
+}
+
+export function WindowRestoreIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
+      <path d="M2.5 2.5v-2h7v7h-2" stroke="currentColor" strokeWidth="1" />
+      <rect x="0.5" y="2.5" width="7" height="7" fill="var(--color-canvas)" stroke="currentColor" strokeWidth="1" />
+    </svg>
+  );
+}
+
+export function WindowCloseIcon() {
+  return (
+    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
+      <path d="M0.5 0.5l9 9M9.5 0.5l-9 9" stroke="currentColor" strokeWidth="1" />
+    </svg>
+  );
+}

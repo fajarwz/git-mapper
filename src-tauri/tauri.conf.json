@@ -18,7 +18,9 @@
         "minWidth": 1024,
         "minHeight": 640,
         "theme": "Light",
-        "backgroundColor": "#e9e6f2"
+        "backgroundColor": "#e9e6f2",
+        "decorations": false,
+        "shadow": true
       }
     ],
     "security": {

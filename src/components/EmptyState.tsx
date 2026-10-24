@@ -11,7 +11,7 @@ interface EmptyStateProps {
 
 export function EmptyState({ onOpen, error, loading, repos }: EmptyStateProps) {
   return (
-    <div className="grid h-full min-h-0 place-items-center">
+    <div className="grid min-h-0 flex-1 place-items-center">
       <div
         className={`${PANEL} flex w-full max-w-md flex-col items-center gap-4 px-8 py-10 text-center`}
       >

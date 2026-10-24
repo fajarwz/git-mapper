@@ -21,7 +21,8 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
 
 ## Architecture
 
-- `src/App.tsx` — shell: grid rows `[52px toolbar | 40px repo tabs | 1fr workspace]`, per-repo selection state, details-panel open/height state. `Repository[]` lives in state (open tabs persisted to `localStorage` under `git-mapper:open-repos`); empty state = `EmptyState.tsx`.
+- `src/App.tsx` — shell: `TitleBar` row (40px) over a flex-1 content area holding the commit list + details panel, per-repo selection state, details-panel open/height state. `Repository[]` lives in state (open tabs persisted to `localStorage` under `git-mapper:open-repos`, written only after the first load lands); empty state = `EmptyState.tsx`.
+- `src/components/TitleBar.tsx` — the window IS undecorated (`decorations: false` in `tauri.conf.json`), so this bar doubles as the title bar: brand, repo tabs (Chrome-style shrink + `tab-fade` on clipped labels), toolbar actions and the caption buttons. `data-tauri-drag-region` covers the bar background and the tab strip; the caption buttons need the `core:window:allow-*` entries in `src-tauri/capabilities/default.json`.
 - `src-tauri/src/git.rs` — Tauri commands running the `git` CLI: `open_repository` (validates + toplevel/name), `read_status` (branch/ahead/behind), `read_log` (porcelain fields `\x00`-separated, records `\x1e`-separated, decorations lead each record), `read_commit_files` (numstat + name-status + patch, first-parent; root via `--root`). Folder picking is JS-side via `tauri-plugin-dialog` (`dialog:default` capability).
 - `src/data/gitLoader.ts` — the only `invoke()` surface: `loadRepository`, `pickAndLoadRepository`, `loadCommitFiles`, plus persisted-path storage. Build the `Repository`/`Commit` objects there; components stay invoke-free.
 - `src/lib/` parsers — `gitLogParser`, `gitDiffParser` (DiffLine text carries NO +/- prefix; the renderer adds it), `graphLanes` (greedy lane assignment; a proper layout engine is future work). All pure, no React — verifiable with `npx vite-node <probe>` against real git output.
@@ -34,7 +35,7 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
 
 ## Design-system rules (project conventions)
 
-1. **Tokens only.** No hardcoded hex in components (exception: inline SVG strokes in the Toolbar `BrandMark`). Re-point tokens in `.dark`; components follow without `dark:`-variant spans.
+1. **Tokens only.** No hardcoded hex in components (exception: inline SVG strokes in the TitleBar `BrandMark`). Re-point tokens in `.dark`; components follow without `dark:`-variant spans.
 2. **Use `panel-shadow` / `soft-shadow`** (custom `@utility` in index.css), never Tailwind's `shadow-panel`/`shadow-soft`. Reason: Tailwind v4 inlines `@theme` literals into generated utilities, so `.dark` overrides of shadow vars silently never applied. The custom utilities route through `var()` and theme correctly.
 3. Row heights and type sizes live in code (`graphGeometry.ts`, component classes) — don't pin them here; they get tuned. Full type/spacing scale lives in `index.css` + component classes; keep hierarchy bouncy (big accents, airy spacing) — density is what made the previous design look dated.
 4. Background depth strategy: vivid full-canvas gradient (light theme gets a linear violet→rose→warm base because radial spots alone measured sat 0.07 and washed out) + subtle shadows. Don't add heavy drop shadows.
