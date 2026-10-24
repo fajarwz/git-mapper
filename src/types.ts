@@ -6,6 +6,8 @@ export interface CommitRef {
   name: string;
   /** True for the branch the working copy currently has checked out. */
   isCurrent?: boolean;
+  /** Local branch paired with its remote: pill renders "name | <remote>" (Git Graph style). */
+  withRemote?: string;
 }
 
 export type FileStatus = "added" | "modified" | "deleted" | "renamed";
@@ -40,7 +42,7 @@ export interface Commit {
   /** Hashes of the parent commits, in order. Empty for the root commit. */
   parents: string[];
   refs: CommitRef[];
-  files: ChangedFile[];
+  /** Files+diff load lazily per selected commit (see gitLoader.loadCommitFiles). */
 }
 
 export interface Repository {

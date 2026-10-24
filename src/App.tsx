@@ -1,27 +1,41 @@
 import { useEffect, useMemo, useState } from "react";
 import type { CSSProperties } from "react";
-import { repositories } from "./data/repositories";
+import type { ChangedFile } from "./types";
 import { CommitList } from "./components/CommitList";
 import { DetailsPanel } from "./components/DetailsPanel";
+import { EmptyState } from "./components/EmptyState";
 import { RepoTabs } from "./components/RepoTabs";
 import { SettingsModal } from "./components/SettingsModal";
 import { StatusBar } from "./components/StatusBar";
 import { Toolbar } from "./components/Toolbar";
 import { applyTheme, initialTheme, storeTheme } from "./lib/theme";
 import type { Theme } from "./lib/theme";
-
-const initialSelectedCommit: Record<string, string> = Object.fromEntries(
-  repositories.map((repo) => [repo.id, repo.defaultCommitHash]),
-);
+import {
+  FIRST_RUN_PATH,
+  checkoutBranch,
+  loadCommitFiles,
+  loadMoreCommits,
+  loadRepository,
+  pickAndLoadRepository,
+  readStoredPaths,
+  storePaths,
+} from "./data/gitLoader";
+import type { Repository } from "./types";
 
 function App() {
-  const [activeRepoId, setActiveRepoId] = useState(repositories[0].id);
-  const [selectedCommitByRepo, setSelectedCommitByRepo] =
-    useState<Record<string, string>>(initialSelectedCommit);
+  const [repos, setRepos] = useState<Repository[]>([]);
+  const [activeRepoId, setActiveRepoId] = useState<string | null>(null);
+  const [selectedCommitByRepo, setSelectedCommitByRepo] = useState<Record<string, string>>({});
   // null means "fall back to the first changed file", which is what a fresh commit selection wants.
   const [selectedFileByRepo, setSelectedFileByRepo] = useState<Record<string, string | null>>({});
+  const [filesByCommitHash, setFilesByCommitHash] = useState<Record<string, ChangedFile[]>>({});
+  const [loadingMoreByRepo, setLoadingMoreByRepo] = useState<Record<string, boolean>>({});
+  const [allLoadedByRepo, setAllLoadedByRepo] = useState<Record<string, boolean>>({});
+  const [filesLoading, setFilesLoading] = useState(false);
+  const [opening, setOpening] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
-  // Bottom panel: collapsible, and its height is draggable (null = the default percentage).
+  // Bottom panel: closable, and its height is draggable (null = the default percentage).
   const [detailsOpen, setDetailsOpen] = useState(true);
   const [detailsHeight, setDetailsHeight] = useState<number | null>(null);
 
@@ -32,26 +46,106 @@ function App() {
     applyTheme(theme);
   }, [theme]);
 
+  // First paint loads the persisted tabs; a fresh install dogfoods on this repo.
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      const stored = readStoredPaths();
+      const paths = stored.length > 0 ? stored : [FIRST_RUN_PATH];
+      const loaded: Repository[] = [];
+      for (const path of paths) {
+        try {
+          loaded.push(await loadRepository(path));
+        } catch (loadError) {
+          console.error(`Could not open ${path}`, loadError);
+        }
+      }
+      if (cancelled) return;
+      setRepos(loaded);
+      if (loaded[0]) setActiveRepoId(loaded[0].id);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // Persist the open tab list; the data itself is reloaded on launch.
+  useEffect(() => {
+    storePaths(repos.map((repo) => repo.path));
+  }, [repos]);
+
   const repo = useMemo(
-    () => repositories.find((item) => item.id === activeRepoId) ?? repositories[0],
-    [activeRepoId],
+    () => repos.find((item) => item.id === activeRepoId) ?? null,
+    [repos, activeRepoId],
   );
-
-  const selectedHash = selectedCommitByRepo[repo.id] ?? repo.defaultCommitHash;
-  const selectedCommit =
-    repo.commits.find((commit) => commit.hash === selectedHash) ?? repo.commits[0];
-
-  const selectedPath = selectedFileByRepo[repo.id] ?? null;
+  const selectedCommit = repo
+    ? (repo.commits.find(
+        (commit) => commit.hash === (selectedCommitByRepo[repo.id] ?? repo.defaultCommitHash),
+      ) ?? repo.commits[0] ?? null)
+    : null;
+  const files = selectedCommit ? (filesByCommitHash[selectedCommit.hash] ?? []) : [];
   const selectedFile =
-    selectedCommit.files.find((file) => file.path === selectedPath) ??
-    selectedCommit.files[0] ??
+    files.find((file) => file.path === (selectedFileByRepo[repo?.id ?? ""] ?? null)) ??
+    files[0] ??
     null;
+
+  // Real diffs load per selected commit; files stay out of the commit list on purpose.
+  const selectedHash = selectedCommit?.hash;
+  useEffect(() => {
+    if (!repo || !selectedHash || filesByCommitHash[selectedHash]) return;
+    let cancelled = false;
+    setFilesLoading(true);
+    loadCommitFiles(repo.path, selectedHash)
+      .then((loaded) => {
+        if (!cancelled) setFilesByCommitHash((prev) => ({ ...prev, [selectedHash]: loaded }));
+      })
+      .catch((loadError) => {
+        if (!cancelled) {
+          console.error("Could not read changed files", loadError);
+          setFilesByCommitHash((prev) => ({ ...prev, [selectedHash]: [] }));
+        }
+      })
+      .finally(() => {
+        if (!cancelled) setFilesLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [repo, selectedHash, filesByCommitHash]);
 
   function handleSelectRepo(id: string) {
     setActiveRepoId(id);
   }
 
+  async function handleAdd() {
+    setOpening(true);
+    setError(null);
+    try {
+      const opened = await pickAndLoadRepository();
+      if (!opened) return;
+      setRepos((previous) =>
+        previous.some((item) => item.path === opened.path) ? previous : [...previous, opened],
+      );
+      setActiveRepoId(opened.id);
+    } catch (openError) {
+      setError(openError instanceof Error ? openError.message : String(openError));
+    } finally {
+      setOpening(false);
+    }
+  }
+
+  function handleCloseRepo(id: string) {
+    setRepos((previous) => {
+      const next = previous.filter((item) => item.id !== id);
+      if (id === activeRepoId) {
+        setActiveRepoId(next[next.length - 1]?.id ?? null);
+      }
+      return next;
+    });
+  }
+
   function handleSelectCommit(hash: string) {
+    if (!repo) return;
     setSelectedCommitByRepo((previous) => ({ ...previous, [repo.id]: hash }));
     setSelectedFileByRepo((previous) => ({ ...previous, [repo.id]: null }));
     // Picking a commit is a request to read it, so bring the details panel back if it was closed.
@@ -59,7 +153,41 @@ function App() {
   }
 
   function handleSelectFile(path: string) {
+    if (!repo) return;
     setSelectedFileByRepo((previous) => ({ ...previous, [repo.id]: path }));
+  }
+
+  // Infinite scroll: the commit rows file a near-bottom signal, one page loads at a time.
+  // Double-clicking a branch pill checks the branch out and reloads the repo.
+  async function handleCheckoutBranch(branch: string) {
+    if (!repo || opening) return;
+    try {
+      await checkoutBranch(repo.path, branch);
+      const refreshed = await loadRepository(repo.path);
+      setRepos((previous) =>
+        previous.map((item) => (item.id === refreshed.id ? refreshed : item)),
+      );
+    } catch (checkoutError) {
+      setError(checkoutError instanceof Error ? checkoutError.message : String(checkoutError));
+    }
+  }
+
+  async function handleNearBottom() {
+    if (!repo || loadingMoreByRepo[repo.id] || allLoadedByRepo[repo.id]) return;
+    setLoadingMoreByRepo((previous) => ({ ...previous, [repo.id]: true }));
+    try {
+      const result = await loadMoreCommits(repo);
+      if (result) {
+        setRepos((previous) =>
+          previous.map((item) => (item.id === result.repo.id ? result.repo : item)),
+        );
+        if (result.done) setAllLoadedByRepo((previous) => ({ ...previous, [repo.id]: true }));
+      }
+    } catch (pageError) {
+      console.error("Could not load more history", pageError);
+    } finally {
+      setLoadingMoreByRepo((previous) => ({ ...previous, [repo.id]: false }));
+    }
   }
 
   function handleThemeChange(nextTheme: Theme) {
@@ -74,30 +202,52 @@ function App() {
       : "minmax(0, 1fr)",
   } as CSSProperties;
 
+  const noRepo = repo === null;
+
   return (
     <div className="grid h-screen grid-rows-[52px_40px_minmax(0,1fr)_26px] gap-2.5 overflow-hidden p-2.5">
       <Toolbar
         repo={repo}
-        detailsOpen={detailsOpen}
+        detailsOpen={detailsOpen && !noRepo}
         onToggleDetails={() => setDetailsOpen((open) => !open)}
         onOpenSettings={() => setSettingsOpen(true)}
       />
-      <RepoTabs repos={repositories} activeId={repo.id} onSelect={handleSelectRepo} />
+      <RepoTabs
+        repos={repos}
+        activeId={repo?.id ?? null}
+        onSelect={handleSelectRepo}
+        onAdd={handleAdd}
+        onClose={handleCloseRepo}
+        adding={opening}
+      />
 
-      <div className="relative grid min-h-0 gap-2.5" style={workspaceStyle}>
-        <CommitList repo={repo} selectedHash={selectedCommit.hash} onSelect={handleSelectCommit} />
-        {detailsOpen && (
-          <DetailsPanel
-            commit={selectedCommit}
-            selectedFile={selectedFile}
-            onSelectFile={handleSelectFile}
-            onClose={() => setDetailsOpen(false)}
-            onHeightChange={setDetailsHeight}
+      {noRepo || repo === null ? (
+        <EmptyState onOpen={handleAdd} error={error} loading={opening} repos={repos} />
+      ) : (
+        <div className="relative grid min-h-0 gap-2.5" style={workspaceStyle}>
+          <CommitList
+            repo={repo}
+            selectedHash={selectedCommit?.hash ?? ""}
+            onSelect={handleSelectCommit}
+            loadingMore={loadingMoreByRepo[repo.id] ?? false}
+            onNearBottom={handleNearBottom}
+            onCheckoutBranch={handleCheckoutBranch}
           />
-        )}
-      </div>
+          {detailsOpen && selectedCommit !== null && (
+            <DetailsPanel
+              commit={selectedCommit}
+              files={files}
+              filesLoading={filesLoading}
+              selectedFile={selectedFile}
+              onSelectFile={handleSelectFile}
+              onClose={() => setDetailsOpen(false)}
+              onHeightChange={setDetailsHeight}
+            />
+          )}
+        </div>
+      )}
 
-      <StatusBar repo={repo} commit={selectedCommit} repoCount={repositories.length} />
+      <StatusBar repo={repo} commit={selectedCommit} repoCount={repos.length} />
 
       {settingsOpen && (
         <SettingsModal
