@@ -54,7 +54,7 @@ src/
   lib/theme.ts              light/dark theme resolution, application and storage
   components/               Toolbar, RepoTabs, CommitList, CommitGraph, CommitRow, RefPill,
                             ResizeHandle, SettingsModal, DetailsPanel, FileList, DiffViewer,
-                            StatusBar, icons
+                            icons
   App.tsx                   shell layout, per-repository selection, details panel state
   index.css                 Tailwind entry, theme tokens and global base styles
 ```

@@ -21,7 +21,7 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
 
 ## Architecture
 
-- `src/App.tsx` — shell: grid rows `[52px toolbar | 40px repo tabs | 1fr workspace | 26px status bar]`, per-repo selection state, details-panel open/height state. `Repository[]` lives in state (open tabs persisted to `localStorage` under `git-mapper:open-repos`); empty state = `EmptyState.tsx`.
+- `src/App.tsx` — shell: grid rows `[52px toolbar | 40px repo tabs | 1fr workspace]`, per-repo selection state, details-panel open/height state. `Repository[]` lives in state (open tabs persisted to `localStorage` under `git-mapper:open-repos`); empty state = `EmptyState.tsx`.
 - `src-tauri/src/git.rs` — Tauri commands running the `git` CLI: `open_repository` (validates + toplevel/name), `read_status` (branch/ahead/behind), `read_log` (porcelain fields `\x00`-separated, records `\x1e`-separated, decorations lead each record), `read_commit_files` (numstat + name-status + patch, first-parent; root via `--root`). Folder picking is JS-side via `tauri-plugin-dialog` (`dialog:default` capability).
 - `src/data/gitLoader.ts` — the only `invoke()` surface: `loadRepository`, `pickAndLoadRepository`, `loadCommitFiles`, plus persisted-path storage. Build the `Repository`/`Commit` objects there; components stay invoke-free.
 - `src/lib/` parsers — `gitLogParser`, `gitDiffParser` (DiffLine text carries NO +/- prefix; the renderer adds it), `graphLanes` (greedy lane assignment; a proper layout engine is future work). All pure, no React — verifiable with `npx vite-node <probe>` against real git output.

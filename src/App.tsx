@@ -6,7 +6,6 @@ import { DetailsPanel } from "./components/DetailsPanel";
 import { EmptyState } from "./components/EmptyState";
 import { RepoTabs } from "./components/RepoTabs";
 import { SettingsModal } from "./components/SettingsModal";
-import { StatusBar } from "./components/StatusBar";
 import { Toolbar } from "./components/Toolbar";
 import { applyTheme, initialTheme, storeTheme } from "./lib/theme";
 import type { Theme } from "./lib/theme";
@@ -205,7 +204,7 @@ function App() {
   const noRepo = repo === null;
 
   return (
-    <div className="grid h-screen grid-rows-[52px_40px_minmax(0,1fr)_26px] gap-2.5 overflow-hidden p-2.5">
+    <div className="grid h-screen grid-rows-[52px_40px_minmax(0,1fr)] gap-2.5 overflow-hidden p-2.5">
       <Toolbar
         repo={repo}
         detailsOpen={detailsOpen && !noRepo}
@@ -246,8 +245,6 @@ function App() {
           )}
         </div>
       )}
-
-      <StatusBar repo={repo} commit={selectedCommit} repoCount={repos.length} />
 
       {settingsOpen && (
         <SettingsModal
