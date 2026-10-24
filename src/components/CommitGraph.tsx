@@ -50,7 +50,7 @@ export function CommitGraph({ commits, selectedHash }: CommitGraphProps) {
         const y = rowY(index);
         const selected = commit.hash === selectedHash;
         const checkedOut = commit.refs.some((ref) => ref.isCurrent);
-        const color = laneColor(layout.colors.get(commit.hash) ?? lane);
+        const color = laneColor(lane);
 
         return (
           <g key={commit.hash}>

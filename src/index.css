@@ -57,6 +57,8 @@
   --color-lane-4: #2fa186;
   --color-lane-5: #dd9438;
   --color-lane-6: #7c77a3;
+  --color-lane-7: #3f8f6f;
+  --color-lane-8: #b06ab3;
 
   /* Subtle. Depth comes from the vivid background, not the drop shadow
      (the reference art carries no shadow at all). */
@@ -100,6 +102,8 @@
   --color-lane-4: #4cc398;
   --color-lane-5: #efb164;
   --color-lane-6: #a29cc8;
+  --color-lane-7: #63c9a4;
+  --color-lane-8: #d98fd8;
 
   --shadow-panel: inset 0 1px 0 0 rgb(255 255 255 / 0.09), 0 18px 40px -28px rgb(0 0 0 / 0.9);
   --shadow-soft: 0 6px 16px -10px rgb(0 0 0 / 0.8);

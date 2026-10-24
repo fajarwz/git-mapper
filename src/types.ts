@@ -36,10 +36,8 @@ export interface Commit {
   authorEmail: string;
   /** ISO timestamp; rendered absolute ("23 Oct 2026 12:09"), never relative. */
   date: string;
-  /** Graph column this commit's dot sits in, from layoutGraph. */
+  /** Graph column this commit's dot sits in, from layoutGraph. The column is also its colour. */
   lane: number;
-  /** Colour slot for the dot and the row's lane bar; stays put when lanes shift. */
-  color: number;
   /** Hashes of the parent commits, in order. Empty for the root commit. */
   parents: string[];
   refs: CommitRef[];

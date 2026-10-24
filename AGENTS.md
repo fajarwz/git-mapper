@@ -67,10 +67,13 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
 
 - **design references:** target look is a frosted-glass commit feed (Dribbble-style, violet/rose/warm palette). The user judges ugliness by: row density, font-scale hierarchy, background saturation. "Ours should be close to the reference" means those three.
 - **Graph geometry:** lines are drawn row to row, never across rows. `layoutGraph` returns, per row,
-  the lanes above and below the commit, so `buildEdges` can draw every fork, join and lane shift as
-  a bend inside that row's band and merge everything vertical into one path per lane and colour.
-  Drawing a child-to-parent curve instead is what produced long diagonals that read as nodes
-  jumping across the graph. Dots sit on `rowY(index)`, so keep `ROW_HEIGHT` shared with `CommitRow`.
+  the lanes above and below the commit plus whether the row is a tip, so `buildEdges` can draw every
+  fork, join and lane shift as a bend inside that row's band, merge vertical pieces into one path
+  per lane and colour, and leave tips without a line above them. Drawing a child-to-parent curve
+  instead is what produced long diagonals that read as nodes jumping across the graph.
+  **Colour belongs to the column**, not the branch: lane *k* is always `laneColor(k)`, so two
+  neighbouring lines can never share a hue. `MAX_LANES` is 8 because the palette has 8 tokens
+  (`--color-lane-1..8`). Dots sit on `rowY(index)`, so keep `ROW_HEIGHT` shared with `CommitRow`.
 - **headless verification:** headless Chrome inherits the system `prefers-color-scheme` (dark on this machine). To screenshot the light theme, pre-seed `localStorage.setItem("git-mapper:theme","light")` before the app loads (server the built `dist/` over http — absolute `/assets/` paths break under `file://`).
 - `vision_analyze` on this setup 401s (upstream credential). Verify visuals with pixel probes (PIL/numpy) or live computed styles instead of screenshots.
 - Dist builds are hashed (`index-*.js/css`); stale copies in preview dirs cause "old design" confusion — always re-copy `dist/*` before capturing.

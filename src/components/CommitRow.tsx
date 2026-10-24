@@ -40,7 +40,7 @@ export const CommitRow = memo(function CommitRow({
         <span
           aria-hidden="true"
           className="h-[15px] w-[2px] shrink-0 rounded-full"
-          style={{ backgroundColor: laneColor(commit.color) }}
+          style={{ backgroundColor: laneColor(commit.lane) }}
         />
         <span className={`truncate text-[13px] text-ink ${weight}`}>
           {commit.subject}
