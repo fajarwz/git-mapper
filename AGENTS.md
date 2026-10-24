@@ -30,6 +30,10 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
 - `src/lib/graphGeometry.ts` — `ROW_HEIGHT` is shared between `CommitRow` and the SVG graph. Change both together or dots misalign with rows.
 - `src/lib/ui.ts` — `PANEL` and `GLASS_CONTROL` class strings; every panel/button picks these up.
 - `src/lib/tableLayout.ts` — column widths, grid templates, resize min/max.
+- `src/lib/persisted.ts` — `usePersistedState` (localStorage-backed `useState`) and the `STORAGE_KEYS`
+  registry every key goes through. Launch restores: open repo paths, the active tab, the selected
+  commit and file per repo, and the details panel open/height. Window bounds come from
+  `tauri-plugin-window-state` (Rust side, `window-state:default` capability), not from localStorage.
 - `src/lib/theme.ts` + inline script in `index.html` — theme resolution; storage key `git-mapper:theme`; the head script must stay in sync with that key.
 - `src/index.css` — all design tokens (`@theme` block + `.dark` overrides) and the background aurora (`body::before`).
 
