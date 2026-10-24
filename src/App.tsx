@@ -152,6 +152,20 @@ function App() {
     setActiveRepoId(id);
   }, [setActiveRepoId]);
 
+  // Tab order is the order of this array, so a drag is just a splice; the persist effect
+  // stores the new order straight after.
+  const handleReorderRepos = useCallback((from: number, to: number) => {
+    setRepos((previous) => {
+      if (from === to || from < 0 || to < 0 || from >= previous.length || to >= previous.length) {
+        return previous;
+      }
+      const next = [...previous];
+      const [moved] = next.splice(from, 1);
+      next.splice(to, 0, moved);
+      return next;
+    });
+  }, []);
+
   async function handleAdd() {
     setOpening(true);
     setError(null);
@@ -300,6 +314,7 @@ function App() {
         onSelect={handleSelectRepo}
         onAdd={handleAdd}
         onClose={handleCloseRepo}
+        onReorder={handleReorderRepos}
         onOpenSettings={() => setSettingsOpen(true)}
       />
 

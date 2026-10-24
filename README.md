@@ -8,8 +8,8 @@ are mock data, and no Git commands are executed.
 ## What the UI does
 
 - Title bar carrying the brand, the open repositories as tabs (each remembering its own selected
-  commit, file and scroll), the current branch with ahead/behind counts, settings and the window
-  buttons.
+  commit and file, drag one sideways to reorder, and the order survives a restart), the current
+  branch with ahead/behind counts, settings and the window buttons.
 - The details panel opens when a commit is clicked and closes from its own button.
 - SVG commit graph with coloured lanes, aligned row by row with the commit list.
 - Draggable dividers for the graph gutter, the commit / author / date columns, the details sidebar

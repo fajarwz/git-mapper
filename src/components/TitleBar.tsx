@@ -80,6 +80,8 @@ interface TitleBarProps {
   onSelect: (id: string) => void;
   onAdd: () => void;
   onClose: (id: string) => void;
+  /** Move the tab at `from` into position `to`, used while dragging. */
+  onReorder: (from: number, to: number) => void;
   onOpenSettings: () => void;
 }
 
@@ -91,9 +93,59 @@ export function TitleBar({
   onSelect,
   onAdd,
   onClose,
+  onReorder,
   onOpenSettings,
 }: TitleBarProps) {
   const [maximized, setMaximized] = useState(false);
+
+  // Tabs reorder by pointer, not HTML5 drag-and-drop: the webview hands drag events to Tauri's
+  // own file-drop handler, so `draggable` never fires reliably inside the app.
+  const stripRef = useRef<HTMLDivElement>(null);
+  const dragRef = useRef<{ index: number; startX: number; moving: boolean } | null>(null);
+  const suppressClick = useRef(false);
+  const [draggingIndex, setDraggingIndex] = useState<number | null>(null);
+
+  function beginTabDrag(event: React.PointerEvent<HTMLDivElement>, index: number) {
+    if (event.button !== 0) return;
+    if ((event.target as HTMLElement).closest("button[aria-label^='Close']")) return;
+    suppressClick.current = false;
+    dragRef.current = { index, startX: event.clientX, moving: false };
+
+    const onMove = (moveEvent: PointerEvent) => {
+      const drag = dragRef.current;
+      if (!drag) return;
+      if (!drag.moving) {
+        // A few pixels of slack so a plain click stays a click.
+        if (Math.abs(moveEvent.clientX - drag.startX) < 4) return;
+        drag.moving = true;
+        setDraggingIndex(drag.index);
+      }
+      const strip = stripRef.current;
+      if (!strip) return;
+      const tabs = [...strip.querySelectorAll<HTMLElement>("[data-tab-index]")];
+      const over = tabs.findIndex((tab) => {
+        const rect = tab.getBoundingClientRect();
+        return moveEvent.clientX >= rect.left && moveEvent.clientX <= rect.right;
+      });
+      if (over === -1 || over === drag.index) return;
+      onReorder(drag.index, over);
+      drag.index = over;
+      setDraggingIndex(over);
+    };
+
+    const onUp = () => {
+      const drag = dragRef.current;
+      dragRef.current = null;
+      setDraggingIndex(null);
+      window.removeEventListener("pointermove", onMove);
+      window.removeEventListener("pointerup", onUp);
+      // The click that follows a drag must not also select the tab it started on.
+      if (drag?.moving) suppressClick.current = true;
+    };
+
+    window.addEventListener("pointermove", onMove);
+    window.addEventListener("pointerup", onUp);
+  }
 
   // The caption button swaps to a restore glyph while the window is maximized.
   useEffect(() => {
@@ -144,23 +196,34 @@ export function TitleBar({
         data-tauri-drag-region
         role="tablist"
         aria-label="Open repositories"
-        className="no-scrollbar ml-1 flex min-w-0 flex-1 items-center gap-1 overflow-x-auto overflow-y-hidden"
+        ref={stripRef}
+        className="no-scrollbar ml-1 flex min-w-0 flex-1 select-none items-center gap-1 overflow-x-auto overflow-y-hidden"
       >
-        {repos.map((item) => {
+        {repos.map((item, index) => {
           const active = item.id === activeId;
+          const dragging = draggingIndex === index;
           return (
             <div
               key={item.id}
               data-active={active}
+              data-tab-index={index}
+              data-dragging={dragging}
+              onPointerDown={(event) => beginTabDrag(event, index)}
               style={{ flex: "1 1 200px", minWidth: 68, maxWidth: 200 }}
-              className="inline-flex h-7 min-w-0 items-center gap-1 rounded-lg border border-transparent bg-glass-soft pl-2.5 text-left text-ink-soft backdrop-blur-md transition-colors hover:bg-hover-glass data-[active=true]:border-hairline data-[active=true]:bg-glass-strong data-[active=true]:text-ink data-[active=true]:soft-shadow"
+              className={`inline-flex h-7 min-w-0 items-center gap-1 rounded-lg border border-transparent bg-glass-soft pl-2.5 text-left text-ink-soft backdrop-blur-md transition-colors hover:bg-hover-glass data-[active=true]:border-hairline data-[active=true]:bg-glass-strong data-[active=true]:text-ink data-[active=true]:soft-shadow ${dragging ? "opacity-60 ring-2 ring-primary/50" : ""}`}
             >
               <button
                 type="button"
                 role="tab"
                 aria-selected={active}
                 title={item.path}
-                onClick={() => onSelect(item.id)}
+                onClick={() => {
+                  if (suppressClick.current) {
+                    suppressClick.current = false;
+                    return;
+                  }
+                  onSelect(item.id);
+                }}
                 className="flex h-full min-w-0 flex-1 cursor-default items-center gap-1.5 bg-transparent p-0 pr-1 text-left text-inherit"
               >
                 <span className="shrink-0 text-ink-dim">
