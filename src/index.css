@@ -130,6 +130,30 @@
   }
 }
 
+/* A row a refresh just touched fades out of a soft primary wash, no layout shift. */
+@utility row-flash {
+  animation: row-flash 2.6s ease-out forwards;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    background-color: var(--color-hover-glass);
+  }
+}
+
+@keyframes row-flash {
+  0% {
+    background-color: color-mix(in srgb, var(--color-primary) 22%, transparent);
+  }
+
+  60% {
+    background-color: color-mix(in srgb, var(--color-primary) 10%, transparent);
+  }
+
+  100% {
+    background-color: transparent;
+  }
+}
+
 @layer base {
   :root {
     color-scheme: light;

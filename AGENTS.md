@@ -29,10 +29,13 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
   objects there; components stay invoke-free.
 - **Refresh is surgical.** `refreshRepository` runs two cheap reads (`read_status`, `read_refs`) and
   compares branch + HEAD + dirty size + a digest of every ref. Unchanged → `null`, no state update.
-  History moved → `read_log_delta` (`git log --all ^<oldHead>`) fetches only the new commits and
-  splices them on top. Empty delta or a full page means history was rewritten or the window shifted,
-  which falls back to `loadRepository`. Unchanged commits keep object identity (see `withLanes`,
-  `sameRefs`) so the memoized `CommitRow` skips their render entirely.
+  A moved HEAD *or* a moved ref triggers `read_log_delta` (`git log --all ^<oldHead>`): a fetch that
+  only adds a branch leaves HEAD alone but its commits are still new to the window. The delta is
+  spliced in **git's own order** (`read_log_order`, `git log --all --format=%H`), because a branch
+  pushed late can carry commits older than rows already on screen. Empty delta with a moved HEAD, or
+  a full page, means history was rewritten or the window shifted → `loadRepository`. Unchanged
+  commits keep object identity (`withLanes`, `sameRefs`) so the memoized `CommitRow` skips their
+  render, and the return value lists the rows a caller should flash (`touched`).
 - `src/lib/` parsers — `gitLogParser`, `gitDiffParser` (DiffLine text carries NO +/- prefix; the renderer adds it), `graphLanes` (greedy lane assignment: a commit takes the lane a child reserved for it, every reservation of a commit is cleared when it is drawn, and lanes past `MAX_LANES` recycle round-robin — a real layout engine is still future work). All pure, no React — verifiable with `npx vite-node <probe>` against real git output.
 - Changed files/diffs load lazily per selected commit (`App` keeps `filesByCommitHash`); the commit list never carries them.
 - Window focus re-checks the visible repo only (throttled to one probe per 1.5s, hidden windows skipped). Other tabs are not refreshed — they are off screen and each refresh costs git reads.

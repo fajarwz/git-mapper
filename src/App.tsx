@@ -49,6 +49,8 @@ function App() {
     null,
   );
 
+  // Rows a refresh just added or re-pilled, highlighted for a moment then forgotten.
+  const [flashHashes, setFlashHashes] = useState<string[]>([]);
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -231,8 +233,9 @@ function App() {
         const refreshed = await refreshRepository(activeRepo);
         if (cancelled || refreshed === null) return;
         setRepos((previous) =>
-          previous.map((item) => (item.id === refreshed.id ? refreshed : item)),
+          previous.map((item) => (item.id === refreshed.repo.id ? refreshed.repo : item)),
         );
+        if (refreshed.touched.length > 0) setFlashHashes(refreshed.touched);
       } catch (refreshError) {
         console.error("Could not refresh the repository", refreshError);
       } finally {
@@ -249,6 +252,15 @@ function App() {
       window.removeEventListener("focus", onFocus);
     };
   }, [repo, opening]);
+
+  // The highlight is only a hint: drop it once the animation has played out.
+  useEffect(() => {
+    if (flashHashes.length === 0) return;
+    const timer = window.setTimeout(() => setFlashHashes([]), 3000);
+    return () => window.clearTimeout(timer);
+  }, [flashHashes]);
+
+  const flashSet = useMemo(() => new Set(flashHashes), [flashHashes]);
 
   function handleThemeChange(nextTheme: Theme) {
     setTheme(nextTheme);
@@ -288,7 +300,8 @@ function App() {
               repo={repo}
               selectedHash={selectedCommit?.hash ?? ""}
               onSelect={handleSelectCommit}
-              loadingMore={loadingMoreByRepo[repo.id] ?? false}
+              flashHashes={flashSet}
+            loadingMore={loadingMoreByRepo[repo.id] ?? false}
               onNearBottom={handleNearBottom}
               onCheckoutBranch={handleCheckoutBranch}
             />

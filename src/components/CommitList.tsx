@@ -23,6 +23,8 @@ import { ResizeHandle } from "./ResizeHandle";
 interface CommitListProps {
   repo: Repository;
   selectedHash: string;
+  /** Commits a refresh just added or re-pilled; they flash once. */
+  flashHashes: Set<string>;
   onSelect: (hash: string) => void;
   loadingMore: boolean;
   onNearBottom: () => void;
@@ -35,7 +37,7 @@ function widthOf(element: HTMLElement | null, fallback: number): number {
 
 const HEADER_CELL = "relative flex h-full min-w-0 items-center";
 
-export function CommitList({ repo, selectedHash, onSelect, loadingMore, onNearBottom, onCheckoutBranch }: CommitListProps) {
+export function CommitList({ repo, selectedHash, flashHashes, onSelect, loadingMore, onNearBottom, onCheckoutBranch }: CommitListProps) {
   const laneCount = Math.max(...repo.commits.map((commit) => commit.lane), 0) + 1;
   const baseGraphWidth = graphWidth(laneCount);
 
@@ -185,6 +187,7 @@ export function CommitList({ repo, selectedHash, onSelect, loadingMore, onNearBo
               key={commit.hash}
               commit={commit}
               selected={commit.hash === selectedHash}
+              fresh={flashHashes.has(commit.hash)}
               onSelect={onSelect}
               onCheckoutBranch={onCheckoutBranch}
             />

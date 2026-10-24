@@ -8,6 +8,8 @@ import { RefPill } from "./RefPill";
 interface CommitRowProps {
   commit: Commit;
   selected: boolean;
+  /** Just arrived (or its refs changed) in the last refresh: flash the row once. */
+  fresh?: boolean;
   onSelect: (hash: string) => void;
   onCheckoutBranch?: (branch: string) => void;
 }
@@ -15,6 +17,7 @@ interface CommitRowProps {
 export const CommitRow = memo(function CommitRow({
   commit,
   selected,
+  fresh = false,
   onSelect,
   onCheckoutBranch,
 }: CommitRowProps) {
@@ -27,7 +30,7 @@ export const CommitRow = memo(function CommitRow({
     <button
       type="button"
       data-commit-row
-      className={`group grid h-8 w-full cursor-default items-center gap-2 border-b border-rule/70 bg-transparent p-0 text-left transition-colors hover:bg-hover-glass focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/60 data-[selected=true]:bg-selected-glass data-[selected=true]:shadow-[inset_3px_0_0_var(--color-primary)] data-[selected=true]:hover:bg-selected-glass ${COMMIT_ROW_GRID}`}
+      className={`group grid h-8 w-full cursor-default items-center gap-2 border-b border-rule/70 bg-transparent p-0 text-left transition-colors hover:bg-hover-glass focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/60 data-[selected=true]:bg-selected-glass data-[selected=true]:shadow-[inset_3px_0_0_var(--color-primary)] data-[selected=true]:hover:bg-selected-glass ${COMMIT_ROW_GRID} ${fresh ? "row-flash" : ""}`}
       data-selected={selected}
       aria-pressed={selected}
       onClick={() => onSelect(commit.hash)}
