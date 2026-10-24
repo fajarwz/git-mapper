@@ -26,6 +26,13 @@ export function computeLanes(
 
   return commits.map(({ hash, parents }) => {
     let lane = slots.indexOf(hash);
+    // A commit can be the parent of several children, so it can be reserved in several lanes.
+    // Drop every reservation before re-reserving, otherwise the leftovers keep those lanes
+    // occupied for a commit that is already drawn: later commits then land lanes away from
+    // their parent and the connecting line looks like it jumps two columns instead of one.
+    for (let index = 0; index < slots.length; index += 1) {
+      if (slots[index] === hash) slots[index] = null;
+    }
     if (lane === -1) lane = claimFreeOrVictim();
     slots[lane] = parents[0] ?? null;
     for (const parent of parents.slice(1)) {

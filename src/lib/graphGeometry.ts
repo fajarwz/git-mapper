@@ -41,12 +41,13 @@ export interface GraphEdge {
 }
 
 /**
- * Builds one path per commit -> parent link. Lane positions come from the mock data, so this is
+ * Builds one path per commit -> parent link. Lane positions come from computeLanes, so this is
  * only geometry, not a layout algorithm.
  *
- * When the parent sits in a different lane, the link moves sideways inside the child's row and
- * then runs straight down the parent's lane. Read from the parent upwards, a branch line stays
- * vertical until it reaches the commit it joins, instead of drifting sideways across the whole gap.
+ * A link that changes lane bends sideways, and it never moves more than one lane per row: the
+ * bend is spread over as many rows as it has lanes to cross (one lane per row), then the line
+ * runs straight down the parent's lane. Cramming a two-lane shift into a single row is what
+ * makes a branch look like it jumps across the graph instead of sliding over.
  */
 export function buildEdges(commits: Commit[]): GraphEdge[] {
   const indexByHash = new Map<string, number>();
@@ -72,11 +73,19 @@ export function buildEdges(commits: Commit[]): GraphEdge[] {
       if (fromX === toX) {
         path = `M ${fromX} ${fromY} L ${toX} ${toY}`;
       } else {
-        const bend = Math.min(ROW_HEIGHT, toY - fromY);
+        const rows = parentIndex - index;
+        const lanesMoved = Math.abs(parent.lane - commit.lane);
+        // One lane per row while there is room; a steep convergence still has to bend in-row.
+        const steps = Math.max(1, Math.min(lanesMoved, rows));
+        const bend = Math.min(ROW_HEIGHT * steps, toY - fromY);
+        // Spreading the move over several rows is a plain diagonal, so the x position advances
+        // exactly one lane per row. A single-row move gets the eased curve instead.
         path =
-          `M ${fromX} ${fromY} ` +
-          `C ${fromX} ${fromY + bend * 0.55}, ${toX} ${fromY + bend * 0.45} ${toX} ${fromY + bend} ` +
-          `L ${toX} ${toY}`;
+          steps === 1
+            ? `M ${fromX} ${fromY} ` +
+              `C ${fromX} ${fromY + bend * 0.55}, ${toX} ${fromY + bend * 0.45} ${toX} ${fromY + bend} ` +
+              `L ${toX} ${toY}`
+            : `M ${fromX} ${fromY} L ${toX} ${fromY + bend} L ${toX} ${toY}`;
       }
 
       edges.push({ key: `${commit.hash}->${parentHash}`, path, color });
