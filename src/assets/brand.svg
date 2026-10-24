@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="15" height="15" viewBox="0 0 18 18" fill="none" stroke="currentColor" aria-hidden="true">
+  <!-- Drawn in currentColor on the solid brand fill: white on violet reads on either canvas. -->
+  <path d="M4.5 4.5v9" stroke-width="1.9" stroke-linecap="round" />
+  <path d="M13.5 4.5v3c0 3.2-4.2 2.6-7.6 3.6" stroke-width="1.9" stroke-linecap="round" />
+  <circle cx="4.5" cy="4.5" r="2.1" fill="currentColor" />
+  <circle cx="13.5" cy="4.5" r="2.1" fill="currentColor" />
+  <circle cx="4.5" cy="13.5" r="1.7" stroke-width="1.6" />
+</svg>

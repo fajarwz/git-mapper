@@ -18,6 +18,7 @@ import type { Repository } from "../types";
 import { GLASS_CONTROL } from "../lib/ui";
 import {
   BranchIcon,
+  BrandGlyph,
   CloseIcon,
   PlusIcon,
   RepoIcon,
@@ -47,20 +48,8 @@ async function windowAction(action: WindowAction): Promise<void> {
 
 function BrandMark() {
   return (
-    <span className="grid h-6 w-6 place-items-center rounded-lg bg-primary text-white shadow-soft">
-      {/* Drawn in currentColor on the solid brand fill: white on violet reads on either canvas. */}
-      <svg width="15" height="15" viewBox="0 0 18 18" fill="none" aria-hidden="true">
-        <path d="M4.5 4.5v9" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
-        <path
-          d="M13.5 4.5v3c0 3.2-4.2 2.6-7.6 3.6"
-          stroke="currentColor"
-          strokeWidth="1.9"
-          strokeLinecap="round"
-        />
-        <circle cx="4.5" cy="4.5" r="2.1" fill="currentColor" />
-        <circle cx="13.5" cy="4.5" r="2.1" fill="currentColor" />
-        <circle cx="4.5" cy="13.5" r="1.7" stroke="currentColor" strokeWidth="1.6" />
-      </svg>
+    <span className="grid place-items-center rounded-lg bg-primary text-white soft-shadow size-6">
+      <BrandGlyph />
     </span>
   );
 }

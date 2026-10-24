@@ -1,97 +1,22 @@
+/**
+ * Icon index. The markup for every glyph lives in ../assets/*.svg; this module is a
+ * thin `size`-prop wrapper over the svgr `?react` components so call sites keep their
+ * API, and `currentColor` (declared inside each SVG file) keeps following the tone of
+ * the parent button or label.
+ */
+import type { ComponentType } from "react";
+import RawBranchIcon from "../assets/branch.svg?react";
+import RawTagIcon from "../assets/tag.svg?react";
+import RawRemoteIcon from "../assets/remote.svg?react";
+import RawRepoIcon from "../assets/repo.svg?react";
+import RawPlusIcon from "../assets/plus.svg?react";
+import RawChevronDownIcon from "../assets/chevron-down.svg?react";
+import RawCloseIcon from "../assets/close.svg?react";
+import RawSettingsIcon from "../assets/settings.svg?react";
+import RawCheckIcon from "../assets/check.svg?react";
+
 interface IconProps {
   size?: number;
-}
-
-export function BranchIcon({ size = 12 }: IconProps) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <circle cx="4" cy="3.5" r="1.8" />
-      <circle cx="4" cy="12.5" r="1.8" />
-      <circle cx="12" cy="5.5" r="1.8" />
-      <path d="M4 5.3v5.4" />
-      <path d="M12 7.3c0 2.7-3.4 3-6.5 3.7" />
-    </svg>
-  );
-}
-
-export function TagIcon({ size = 12 }: IconProps) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M2.4 2.4h5.1l6.1 6.1-5.1 5.1-6.1-6.1z" />
-      <circle cx="5.5" cy="5.5" r="1" fill="currentColor" stroke="none" />
-    </svg>
-  );
-}
-
-export function RemoteIcon({ size = 12 }: IconProps) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M4.6 12.2h6.9a2.6 2.6 0 0 0 .3-5.1 3.6 3.6 0 0 0-6.9-.9 2.9 2.9 0 0 0-.3 6Z" />
-    </svg>
-  );
-}
-
-export function RepoIcon({ size = 14 }: IconProps) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M2.3 3.2h4l1.6 2h5.8v7.6H2.3z" />
-      <path d="M2.3 7.6h11.4" />
-    </svg>
-  );
-}
-
-export function PlusIcon({ size = 12 }: IconProps) {
-  return (
-    <svg
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.6"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <path d="M8 3.2v9.6M3.2 8h9.6" />
-    </svg>
-  );
 }
 
 interface GlyphProps {
@@ -99,112 +24,52 @@ interface GlyphProps {
   className?: string;
 }
 
+type SvgGlyph = ComponentType<{ width?: number; height?: number; className?: string }>;
+
+function SizedIcon({ glyph, size, className }: { glyph: SvgGlyph; size: number; className?: string }) {
+  const Glyph = glyph;
+  return <Glyph width={size} height={size} className={className} />;
+}
+
+export function BranchIcon({ size = 12 }: IconProps) {
+  return <SizedIcon glyph={RawBranchIcon} size={size} />;
+}
+
+export function TagIcon({ size = 12 }: IconProps) {
+  return <SizedIcon glyph={RawTagIcon} size={size} />;
+}
+
+export function RemoteIcon({ size = 12 }: IconProps) {
+  return <SizedIcon glyph={RawRemoteIcon} size={size} />;
+}
+
+export function RepoIcon({ size = 14 }: IconProps) {
+  return <SizedIcon glyph={RawRepoIcon} size={size} />;
+}
+
+export function PlusIcon({ size = 12 }: IconProps) {
+  return <SizedIcon glyph={RawPlusIcon} size={size} />;
+}
+
 export function ChevronDownIcon({ size = 12, className = "" }: GlyphProps) {
-  return (
-    <svg
-      className={className}
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M4 6.5 8 10.5l4-4" />
-    </svg>
-  );
+  return <SizedIcon glyph={RawChevronDownIcon} size={size} className={className} />;
 }
 
 export function CloseIcon({ size = 12, className = "" }: GlyphProps) {
-  return (
-    <svg
-      className={className}
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.5"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <path d="M4 4l8 8M12 4l-8 8" />
-    </svg>
-  );
+  return <SizedIcon glyph={RawCloseIcon} size={size} className={className} />;
 }
 
 export function SettingsIcon({ size = 14, className = "" }: GlyphProps) {
-  return (
-    <svg
-      className={className}
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.4"
-      strokeLinecap="round"
-      aria-hidden="true"
-    >
-      <path d="M2.5 5h11M2.5 11h11" />
-      <circle cx="6" cy="5" r="1.7" fill="currentColor" stroke="none" />
-      <circle cx="10.5" cy="11" r="1.7" fill="currentColor" stroke="none" />
-    </svg>
-  );
+  return <SizedIcon glyph={RawSettingsIcon} size={size} className={className} />;
 }
 
 export function CheckIcon({ size = 12, className = "" }: GlyphProps) {
-  return (
-    <svg
-      className={className}
-      width={size}
-      height={size}
-      viewBox="0 0 16 16"
-      fill="none"
-      stroke="currentColor"
-      strokeWidth="1.8"
-      strokeLinecap="round"
-      strokeLinejoin="round"
-      aria-hidden="true"
-    >
-      <path d="M3.5 8.5 6.5 11.5 12.5 4.5" />
-    </svg>
-  );
+  return <SizedIcon glyph={RawCheckIcon} size={size} className={className} />;
 }
 
-/* Windows caption buttons: thin 1px strokes on a 10x10 grid, like the system chrome. */
-export function WindowMinimizeIcon() {
-  return (
-    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-      <path d="M0 5.5h10" stroke="currentColor" strokeWidth="1" />
-    </svg>
-  );
-}
-
-export function WindowMaximizeIcon() {
-  return (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-      <rect x="0.5" y="0.5" width="9" height="9" stroke="currentColor" strokeWidth="1" />
-    </svg>
-  );
-}
-
-export function WindowRestoreIcon() {
-  return (
-    <svg width="10" height="10" viewBox="0 0 10 10" fill="none" aria-hidden="true">
-      <path d="M2.5 2.5v-2h7v7h-2" stroke="currentColor" strokeWidth="1" />
-      <rect x="0.5" y="2.5" width="7" height="7" stroke="currentColor" strokeWidth="1" />
-    </svg>
-  );
-}
-
-export function WindowCloseIcon() {
-  return (
-    <svg width="10" height="10" viewBox="0 0 10 10" aria-hidden="true">
-      <path d="M0.5 0.5l9 9M9.5 0.5l-9 9" stroke="currentColor" strokeWidth="1" />
-    </svg>
-  );
-}
+/* Fixed-size glyphs re-exported as-is; their dimensions live in the SVG files. */
+export { default as BrandGlyph } from "../assets/brand.svg?react";
+export { default as WindowMinimizeIcon } from "../assets/window-minimize.svg?react";
+export { default as WindowMaximizeIcon } from "../assets/window-maximize.svg?react";
+export { default as WindowRestoreIcon } from "../assets/window-restore.svg?react";
+export { default as WindowCloseIcon } from "../assets/window-close.svg?react";

@@ -1,6 +1,7 @@
 import { defineConfig, type Plugin } from "vite";
 import react from "@vitejs/plugin-react";
 import tailwindcss from "@tailwindcss/vite";
+import svgr from "vite-plugin-svgr";
 // @ts-expect-error type error without @types/node package
 import process from "node:process";
 import { execFileSync } from "node:child_process";
@@ -143,7 +144,7 @@ function gitDevApi(): Plugin {
 
 // https://vite.dev/config/
 export default defineConfig(() => ({
-  plugins: [react(), tailwindcss(), gitDevApi()],
+  plugins: [react(), tailwindcss(), svgr(), gitDevApi()],
 
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
