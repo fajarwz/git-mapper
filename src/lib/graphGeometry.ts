@@ -132,7 +132,9 @@ export function buildEdges(layout: LaneLayout): GraphEdge[] {
 
     // Gaps between rows: the lines still running leave this row band and enter the next one.
     if (index < layout.rows.length - 1) {
-      row.after.forEach((_hash, lane) => addVertical(lane, outY, gapTo, laneColor(lane)));
+      row.after.forEach((hash, lane) => {
+        if (hash !== null) addVertical(lane, outY, gapTo, laneColor(lane));
+      });
     }
   });
 

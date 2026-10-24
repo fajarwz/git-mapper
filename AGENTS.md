@@ -101,6 +101,11 @@ loader). `npm run lint` is a Tailwind class checker, not a code linter. `npm run
   neighbouring lanes never share one. The dot, its segments and its ref pills all use
   `laneColor(commit.lane)`, so a row and its node always match. Do not carry a colour in the line:
   a shifting line keeping its old hue is what made the graph read as broken.
+  **A joining merge leaves its column empty.** When a commit joins an existing line, its own
+  column is filled with `null` instead of collapsing, and the lines to its right stay put.
+  Collapsing there pulled the merge's second parent into the dot's column, so the branch was
+  drawn straight down in the dot's hue and looked like it never separated. The hole is reclaimed
+  by the next branch tip that needs a lane. A plain (non-merge) join still collapses, as git does.
   **One line per pending commit.** A parent reserved by several children is drawn ONCE; each extra
   child records `join` and bends into that line at its own row. Reserving a lane per child drew the
   same commit as several parallel lines that fanned into one dot rows later (that was the

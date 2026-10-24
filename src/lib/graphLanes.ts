@@ -28,8 +28,11 @@
  */
 export const LINE_COLOR_COUNT = 8;
 
-/** One line, identified by the commit it is heading for. Colour comes from its lane. */
-export type LaneSlot = string;
+/**
+ * One line, identified by the commit it is heading for. Colour comes from its lane.
+ * `null` is a hole: the line that used to sit there ended at this row.
+ */
+export type LaneSlot = string | null;
 
 export type TransitionKind =
   /** A running line keeps its lane: a vertical piece through this row. */
@@ -95,8 +98,11 @@ export function layoutGraph(commits: Array<{ hash: string; parents: string[] }>)
     let lane = pending.indexOf(hash);
     const tip = lane === -1;
     if (tip) {
-      lane = pending.length;
-      pending.push(hash);
+      // Reuse the leftmost hole when a line has ended there, otherwise open a lane on the right.
+      const hole = pending.indexOf(null);
+      lane = hole === -1 ? pending.length : hole;
+      if (hole === -1) pending.push(hash);
+      else pending[hole] = hash;
     }
 
     // Snapshot before any mutation: this row's incoming geometry must not change under it.
@@ -110,7 +116,7 @@ export function layoutGraph(commits: Array<{ hash: string; parents: string[] }>)
     const first = parents[0];
 
     if (first === undefined) {
-      pending.splice(lane, 1); // root: the lane ends here
+      pending.splice(lane, 1); // root: the lane ends here and the lanes right of it close up
     } else if (drawn.has(first)) {
       // The parent is already above this row, so the input is not topological. Never draw a line
       // that points upward: drop the connection and mark the layout unordered.
@@ -119,8 +125,16 @@ export function layoutGraph(commits: Array<{ hash: string; parents: string[] }>)
       pending.splice(lane, 1);
     } else if (pending.some((slot, index) => index !== lane && slot === first)) {
       // Another child already holds a line for that parent: this line ends and bends into it.
-      pending.splice(lane, 1);
       stubs.push(first);
+      if (parents.length > 1) {
+        // A merge needs the columns on its right to stay where they are. Collapsing here would
+        // slide its second parent into the dot's own lane, drawing the branch straight down in the
+        // dot's colour, which reads as if the branch never separated.
+        pending[lane] = null;
+      } else {
+        // Nothing else needs the column: close up, as git does at the end of a line.
+        pending.splice(lane, 1);
+      }
     } else {
       pending[lane] = first;
     }
@@ -145,6 +159,7 @@ export function layoutGraph(commits: Array<{ hash: string; parents: string[] }>)
     // same line moving (`continue` / `shift`) or a line that starts at this dot (`fork`).
     const transitions: LaneTransition[] = [];
     after.forEach((slot, to) => {
+      if (slot === null) return;
       const from = above.indexOf(slot);
       if (from === -1) {
         transitions.push({ kind: "fork", from: lane, to, hash: slot });
@@ -160,10 +175,13 @@ export function layoutGraph(commits: Array<{ hash: string; parents: string[] }>)
       }
     }
     above.forEach((slot, from) => {
-      if (after.includes(slot)) return;
+      if (slot === null || after.includes(slot)) return;
       if (tip && from === lane) return; // a tip has nothing above its dot
       transitions.push({ kind: "join", from, to: lane, hash: slot });
     });
+
+    // A hole at the far right would only pad the graph, so trim it before measuring.
+    while (pending.length > 0 && pending[pending.length - 1] === null) pending.pop();
 
     laneCount = Math.max(laneCount, above.length, after.length);
     drawn.add(hash);

@@ -67,10 +67,12 @@ function checkInvariants(rows, label = "") {
     const lane = layout.lanes[index];
     assert.ok(lane >= 0 && lane < layout.laneCount, `${prefix}row ${index}: dot outside the lanes`);
 
-    // One line per pending commit.
+    // One line per pending commit. A `null` slot is a hole: a line that ended at this row, which
+    // keeps the columns to its right from sliding into the dot's own lane.
     for (const side of ["above", "after"]) {
-      assert.equal(new Set(row[side]).size, row[side].length,
-        `${prefix}row ${index}: ${side} holds ${row[side].length} lines for ${new Set(row[side]).size} commits`);
+      const lines = row[side].filter((slot) => slot !== null);
+      assert.equal(new Set(lines).size, lines.length,
+        `${prefix}row ${index}: ${side} holds ${lines.length} lines for ${new Set(lines).size} commits`);
     }
 
     // The line on the dot lane is this commit's own.
