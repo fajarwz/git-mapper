@@ -54,6 +54,17 @@ interface StatusInfo {
   dirty: boolean;
   /** Changed paths in the working tree, untracked files counted individually. */
   changed: number;
+  /** HEAD commit sha; empty on an unborn branch. */
+  head: string;
+}
+
+/** Cheap, stable digest: we only ever compare ref snapshots for equality. */
+function hashText(text: string): string {
+  let hash = 5381;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = ((hash << 5) + hash + text.charCodeAt(index)) | 0;
+  }
+  return `${text.length}:${(hash >>> 0).toString(16)}`;
 }
 
 /** Decoration refs first, then for-each-ref tips not already present (dedupe by type+name). */
@@ -123,6 +134,10 @@ function readLog(dir: string, limit: number, skip: number): Promise<string> {
   );
 }
 
+function readStatus(dir: string): Promise<StatusInfo> {
+  return call<StatusInfo>("read_status", { dir }, (raw) => raw as StatusInfo);
+}
+
 async function readRefs(dir: string): Promise<string> {
   return isTauri()
     ? invoke<string>("read_refs", { dir })
@@ -172,9 +187,28 @@ export async function loadRepository(dir: string): Promise<Repository> {
     branch: status.branch || "HEAD detached",
     ahead: status.ahead,
     behind: status.behind,
+    head: status.head,
+    changed: status.changed,
+    refsDigest: hashText(refsRaw),
     commits: finalCommits,
     defaultCommitHash: commits[0]?.hash ?? "",
   };
+}
+
+/** Fingerprint of a loaded repository, comparable with readRepoFingerprint(). */
+export function repoFingerprint(repo: Repository): string {
+  const dirty = repo.commits.some((commit) => commit.hash === UNCOMMITTED_HASH);
+  return [repo.branch, repo.head, dirty ? repo.changed : 0, repo.refsDigest].join("|");
+}
+
+/**
+ * Cheap "did anything move on disk?" check: branch, HEAD, working-tree size and the whole
+ * ref table (so a fetch that only adds a remote branch still counts). No log read.
+ */
+export async function readRepoFingerprint(repoPath: string): Promise<string> {
+  const [status, refsRaw] = await Promise.all([readStatus(repoPath), readRefs(repoPath)]);
+  const branch = status.branch || "HEAD detached";
+  return [branch, status.head, status.dirty ? status.changed : 0, hashText(refsRaw)].join("|");
 }
 
 /** Appends the next page of history to a loaded repository, lanes re-computed over the whole list. */
@@ -195,7 +229,7 @@ export async function loadMoreCommits(
   const wip = repo.commits.find((commit) => commit.hash === UNCOMMITTED_HASH) ?? null;
   const list = (wip ? [wip, ...loaded, ...fresh] : [...loaded, ...fresh]);
   const done = parsed.length < LOG_LIMIT;
-  return { repo: { ...repo, commits: withLanes(list) }, done };
+  return { repo: { ...repo, refsDigest: hashText(refsRaw), commits: withLanes(list) }, done };
 }
 
 export async function pickAndLoadRepository(): Promise<Repository | null> {

@@ -17,6 +17,8 @@ pub struct StatusInfo {
     pub dirty: bool,
     /// Changed paths in the working tree, untracked files counted individually.
     pub changed: u32,
+    /// Current HEAD commit; empty on an unborn branch. Lets the UI detect work done elsewhere.
+    pub head: String,
 }
 
 #[derive(Serialize)]
@@ -67,12 +69,16 @@ pub fn read_status(dir: &str) -> Result<StatusInfo, String> {
         .filter(|l| !l.trim().is_empty() && !l.starts_with("## "))
         .count() as u32;
     // First line: "## main...origin/main [ahead 1, behind 2]" with any piece optional.
+    let head = run_git(dir, &["rev-parse", "--verify", "HEAD"])
+        .map(|sha| sha.trim().to_string())
+        .unwrap_or_default();
     let mut info = StatusInfo {
         branch: String::new(),
         ahead: 0,
         behind: 0,
         dirty: changed > 0,
         changed,
+        head,
     };
     if let Some(line) = out.lines().find(|l| l.starts_with("## ")) {
         let head = line.trim_start_matches("## ");

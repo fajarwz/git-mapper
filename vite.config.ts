@@ -34,12 +34,19 @@ function gitDevApi(): Plugin {
       const changed = out
         .split("\n")
         .filter((l) => l.trim() !== "" && !l.startsWith("## ")).length;
+      let headSha = "";
+      try {
+        headSha = run(String(dir), ["rev-parse", "--verify", "HEAD"]).trim();
+      } catch {
+        headSha = "";
+      }
       return {
         branch: branchPart ?? "HEAD detached",
         ahead,
         behind,
         dirty: changed > 0,
         changed,
+        head: headSha,
       };
     },
     read_log: ({ dir, limit, skip }) => ({

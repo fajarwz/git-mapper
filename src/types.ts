@@ -51,6 +51,12 @@ export interface Repository {
   branch: string;
   ahead: number;
   behind: number;
+  /** HEAD commit sha at load time; used to notice commits made elsewhere. */
+  head: string;
+  /** Changed path count at load time, so working-tree edits are noticed too. */
+  changed: number;
+  /** Digest of all branch/remote/tag refs at load time; a fetch changes it. */
+  refsDigest: string;
   commits: Commit[];
   /** Commit pre-selected when the tab is first shown. */
   defaultCommitHash: string;
