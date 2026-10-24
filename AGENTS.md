@@ -4,7 +4,8 @@ Guidance for AI agents working in this repo. Written after the full redesign + r
 
 ## Project
 
-**Git Mapper** (formerly Git Trail) — standalone Git history viewer for Windows. Tauri 2 + React 19 + TypeScript + Tailwind CSS v4 + Vite. Reads real Git data: the Tauri backend runs the `git` CLI and returns porcelain output; TS parsers turn it into `types.ts` shapes. Read-only (no mutating Git operations yet).
+**Git Mapper** (formerly Git Trail) — standalone Git history viewer for Windows. Tauri 2 + React 19 + TypeScript + Tailwind CSS v4 + Vite. Reads real Git data: the Tauri backend runs the `git` CLI and returns porcelain output; TS parsers turn it into `types.ts` shapes. Read-only apart from a branch checkout (`checkout_branch`, from double-clicking a branch
+pill); there is no staging or committing.
 
 - Package/crate/identifier/brand are `git-mapper` / `git_mapper_lib` / `com.fajar.git-mapper` / "Git Mapper".
 
@@ -19,13 +20,16 @@ npm run tauri dev    # desktop window
 cargo check          # in src-tauri/; gate for Rust work
 ```
 
-No tests, no linter configured. `npm run build` + `cargo check` pass = verifiable state.
+No test suite, and `npm run lint` is a Tailwind class checker rather than a code linter.
+`npm run build` + `npm run lint:check` + `cargo check` pass = verifiable state.
 
 ## Architecture
 
 - `src/App.tsx` — shell: `TitleBar` row (40px) over a flex-1 content area holding the commit list + details panel, per-repo selection state, details-panel open/height state. `Repository[]` lives in state (open tabs persisted to `localStorage` under `git-mapper:open-repos`, written only after the first load lands); empty state = `EmptyState.tsx`.
 - `src/components/TitleBar.tsx` — the window IS undecorated (`decorations: false` in `tauri.conf.json`), so this bar doubles as the title bar: brand, repo tabs (Chrome-style shrink + `tab-fade` on clipped labels), toolbar actions (a refresh button whose glyph spins for at least 550ms so a fast local read still reads as work, plus settings) and the caption buttons. Tabs reorder through `@dnd-kit/sortable` (`horizontalListSortingStrategy` + `DragOverlay`); the sensors are **pointer only**, because the keyboard sensor claims Space/Enter on the focused tab and a tab must stay activatable from the keyboard. HTML5 drag-and-drop is not an option here: the webview routes drag events to Tauri's file-drop handler. `data-tauri-drag-region` covers the bar background and the tab strip; the caption buttons need the `core:window:allow-*` entries in `src-tauri/capabilities/default.json`.
-- `src-tauri/src/git.rs` — Tauri commands running the `git` CLI: `open_repository` (validates + toplevel/name), `read_status` (branch/ahead/behind), `read_log` (porcelain fields `\x00`-separated, records `\x1e`-separated, decorations lead each record), `read_commit_files` (numstat + name-status + patch, first-parent; root via `--root`). Folder picking is JS-side via `tauri-plugin-dialog` (`dialog:default` capability).
+- `src-tauri/src/git.rs` — Tauri commands running the `git` CLI: `open_repository` (validates + toplevel/name), `read_status` (branch / ahead / behind / head + the worktree digest), `read_refs` (`hash	fullref` lines), `read_log` (porcelain fields `\x00`-separated, records `\x1e`-separated, decorations lead each record), `read_log_delta` (`git log --all ^<head>`), `read_log_order` (hashes only, for splicing),
+  `read_commit_files` (numstat + name-status + patch, first-parent; root via `--root`; the
+  pseudo hash `wip` means the working tree), `checkout_branch`. Folder picking is JS-side via `tauri-plugin-dialog` (`dialog:default` capability).
 - `src/data/gitLoader.ts` — the only `invoke()` surface: `loadRepository`, `pickAndLoadRepository`,
   `refreshRepository`, `loadCommitFiles`, plus persisted-path storage. Build the `Repository`/`Commit`
   objects there; components stay invoke-free.
@@ -67,7 +71,9 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
 2. **Use `panel-shadow` / `soft-shadow`** (custom `@utility` in index.css), never Tailwind's `shadow-panel`/`shadow-soft`. Reason: Tailwind v4 inlines `@theme` literals into generated utilities, so `.dark` overrides of shadow vars silently never applied. The custom utilities route through `var()` and theme correctly.
 3. Row heights and type sizes live in code (`graphGeometry.ts`, component classes) — don't pin them here; they get tuned. Full type/spacing scale lives in `index.css` + component classes; keep hierarchy bouncy (big accents, airy spacing) — density is what made the previous design look dated.
 4. Background depth strategy: vivid full-canvas gradient (light theme gets a linear violet→rose→warm base because radial spots alone measured sat 0.07 and washed out) + subtle shadows. Don't add heavy drop shadows.
-5. Pills/badges: no borders, saturated tone fills (`bg-primary/12` etc.). Glass panels: `border-hairline` + `panel-shadow` + `backdrop-blur-xl` via `PANEL`.
+5. Pills: the checked-out branch is a filled `laneColor` pill with `text-surface`; every other ref
+   is an outline pill with a 1.5px lane-coloured border and lane-tinted text. Spell the width
+   `border-[1.5px]` - `border-1.5` is not a utility and silently renders 0px. Glass panels: `border-hairline` + `panel-shadow` + `backdrop-blur-xl` via `PANEL`.
 
 5. **Chrome on the canvas needs a backing.** The title bar sits straight on the aurora, so bare text
    there measures ~2.8:1 (`text-ink-soft` over the gradient). Anything interactive or readable in the
@@ -101,4 +107,5 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
 
 ## Roadmap (not built yet)
 
-Proper graph lane layout engine, mutating Git operations (stage, commit, branch), search/filter over history, pagination for repos with >500 commits (`read_log` caps at 500).
+Search and filtering over history, staging / committing / merging, a side-by-side diff view.
+History pages at 500 commits per read; `loadMoreCommits` appends the next page on scroll.
