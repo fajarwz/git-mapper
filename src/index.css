@@ -1,0 +1,212 @@
+@import "tailwindcss";
+
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/fonts/plus-jakarta-sans.woff2") format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/jetbrains-mono.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Semantic design tokens. Components only reference these, so re-pointing them in `.dark`
+   themes the whole app without dark: variants in every component. */
+@theme {
+  /* Violet-forward palette (replaces the neon blue): dusty violet primary with
+     muted steel/rose/teal/amber satellites, close to the reference art's hues. */
+  --color-primary: #6e56cf;
+  --color-primary-ink: #563d9a;
+  --color-secondary: #57536e;
+  --color-success: #30a46c;
+  --color-success-ink: #218358;
+  --color-warning: #e0a24b;
+  --color-warning-ink: #8a5a11;
+  --color-danger: #d5535e;
+  --color-danger-ink: #c23a55;
+  --color-info: #477fb8;
+
+  --color-surface: #ffffff;
+  --color-canvas: #e9e6f2;
+  --color-ink: #17151f;
+  --color-ink-soft: #413d51;
+  --color-ink-dim: #544f68;
+  --color-rule: rgb(23 21 31 / 0.08);
+
+  /* Glass layers */
+  --color-glass: rgb(255 255 255 / 0.76);
+  --color-glass-strong: rgb(255 255 255 / 0.88);
+  --color-glass-soft: rgb(255 255 255 / 0.55);
+  --color-hairline: rgb(255 255 255 / 0.78);
+  --color-sheet: rgb(255 255 255 / 0.5);
+  --color-sheet-strong: rgb(255 255 255 / 0.85);
+  --color-hover-glass: rgb(110 86 207 / 0.07);
+  --color-selected-glass: rgb(110 86 207 / 0.12);
+  --color-scrim: rgb(16 12 28 / 0.35);
+
+  /* Graph lanes: 6 distinct muted hues that stay separate against glass. */
+  --color-lane-1: #6e56cf;
+  --color-lane-2: #477fb8;
+  --color-lane-3: #cf6a92;
+  --color-lane-4: #2fa186;
+  --color-lane-5: #dd9438;
+  --color-lane-6: #7c77a3;
+
+  /* Subtle. Depth comes from the vivid background, not the drop shadow
+     (the reference art carries no shadow at all). */
+  --shadow-panel: inset 0 1px 0 0 rgb(255 255 255 / 0.85), 0 14px 34px -26px rgb(48 36 100 / 0.45);
+  --shadow-soft: 0 6px 16px -10px rgb(48 36 100 / 0.4);
+
+  --font-ui: "Plus Jakarta Sans", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
+}
+
+/* Dark theme: smoked glass over a deep canvas, same brand hues. */
+.dark {
+  color-scheme: dark;
+
+  --color-primary-ink: #b4a2f5;
+  --color-secondary: #b1abc9;
+  --color-success-ink: #58c392;
+  --color-warning-ink: #f0b268;
+  --color-danger-ink: #ff8fa0;
+
+  --color-surface: #0f1523;
+  --color-canvas: #070b12;
+  --color-ink: #f3f4fc;
+  --color-ink-soft: #c5cbdd;
+  --color-ink-dim: #99a1b4;
+  --color-rule: rgb(255 255 255 / 0.1);
+
+  --color-glass: rgb(18 24 37 / 0.68);
+  --color-glass-strong: rgb(25 33 49 / 0.88);
+  --color-glass-soft: rgb(12 18 28 / 0.5);
+  --color-hairline: rgb(255 255 255 / 0.15);
+  --color-sheet: rgb(12 17 27 / 0.55);
+  --color-sheet-strong: rgb(26 34 50 / 0.92);
+  --color-hover-glass: rgb(150 124 240 / 0.12);
+  --color-selected-glass: rgb(123 97 255 / 0.24);
+  --color-scrim: rgb(0 0 0 / 0.55);
+
+  --color-lane-1: #9b7bff;
+  --color-lane-2: #5ba8de;
+  --color-lane-3: #e08bad;
+  --color-lane-4: #4cc398;
+  --color-lane-5: #efb164;
+  --color-lane-6: #a29cc8;
+
+  --shadow-panel: inset 0 1px 0 0 rgb(255 255 255 / 0.09), 0 18px 40px -28px rgb(0 0 0 / 0.9);
+  --shadow-soft: 0 6px 16px -10px rgb(0 0 0 / 0.8);
+}
+
+/* Tailwind v4 inlines @theme values into its generated utilities, so overriding
+   --shadow-panel in .dark would never reach the box. These utilities keep the
+   var() indirection, which is what makes the per-theme override work. */
+@utility panel-shadow {
+  box-shadow: var(--shadow-panel);
+}
+
+@utility soft-shadow {
+  box-shadow: var(--shadow-soft);
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html,
+  body,
+  #root {
+    height: 100%;
+  }
+
+  body {
+    margin: 0;
+    overflow: hidden;
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-ui);
+    font-size: 14px;
+    line-height: 1.5;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+  }
+
+  /* Colour fields behind the glass panels; these are what the backdrop blur picks up.
+     The linear base keeps saturation high across the whole canvas (radial spots alone
+     wash out); the radials add the aurora accents, like the reference art. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: -12%;
+    z-index: 0;
+    pointer-events: none;
+    background-image:
+      radial-gradient(34rem 28rem at 88% 6%, rgb(226 168 122 / 0.55), transparent 70%),
+      radial-gradient(30rem 26rem at 76% 96%, rgb(228 141 180 / 0.5), transparent 72%),
+      radial-gradient(26rem 22rem at 28% 90%, rgb(96 148 196 / 0.5), transparent 70%),
+      radial-gradient(40rem 32rem at 8% 10%, rgb(110 82 216 / 0.75), transparent 72%),
+      linear-gradient(118deg, #8a6fe0 0%, #a795dd 36%, #d3a6c4 70%, #e2b194 100%);
+    filter: blur(18px);
+  }
+
+  .dark body::before {
+    background-image:
+      radial-gradient(38rem 30rem at 10% 12%, rgb(96 68 200 / 0.5), transparent 66%),
+      radial-gradient(34rem 28rem at 90% 4%, rgb(219 148 92 / 0.4), transparent 70%),
+      radial-gradient(30rem 26rem at 78% 96%, rgb(228 141 180 / 0.38), transparent 72%),
+      radial-gradient(26rem 22rem at 28% 90%, rgb(96 148 196 / 0.4), transparent 74%);
+  }
+
+  #root {
+    position: relative;
+    z-index: 1;
+  }
+
+  ::selection {
+    background-color: rgb(110 86 207 / 0.3);
+  }
+
+  :focus-visible {
+    outline-color: var(--color-primary);
+  }
+
+  /* Desktop scrollbars; everything else is utility classes. */
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgb(120 126 150 / 0.4);
+    border: 2px solid transparent;
+    background-clip: content-box;
+    border-radius: 6px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(120 126 150 / 0.6);
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+
+  /* Set while any divider is dragged, so the cursor holds everywhere. */
+  body.is-resizing {
+    cursor: col-resize;
+    user-select: none;
+  }
+}
