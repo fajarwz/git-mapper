@@ -33,19 +33,19 @@ async function windowAction(action: WindowAction): Promise<void> {
 
 function BrandMark() {
   return (
-    <span className="grid h-6 w-6 place-items-center rounded-lg bg-primary/10 ring-1 ring-inset ring-hairline">
-      <svg width="14" height="14" viewBox="0 0 18 18" aria-hidden="true">
-        <path d="M4.5 4.5v9" stroke="#6e56cf" strokeWidth="1.9" strokeLinecap="round" />
+    <span className="grid h-6 w-6 place-items-center rounded-lg bg-primary text-white shadow-soft">
+      {/* Drawn in currentColor on the solid brand fill: white on violet reads on either canvas. */}
+      <svg width="15" height="15" viewBox="0 0 18 18" fill="none" aria-hidden="true">
+        <path d="M4.5 4.5v9" stroke="currentColor" strokeWidth="1.9" strokeLinecap="round" />
         <path
           d="M13.5 4.5v3c0 3.2-4.2 2.6-7.6 3.6"
-          stroke="#57536e"
+          stroke="currentColor"
           strokeWidth="1.9"
           strokeLinecap="round"
-          fill="none"
         />
-        <circle cx="4.5" cy="4.5" r="2.1" fill="#6e56cf" />
-        <circle cx="13.5" cy="4.5" r="2.1" fill="#57536e" />
-        <circle cx="4.5" cy="13.5" r="1.6" fill="#ffffff" stroke="#6e56cf" strokeWidth="1.4" />
+        <circle cx="4.5" cy="4.5" r="2.1" fill="currentColor" />
+        <circle cx="13.5" cy="4.5" r="2.1" fill="currentColor" />
+        <circle cx="4.5" cy="13.5" r="1.7" stroke="currentColor" strokeWidth="1.6" />
       </svg>
     </span>
   );
@@ -135,7 +135,10 @@ export function TitleBar({
       onDoubleClick={handleDoubleClick}
       className="flex h-10 shrink-0 items-center gap-2 pl-2.5"
     >
-      <div data-tauri-drag-region className="flex shrink-0 items-center gap-2">
+      <div
+        data-tauri-drag-region
+        className="flex shrink-0 items-center gap-2 rounded-xl border border-hairline/60 bg-glass-soft py-0.5 pl-1 pr-2.5 backdrop-blur-md"
+      >
         <BrandMark />
         <span data-tauri-drag-region className="text-[12.5px] font-bold tracking-tight text-ink">
           Git Mapper
@@ -155,7 +158,7 @@ export function TitleBar({
               key={item.id}
               data-active={active}
               style={{ flex: "1 1 200px", minWidth: 68, maxWidth: 200 }}
-              className="inline-flex h-7 min-w-0 items-center gap-1 rounded-lg border border-transparent pl-2.5 text-left text-ink-soft transition-colors hover:bg-hover-glass data-[active=true]:border-hairline data-[active=true]:bg-glass-strong data-[active=true]:text-ink data-[active=true]:soft-shadow"
+              className="inline-flex h-7 min-w-0 items-center gap-1 rounded-lg border border-transparent bg-glass-soft pl-2.5 text-left text-ink-soft backdrop-blur-md transition-colors hover:bg-hover-glass data-[active=true]:border-hairline data-[active=true]:bg-glass-strong data-[active=true]:text-ink data-[active=true]:soft-shadow"
             >
               <button
                 type="button"
@@ -192,7 +195,7 @@ export function TitleBar({
           disabled={adding}
           aria-label="Open repository"
           title="Open a repository folder"
-          className="grid h-7 w-7 shrink-0 cursor-default place-items-center rounded-lg text-ink-dim hover:bg-hover-glass hover:text-ink disabled:opacity-60"
+          className="grid h-7 w-7 shrink-0 cursor-default place-items-center rounded-lg border border-dashed border-rule bg-glass-soft text-ink-soft backdrop-blur-md hover:bg-glass-strong hover:text-ink disabled:opacity-60"
         >
           <PlusIcon />
         </button>

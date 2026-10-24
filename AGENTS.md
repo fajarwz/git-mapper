@@ -57,6 +57,11 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
 4. Background depth strategy: vivid full-canvas gradient (light theme gets a linear violet→rose→warm base because radial spots alone measured sat 0.07 and washed out) + subtle shadows. Don't add heavy drop shadows.
 5. Pills/badges: no borders, saturated tone fills (`bg-primary/12` etc.). Glass panels: `border-hairline` + `panel-shadow` + `backdrop-blur-xl` via `PANEL`.
 
+5. **Chrome on the canvas needs a backing.** The title bar sits straight on the aurora, so bare text
+   there measures ~2.8:1 (`text-ink-soft` over the gradient). Anything interactive or readable in the
+   bar gets `bg-glass-soft` + `backdrop-blur-md`; contrast after: brand 9.9, tabs 6.1, add button 7.0.
+   `BrandMark` is the one solid control: `bg-primary` with a white glyph, so it reads in both themes.
+
 ## Known pitfalls
 
 - **Never reload the webview.** WebView2's context-menu Reload (and F5 / Ctrl+R) reloads the
