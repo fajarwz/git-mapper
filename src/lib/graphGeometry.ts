@@ -6,8 +6,6 @@ export const ROW_HEIGHT = 32;
 export const LANE_WIDTH = 16;
 export const GRAPH_PADDING_X = 14;
 export const DOT_RADIUS = 3.5;
-/** Lane cap. Every lane gets its own hue, so the cap also keeps colours unique. */
-export { MAX_LANES };
 
 /** One hue per lane, so adjacent columns always read apart. Tokens, so themes carry over. */
 export const LANE_COLORS = [
