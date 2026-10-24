@@ -120,6 +120,27 @@ pub fn read_log(dir: &str, limit: u32, skip: u32) -> Result<String, String> {
     )
 }
 
+/// Commits reachable from any ref but not from `since`: the delta a focus refresh needs,
+/// so the UI never re-reads the whole history for one new commit.
+#[tauri::command]
+pub fn read_log_delta(dir: &str, since: &str, limit: u32) -> Result<String, String> {
+    if since.trim().is_empty() {
+        return read_log(dir, limit, 0);
+    }
+    let exclude = format!("^{since}");
+    run_git(
+        dir,
+        &[
+            "log",
+            "--all",
+            &format!("--max-count={limit}"),
+            &exclude,
+            "--date=iso-strict",
+            "--pretty=tformat:%d%x00%H%x00%an%x00%ae%x00%aI%x00%P%x00%B%x1e",
+        ],
+    )
+}
+
 /// All branch/remote/tag tips: raw `hash\tfullref` lines for TS-side parsing.
 /// Decorations on log rows miss tips that point outside the loaded window.
 #[tauri::command]

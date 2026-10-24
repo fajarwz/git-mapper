@@ -56,6 +56,13 @@ function gitDevApi(): Plugin {
           "--pretty=tformat:%d%x00%H%x00%an%x00%ae%x00%aI%x00%P%x00%B%x1e"],
       ),
     }),
+    read_log_delta: ({ dir, since, limit }) => {
+      const rev = String(since ?? "").trim();
+      const base = ["log", "--all", `--max-count=${Number(limit) || 500}`];
+      if (rev !== "") base.push(`^${rev}`);
+      base.push("--date=iso-strict", "--pretty=tformat:%d%x00%H%x00%an%x00%ae%x00%aI%x00%P%x00%B%x1e");
+      return { text: run(String(dir), base) };
+    },
     read_refs: ({ dir }) => ({
       text: run(String(dir), [
         "for-each-ref",

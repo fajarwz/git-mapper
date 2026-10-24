@@ -138,6 +138,14 @@ function readStatus(dir: string): Promise<StatusInfo> {
   return call<StatusInfo>("read_status", { dir }, (raw) => raw as StatusInfo);
 }
 
+function readLogDelta(dir: string, since: string, limit: number): Promise<string> {
+  return call(
+    "read_log_delta",
+    { dir, since, limit },
+    (raw) => (isTauri() ? (raw as string) : (raw as { text: string }).text),
+  );
+}
+
 async function readRefs(dir: string): Promise<string> {
   return isTauri()
     ? invoke<string>("read_refs", { dir })
@@ -161,7 +169,26 @@ function uncommittedCommit(commits: Commit[], changed: number): Commit {
 /** Places lanes over the real commits plus, when present, the uncommitted row on top. */
 function withLanes(commits: Commit[]): Commit[] {
   const lanes = computeLanes(commits.map((c) => ({ hash: c.hash, parents: c.parents })));
-  return commits.map((commit, index) => ({ ...commit, lane: lanes[index] ?? 0 }));
+  // Reuse the commit object when its lane is unchanged: rows are memoized, so identical
+  // objects mean identical renders and no DOM work for history that did not move.
+  return commits.map((commit, index) => {
+    const lane = lanes[index] ?? 0;
+    return commit.lane === lane ? commit : { ...commit, lane };
+  });
+}
+
+/** True when two ref lists draw the same pills, so the commit object can be reused. */
+function sameRefs(a: CommitRef[], b: CommitRef[]): boolean {
+  if (a.length !== b.length) return false;
+  return a.every((ref, index) => {
+    const other = b[index];
+    return (
+      ref.type === other.type &&
+      ref.name === other.name &&
+      ref.isCurrent === other.isCurrent &&
+      ref.withRemote === other.withRemote
+    );
+  });
 }
 
 export async function loadRepository(dir: string): Promise<Repository> {
@@ -195,20 +222,73 @@ export async function loadRepository(dir: string): Promise<Repository> {
   };
 }
 
-/** Fingerprint of a loaded repository, comparable with readRepoFingerprint(). */
-export function repoFingerprint(repo: Repository): string {
-  const dirty = repo.commits.some((commit) => commit.hash === UNCOMMITTED_HASH);
-  return [repo.branch, repo.head, dirty ? repo.changed : 0, repo.refsDigest].join("|");
-}
-
 /**
- * Cheap "did anything move on disk?" check: branch, HEAD, working-tree size and the whole
- * ref table (so a fetch that only adds a remote branch still counts). No log read.
+ * Focus refresh. Two cheap reads decide whether anything moved on disk (branch, HEAD, dirty
+ * size, and a digest of every branch/remote/tag ref). When only refs moved the commit objects
+ * are reused untouched; when history moved only the new commits are read and spliced on top.
+ * Returns null when the repo is unchanged, so the caller can skip the state update entirely.
  */
-export async function readRepoFingerprint(repoPath: string): Promise<string> {
-  const [status, refsRaw] = await Promise.all([readStatus(repoPath), readRefs(repoPath)]);
+export async function refreshRepository(repo: Repository): Promise<Repository | null> {
+  const [status, refsRaw] = await Promise.all([readStatus(repo.path), readRefs(repo.path)]);
   const branch = status.branch || "HEAD detached";
-  return [branch, status.head, status.dirty ? status.changed : 0, hashText(refsRaw)].join("|");
+  const refsDigest = hashText(refsRaw);
+  const hadWip = repo.commits.some((commit) => commit.hash === UNCOMMITTED_HASH);
+  const dirtyCount = status.dirty ? status.changed : 0;
+  const knownDirtyCount = hadWip ? repo.changed : 0;
+
+  if (
+    branch === repo.branch &&
+    status.head === repo.head &&
+    refsDigest === repo.refsDigest &&
+    dirtyCount === knownDirtyCount
+  ) {
+    return null;
+  }
+
+  const tipRefs = parseForEachRef(refsRaw, branch);
+  let fresh: Commit[] = [];
+
+  if (status.head !== repo.head) {
+    try {
+      const raw = await readLogDelta(repo.path, repo.head, LOG_LIMIT);
+      fresh = toCommits(parseLog(raw)).map((commit) => ({
+        ...commit,
+        refs: mergeRefs(commit.refs, tipRefs.get(commit.hash) ?? []),
+      }));
+      // Nothing new but a different HEAD means history was rewritten or rewound (reset,
+      // rebase) and a page cap means the window shifted; both need the full log again.
+      if (fresh.length === 0 || fresh.length >= LOG_LIMIT) return loadRepository(repo.path);
+    } catch (deltaError) {
+      // A rebase or force-push can orphan the old HEAD; the range is meaningless then.
+      console.error("Could not read the new commits, reloading the repository", deltaError);
+      return loadRepository(repo.path);
+    }
+  }
+
+  const freshHashes = new Set(fresh.map((commit) => commit.hash));
+  const existing = repo.commits
+    .filter((commit) => commit.hash !== UNCOMMITTED_HASH && !freshHashes.has(commit.hash))
+    .map((commit) => {
+      const refs = tipRefs.get(commit.hash) ?? [];
+      return sameRefs(commit.refs, refs) ? commit : { ...commit, refs };
+    });
+
+  const history = [...fresh, ...existing];
+  const commits = status.dirty
+    ? [uncommittedCommit(history, status.changed), ...history]
+    : history;
+
+  return {
+    ...repo,
+    branch,
+    ahead: status.ahead,
+    behind: status.behind,
+    head: status.head,
+    changed: status.changed,
+    refsDigest,
+    commits: withLanes(commits),
+    defaultCommitHash: history.find((commit) => commit.hash === status.head)?.hash ?? repo.defaultCommitHash,
+  };
 }
 
 /** Appends the next page of history to a loaded repository, lanes re-computed over the whole list. */
