@@ -10,7 +10,6 @@ import { STORAGE_KEYS, usePersistedState } from "./lib/persisted";
 import { applyTheme, initialTheme, storeTheme } from "./lib/theme";
 import type { Theme } from "./lib/theme";
 import {
-  FIRST_RUN_PATH,
   checkoutBranch,
   loadCommitFiles,
   loadMoreCommits,
@@ -72,14 +71,14 @@ function App() {
 
   const hydratedPaths = useRef(false);
 
-  // First paint loads the persisted tabs; a fresh install dogfoods on this repo.
+  // First paint loads the persisted tabs; a fresh install starts on the empty state, so no
+  // machine-specific path is baked into the build.
   useEffect(() => {
     let cancelled = false;
     (async () => {
       const stored = readStoredPaths();
-      const paths = stored.length > 0 ? stored : [FIRST_RUN_PATH];
       const loaded: Repository[] = [];
-      for (const path of paths) {
+      for (const path of stored) {
         try {
           loaded.push(await loadRepository(path));
         } catch (loadError) {

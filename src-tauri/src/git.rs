@@ -129,7 +129,7 @@ pub fn open_repository(dir: &str) -> Result<RepoInfo, String> {
     }
     let path = run_git(dir, &["rev-parse", "--show-toplevel"])?.trim().to_string();
     // Git prints Windows paths with forward slashes from MSYS builds
-    // (C:/DATA/lab/x); keep that form so path comparisons stay consistent.
+    // (C:/Users/you/repo); keep that form so path comparisons stay consistent.
     let path_buf = PathBuf::from(&path);
     let name = path_buf
         .file_name()

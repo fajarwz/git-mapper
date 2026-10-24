@@ -37,9 +37,6 @@ async function call<T>(op: string, args: Record<string, unknown>, unwrap: (raw: 
 /** Pseudo-commit hash for the "Uncommitted changes" row (Rust + middleware treat it the same). */
 export const UNCOMMITTED_HASH = "wip";
 
-/** Dogfood target for the very first run, when no repository has been opened before. */
-export const FIRST_RUN_PATH = "C:/DATA/lab/tauri/git-mapper";
-
 export const OPEN_REPOS_KEY = STORAGE_KEYS.repos;
 
 interface RepoInfo {
@@ -411,7 +408,7 @@ export async function pickAndLoadRepository(): Promise<Repository | null> {
   // The native folder dialog exists only in the Tauri window; browser tabs prompt for the path.
   const dir = isTauri()
     ? await pickDirectory({ directory: true, multiple: false })
-    : window.prompt("Folder path of a git repository (e.g. C:/DATA/lab/tauri/git-mapper):");
+    : window.prompt("Folder path of a git repository (e.g. C:/Users/you/projects/my-repo):");
   if (!dir) return null;
   return loadRepository(dir);
 }
