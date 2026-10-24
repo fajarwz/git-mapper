@@ -7,7 +7,8 @@ reading real repositories through the `git` CLI.
 
 - Opens repositories as tabs. Each tab remembers its selected commit, file and panel state, and
   tabs can be dragged into any order.
-- Commit list with a lane-coloured graph and branch, remote and tag pills. Double-click a branch
+- Commit list with a graph whose lines keep their colour from tip to root, and branch,
+  remote and tag pills. Double-click a branch
   pill to check it out.
 - Details panel with commit metadata, the changed-file list and a line-numbered diff, loaded per
   selected commit.

@@ -15,13 +15,15 @@ pill); there is no staging or committing.
 npm run build        # gate for frontend work: tsc && vite build (run this before claiming done)
 npm run lint         # tailwind hygiene autofix over src (eslint-plugin-tailwindcss); run after CSS-class changes
 npm run lint:check   # same rules without fixing (CI-style check)
+npm test             # commit graph regression checks (lane geometry + line colours)
 npm run dev          # vite dev server on http://localhost:1420
 npm run tauri dev    # desktop window
 cargo check          # in src-tauri/; gate for Rust work
 ```
 
-No test suite, and `npm run lint` is a Tailwind class checker rather than a code linter.
-`npm run build` + `npm run lint:check` + `cargo check` pass = verifiable state.
+`npm test` runs the graph regression checks (Node's test runner, TS loaded through Vite's SSR
+loader). `npm run lint` is a Tailwind class checker, not a code linter. `npm run build` +
+`npm test` + `npm run lint:check` + `cargo check` pass = verifiable state.
 
 ## Architecture
 
@@ -94,9 +96,17 @@ No test suite, and `npm run lint` is a Tailwind class checker rather than a code
   fork, join and lane shift as a bend inside that row's band, merge vertical pieces into one path
   per lane and colour, and leave tips without a line above them. Drawing a child-to-parent curve
   instead is what produced long diagonals that read as nodes jumping across the graph.
-  **Colour belongs to the column**, not the branch: lane *k* is always `laneColor(k)`, so two
-  neighbouring lines can never share a hue. `MAX_LANES` is 8 because the palette has 8 tokens
-  (`--color-lane-1..8`). Dots sit on `rowY(index)`, so keep `ROW_HEIGHT` shared with `CommitRow`.
+  **Colour belongs to the line.** Each lane slot carries `{hash, color}`: the lane says *where* a
+  line is drawn, the slot says which colour it has, so a line keeps its hue when lanes shift and
+  the dot, its segments and its pills all use `lineColor(commit.color)`. Claiming colour from the
+  lane index (`laneColor(lane)`) is the bug that made lines repaint mid-run; there are 8 palette
+  entries (`--color-lane-1..8`), and a new line takes the least-used one, skipping its neighbours.
+  Dots sit on `rowY(index)`, so keep `ROW_HEIGHT` shared with `CommitRow`.
+  **One line per pending commit.** A parent reserved by several children is drawn ONCE; each extra
+  child records `join` and bends into that line at its own row. Reserving a lane per child drew the
+  same commit as several parallel lines that fanned into one dot rows later (that was the
+  `jersium-marketplace` breakage). `laneX` is not clamped: lanes past the palette still get their
+  own x, and the graph width comes from `layout.laneCount`.
 - **verifying without the desktop window:** `npm run dev` exposes the same git commands as
   `POST /api/git` (`{op, args}`), so a headless Chrome probe of `http://127.0.0.1:1420` exercises the
   real TS path (refresh, wip payloads, flash classes) without rebuilding Rust. Rust-side changes
