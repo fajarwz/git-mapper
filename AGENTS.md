@@ -25,12 +25,17 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
 - `src/components/TitleBar.tsx` — the window IS undecorated (`decorations: false` in `tauri.conf.json`), so this bar doubles as the title bar: brand, repo tabs (Chrome-style shrink + `tab-fade` on clipped labels), toolbar actions and the caption buttons. `data-tauri-drag-region` covers the bar background and the tab strip; the caption buttons need the `core:window:allow-*` entries in `src-tauri/capabilities/default.json`.
 - `src-tauri/src/git.rs` — Tauri commands running the `git` CLI: `open_repository` (validates + toplevel/name), `read_status` (branch/ahead/behind), `read_log` (porcelain fields `\x00`-separated, records `\x1e`-separated, decorations lead each record), `read_commit_files` (numstat + name-status + patch, first-parent; root via `--root`). Folder picking is JS-side via `tauri-plugin-dialog` (`dialog:default` capability).
 - `src/data/gitLoader.ts` — the only `invoke()` surface: `loadRepository`, `pickAndLoadRepository`,
-  `loadCommitFiles`, `repoFingerprint`/`readRepoFingerprint` (cheap "did the repo change on disk?"
-  probe: branch + HEAD + changed count + a digest of every branch/remote/tag ref, no log read), plus
-  persisted-path storage. Build the `Repository`/`Commit` objects there; components stay invoke-free.
+  `refreshRepository`, `loadCommitFiles`, plus persisted-path storage. Build the `Repository`/`Commit`
+  objects there; components stay invoke-free.
+- **Refresh is surgical.** `refreshRepository` runs two cheap reads (`read_status`, `read_refs`) and
+  compares branch + HEAD + dirty size + a digest of every ref. Unchanged → `null`, no state update.
+  History moved → `read_log_delta` (`git log --all ^<oldHead>`) fetches only the new commits and
+  splices them on top. Empty delta or a full page means history was rewritten or the window shifted,
+  which falls back to `loadRepository`. Unchanged commits keep object identity (see `withLanes`,
+  `sameRefs`) so the memoized `CommitRow` skips their render entirely.
 - `src/lib/` parsers — `gitLogParser`, `gitDiffParser` (DiffLine text carries NO +/- prefix; the renderer adds it), `graphLanes` (greedy lane assignment; a proper layout engine is future work). All pure, no React — verifiable with `npx vite-node <probe>` against real git output.
 - Changed files/diffs load lazily per selected commit (`App` keeps `filesByCommitHash`); the commit list never carries them.
-- Window focus re-checks the visible repo only and reloads it when the fingerprint moved (commit, fetch, new branch, dirty tree). Other tabs are not refreshed — they are off screen and each reload costs a full log read.
+- Window focus re-checks the visible repo only (throttled to one probe per 1.5s, hidden windows skipped). Other tabs are not refreshed — they are off screen and each refresh costs git reads.
 - `src/lib/graphGeometry.ts` — `ROW_HEIGHT` is shared between `CommitRow` and the SVG graph. Change both together or dots misalign with rows.
 - `src/lib/ui.ts` — `PANEL` and `GLASS_CONTROL` class strings; every panel/button picks these up.
 - `src/lib/tableLayout.ts` — column widths, grid templates, resize min/max.

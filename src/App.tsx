@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { ChangedFile } from "./types";
 import { CommitList } from "./components/CommitList";
@@ -17,8 +17,7 @@ import {
   loadRepository,
   pickAndLoadRepository,
   readStoredPaths,
-  readRepoFingerprint,
-  repoFingerprint,
+  refreshRepository,
   storePaths,
 } from "./data/gitLoader";
 import type { Repository } from "./types";
@@ -96,6 +95,8 @@ function App() {
     () => repos.find((item) => item.id === activeRepoId) ?? null,
     [repos, activeRepoId],
   );
+  const activeRepoPath = repo?.path ?? null;
+
   const selectedCommit = repo
     ? (repo.commits.find(
         (commit) => commit.hash === (selectedCommitByRepo[repo.id] ?? repo.defaultCommitHash),
@@ -131,9 +132,9 @@ function App() {
     };
   }, [repo, selectedHash, filesByCommitHash]);
 
-  function handleSelectRepo(id: string) {
+  const handleSelectRepo = useCallback((id: string) => {
     setActiveRepoId(id);
-  }
+  }, [setActiveRepoId]);
 
   async function handleAdd() {
     setOpening(true);
@@ -162,33 +163,33 @@ function App() {
     });
   }
 
-  function handleSelectCommit(hash: string) {
-    if (!repo) return;
-    setSelectedCommitByRepo((previous) => ({ ...previous, [repo.id]: hash }));
-    setSelectedFileByRepo((previous) => ({ ...previous, [repo.id]: null }));
+  const handleSelectCommit = useCallback((hash: string) => {
+    if (!activeRepoId) return;
+    setSelectedCommitByRepo((previous) => ({ ...previous, [activeRepoId]: hash }));
+    setSelectedFileByRepo((previous) => ({ ...previous, [activeRepoId]: null }));
     // Picking a commit is a request to read it, so bring the details panel back if it was closed.
     setDetailsOpen(true);
-  }
+  }, [activeRepoId, setDetailsOpen, setSelectedCommitByRepo, setSelectedFileByRepo]);
 
-  function handleSelectFile(path: string) {
-    if (!repo) return;
-    setSelectedFileByRepo((previous) => ({ ...previous, [repo.id]: path }));
-  }
+  const handleSelectFile = useCallback((path: string) => {
+    if (!activeRepoId) return;
+    setSelectedFileByRepo((previous) => ({ ...previous, [activeRepoId]: path }));
+  }, [activeRepoId, setSelectedFileByRepo]);
 
   // Infinite scroll: the commit rows file a near-bottom signal, one page loads at a time.
   // Double-clicking a branch pill checks the branch out and reloads the repo.
-  async function handleCheckoutBranch(branch: string) {
-    if (!repo || opening) return;
+  const handleCheckoutBranch = useCallback(async (branch: string) => {
+    if (!activeRepoPath || opening) return;
     try {
-      await checkoutBranch(repo.path, branch);
-      const refreshed = await loadRepository(repo.path);
+      await checkoutBranch(activeRepoPath, branch);
+      const refreshed = await loadRepository(activeRepoPath);
       setRepos((previous) =>
         previous.map((item) => (item.id === refreshed.id ? refreshed : item)),
       );
     } catch (checkoutError) {
       setError(checkoutError instanceof Error ? checkoutError.message : String(checkoutError));
     }
-  }
+  }, [activeRepoPath, opening]);
 
   async function handleNearBottom() {
     if (!repo || loadingMoreByRepo[repo.id] || allLoadedByRepo[repo.id]) return;
@@ -210,28 +211,33 @@ function App() {
 
   // Repo data changes while the app sits in the background: a commit from a terminal, an
   // editor save, a fetch that brings new remote branches. On window focus we re-check the
-  // visible repo only — the other tabs are not on screen and would each pay a full log read.
+  // visible repo only, and refreshRepository does the cheapest thing that is correct: two
+  // cheap git reads, then only the new commits are spliced in. The other tabs are not
+  // touched — they are off screen and each reload costs a full log read.
   const refreshBusy = useRef(false);
+  const lastProbe = useRef(0);
   useEffect(() => {
     if (!repo) return;
     const activeRepo = repo;
-    const known = repoFingerprint(activeRepo);
     let cancelled = false;
 
     async function refreshIfChanged() {
+      // Alt-tab storms and minimized windows cost nothing: one probe per 1.5s, visible only.
       if (refreshBusy.current || opening || document.visibilityState === "hidden") return;
+      if (Date.now() - lastProbe.current < 1500) return;
+      lastProbe.current = Date.now();
       refreshBusy.current = true;
       try {
-        const current = await readRepoFingerprint(activeRepo.path);
-        if (cancelled || current === known) return;
-        const refreshed = await loadRepository(activeRepo.path);
-        if (cancelled) return;
-        setRepos((previous) => previous.map((item) => (item.id === refreshed.id ? refreshed : item)));
+        const refreshed = await refreshRepository(activeRepo);
+        if (cancelled || refreshed === null) return;
+        setRepos((previous) =>
+          previous.map((item) => (item.id === refreshed.id ? refreshed : item)),
+        );
       } catch (refreshError) {
         console.error("Could not refresh the repository", refreshError);
       } finally {
         refreshBusy.current = false;
-        }
+      }
     }
 
     const onFocus = () => {

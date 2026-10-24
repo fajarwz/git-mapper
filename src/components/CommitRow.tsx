@@ -1,3 +1,4 @@
+import { memo } from "react";
 import type { Commit } from "../types";
 import { formatAbsoluteDate } from "../lib/format";
 import { laneColor } from "../lib/graphGeometry";
@@ -11,7 +12,12 @@ interface CommitRowProps {
   onCheckoutBranch?: (branch: string) => void;
 }
 
-export function CommitRow({ commit, selected, onSelect, onCheckoutBranch }: CommitRowProps) {
+export const CommitRow = memo(function CommitRow({
+  commit,
+  selected,
+  onSelect,
+  onCheckoutBranch,
+}: CommitRowProps) {
   // The checked-out branch's tip commit reads bold across the whole row.
   const onHead = commit.refs.some((ref) => ref.isCurrent);
   const weight = onHead ? "font-bold" : "";
@@ -55,4 +61,4 @@ export function CommitRow({ commit, selected, onSelect, onCheckoutBranch }: Comm
       <span aria-hidden="true" />
     </button>
   );
-}
+});
