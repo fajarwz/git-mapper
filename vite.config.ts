@@ -126,14 +126,14 @@ function gitDevApi(): Plugin {
     read_log: ({ dir, limit, skip }) => ({
       text: run(
         String(dir),
-        ["log", "--all", `--max-count=${Number(limit) || 500}`, `--skip=${Number(skip) || 0}`, "--date=iso-strict",
+        ["log", "--all", "--date-order", `--max-count=${Number(limit) || 500}`, `--skip=${Number(skip) || 0}`, "--date=iso-strict",
           "--pretty=tformat:%d%x00%H%x00%an%x00%ae%x00%aI%x00%P%x00%B%x1e"],
       ),
     }),
     read_log_order: ({ dir, limit }) => ({
       text: run(String(dir), [
         "log",
-        "--all",
+        "--all", "--date-order",
         `--max-count=${Number(limit) || 500}`,
         "--date=iso-strict",
         "--pretty=tformat:%H",
@@ -141,7 +141,7 @@ function gitDevApi(): Plugin {
     }),
     read_log_delta: ({ dir, since, limit }) => {
       const rev = String(since ?? "").trim();
-      const base = ["log", "--all", `--max-count=${Number(limit) || 500}`];
+      const base = ["log", "--all", "--date-order", `--max-count=${Number(limit) || 500}`];
       if (rev !== "") base.push(`^${rev}`);
       base.push("--date=iso-strict", "--pretty=tformat:%d%x00%H%x00%an%x00%ae%x00%aI%x00%P%x00%B%x1e");
       return { text: run(String(dir), base) };

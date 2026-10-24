@@ -191,7 +191,7 @@ pub fn read_log(dir: &str, limit: u32, skip: u32) -> Result<String, String> {
         dir,
         &[
             "log",
-            "--all",
+            "--all", "--date-order",
             &format!("--max-count={limit}"),
             &format!("--skip={skip}"),
             "--date=iso-strict",
@@ -212,7 +212,7 @@ pub fn read_log_delta(dir: &str, since: &str, limit: u32) -> Result<String, Stri
         dir,
         &[
             "log",
-            "--all",
+            "--all", "--date-order",
             &format!("--max-count={limit}"),
             &exclude,
             "--date=iso-strict",
@@ -230,7 +230,7 @@ pub fn read_log_order(dir: &str, limit: u32) -> Result<String, String> {
         dir,
         &[
             "log",
-            "--all",
+            "--all", "--date-order",
             &format!("--max-count={limit}"),
             "--date=iso-strict",
             "--pretty=tformat:%H",
