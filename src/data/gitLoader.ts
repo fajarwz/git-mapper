@@ -1,7 +1,6 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open as pickDirectory } from "@tauri-apps/plugin-dialog";
 import type { ChangedFile, Commit, CommitRef, Repository } from "../types";
-import { relativeDate } from "../lib/format";
 import { orderRefs } from "../lib/refOrder";
 import { computeLanes } from "../lib/graphLanes";
 import { parseCommitFiles } from "../lib/gitDiffParser";
@@ -73,7 +72,6 @@ function toCommits(parsed: ReturnType<typeof parseLog>): Commit[] {
     author: commit.author,
     authorEmail: commit.authorEmail,
     date: commit.date,
-    relativeDate: relativeDate(commit.date),
     lane: lanes[index] ?? 0,
     parents: commit.parents,
     refs: commit.refs,
@@ -136,7 +134,6 @@ function uncommittedCommit(commits: Commit[]): Commit {
     author: "",
     authorEmail: "",
     date: new Date().toISOString(),
-    relativeDate: "now",
     lane: 0,
     parents: [head.hash],
     refs: [],

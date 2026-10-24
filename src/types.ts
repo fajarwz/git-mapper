@@ -34,9 +34,8 @@ export interface Commit {
   body?: string;
   author: string;
   authorEmail: string;
-  /** ISO timestamp used for the absolute date in the details panel. */
+  /** ISO timestamp; rendered absolute ("23 Oct 2026 12:09"), never relative. */
   date: string;
-  relativeDate: string;
   /** Graph column this commit's dot sits in. Authored per row while the layout engine is out of scope. */
   lane: number;
   /** Hashes of the parent commits, in order. Empty for the root commit. */
