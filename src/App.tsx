@@ -6,6 +6,7 @@ import { DetailsPanel } from "./components/DetailsPanel";
 import { EmptyState } from "./components/EmptyState";
 import { TitleBar } from "./components/TitleBar";
 import { SettingsModal } from "./components/SettingsModal";
+import { STORAGE_KEYS, usePersistedState } from "./lib/persisted";
 import { applyTheme, initialTheme, storeTheme } from "./lib/theme";
 import type { Theme } from "./lib/theme";
 import {
@@ -22,10 +23,17 @@ import type { Repository } from "./types";
 
 function App() {
   const [repos, setRepos] = useState<Repository[]>([]);
-  const [activeRepoId, setActiveRepoId] = useState<string | null>(null);
-  const [selectedCommitByRepo, setSelectedCommitByRepo] = useState<Record<string, string>>({});
+  // Restored on launch: which tab was open, which commit/file was being read, panel state.
+  const [activeRepoId, setActiveRepoId] = usePersistedState<string | null>(STORAGE_KEYS.activeRepo, null);
+  const [selectedCommitByRepo, setSelectedCommitByRepo] = usePersistedState<Record<string, string>>(
+    STORAGE_KEYS.selectedCommits,
+    {},
+  );
   // null means "fall back to the first changed file", which is what a fresh commit selection wants.
-  const [selectedFileByRepo, setSelectedFileByRepo] = useState<Record<string, string | null>>({});
+  const [selectedFileByRepo, setSelectedFileByRepo] = usePersistedState<Record<string, string | null>>(
+    STORAGE_KEYS.selectedFiles,
+    {},
+  );
   const [filesByCommitHash, setFilesByCommitHash] = useState<Record<string, ChangedFile[]>>({});
   const [loadingMoreByRepo, setLoadingMoreByRepo] = useState<Record<string, boolean>>({});
   const [allLoadedByRepo, setAllLoadedByRepo] = useState<Record<string, boolean>>({});
@@ -34,8 +42,11 @@ function App() {
   const [error, setError] = useState<string | null>(null);
 
   // Bottom panel: closable, and its height is draggable (null = the default percentage).
-  const [detailsOpen, setDetailsOpen] = useState(true);
-  const [detailsHeight, setDetailsHeight] = useState<number | null>(null);
+  const [detailsOpen, setDetailsOpen] = usePersistedState(STORAGE_KEYS.detailsOpen, true);
+  const [detailsHeight, setDetailsHeight] = usePersistedState<number | null>(
+    STORAGE_KEYS.detailsHeight,
+    null,
+  );
 
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -63,7 +74,8 @@ function App() {
       if (cancelled) return;
       hydratedPaths.current = true;
       setRepos(loaded);
-      if (loaded[0]) setActiveRepoId(loaded[0].id);
+      const restored = loaded.some((item) => item.id === activeRepoId) ? activeRepoId : null;
+      setActiveRepoId(restored ?? loaded[0]?.id ?? null);
     })();
     return () => {
       cancelled = true;

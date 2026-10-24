@@ -1,6 +1,8 @@
+import { STORAGE_KEYS } from "./persisted";
+
 export type Theme = "light" | "dark";
 
-const STORAGE_KEY = "git-mapper:theme";
+const STORAGE_KEY = STORAGE_KEYS.theme;
 
 export function readStoredTheme(): Theme | null {
   try {

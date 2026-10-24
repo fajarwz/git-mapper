@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open as pickDirectory } from "@tauri-apps/plugin-dialog";
 import type { ChangedFile, Commit, CommitRef, Repository } from "../types";
+import { STORAGE_KEYS } from "../lib/persisted";
 import { orderRefs } from "../lib/refOrder";
 import { computeLanes } from "../lib/graphLanes";
 import { parseCommitFiles } from "../lib/gitDiffParser";
@@ -39,7 +40,7 @@ export const UNCOMMITTED_HASH = "wip";
 /** Dogfood target for the very first run, when no repository has been opened before. */
 export const FIRST_RUN_PATH = "C:/DATA/lab/tauri/git-mapper";
 
-export const OPEN_REPOS_KEY = "git-mapper:open-repos";
+export const OPEN_REPOS_KEY = STORAGE_KEYS.repos;
 
 interface RepoInfo {
   path: string;
