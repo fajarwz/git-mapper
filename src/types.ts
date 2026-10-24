@@ -38,6 +38,8 @@ export interface Commit {
   date: string;
   /** Graph column this commit's dot sits in, from layoutGraph. The column is also its colour. */
   lane: number;
+  /** Palette index of the line this commit belongs to. Travels with the line as lanes shift. */
+  color: number;
   /** Hashes of the parent commits, in order. Empty for the root commit. */
   parents: string[];
   refs: CommitRef[];

@@ -1,18 +1,20 @@
 import { useMemo } from "react";
 import type { Commit } from "../types";
-import { layoutGraph } from "../lib/graphLanes";
+import type { LaneLayout } from "../lib/graphLanes";
 import {
   DOT_RADIUS,
   ROW_HEIGHT,
   buildEdges,
   graphWidth,
-  laneColor,
   laneX,
+  lineColor,
   rowY,
 } from "../lib/graphGeometry";
 
 interface CommitGraphProps {
   commits: Commit[];
+  /** Computed once by CommitList: the graph column is sized from it, so it cannot differ. */
+  layout: LaneLayout;
   selectedHash: string;
 }
 
@@ -21,11 +23,7 @@ interface CommitGraphProps {
  * row band, so forks and joins sit exactly on the commit that causes them. Same ROW_HEIGHT as the
  * commit rows, so a dot always lines up with its row.
  */
-export function CommitGraph({ commits, selectedHash }: CommitGraphProps) {
-  const layout = useMemo(
-    () => layoutGraph(commits.map((commit) => ({ hash: commit.hash, parents: commit.parents }))),
-    [commits],
-  );
+export function CommitGraph({ commits, layout, selectedHash }: CommitGraphProps) {
   const edges = useMemo(() => buildEdges(layout), [layout]);
 
   const width = graphWidth(layout.laneCount);
@@ -50,7 +48,8 @@ export function CommitGraph({ commits, selectedHash }: CommitGraphProps) {
         const y = rowY(index);
         const selected = commit.hash === selectedHash;
         const checkedOut = commit.refs.some((ref) => ref.isCurrent);
-        const color = laneColor(lane);
+        // The dot belongs to a line, so it takes the line's colour, not its column's.
+        const color = lineColor(layout.colors[index] ?? 0);
 
         return (
           <g key={commit.hash}>

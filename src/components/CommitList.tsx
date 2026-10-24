@@ -1,6 +1,7 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Repository } from "../types";
+import { layoutGraph } from "../lib/graphLanes";
 import { graphWidth } from "../lib/graphGeometry";
 import {
   COMMIT_HEADER_GRID,
@@ -38,8 +39,13 @@ function widthOf(element: HTMLElement | null, fallback: number): number {
 const HEADER_CELL = "relative flex h-full min-w-0 items-center";
 
 export function CommitList({ repo, selectedHash, flashHashes, onSelect, loadingMore, onNearBottom, onCheckoutBranch }: CommitListProps) {
-  const laneCount = Math.max(...repo.commits.map((commit) => commit.lane), 0) + 1;
-  const baseGraphWidth = graphWidth(laneCount);
+  // One layout for the graph column and the SVG. Sizing the column from the dot lanes alone used to
+  // clip the graph whenever a line ran right of every dot.
+  const layout = useMemo(
+    () => layoutGraph(repo.commits.map((commit) => ({ hash: commit.hash, parents: commit.parents }))),
+    [repo.commits],
+  );
+  const baseGraphWidth = graphWidth(layout.laneCount);
 
   // null keeps the message column flexible; dragging pins it to a pixel width.
   const [graphExtra, setGraphExtra] = useState(0);
@@ -179,7 +185,7 @@ export function CommitList({ repo, selectedHash, flashHashes, onSelect, loadingM
         }}
       >
         <div ref={graphColumnRef} className="w-(--graph-width) shrink-0">
-          <CommitGraph commits={repo.commits} selectedHash={selectedHash} />
+          <CommitGraph commits={repo.commits} layout={layout} selectedHash={selectedHash} />
         </div>
         <div className="min-w-0 flex-1 pl-2 pr-3">
           {repo.commits.map((commit) => (
