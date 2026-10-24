@@ -51,6 +51,12 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
 
 ## Known pitfalls
 
+- **Never reload the webview.** WebView2's context-menu Reload (and F5 / Ctrl+R) reloads the
+  custom-protocol origin and lands on Edge's "can't reach this page" instead of the app.
+  `src/lib/webview.ts` blocks both paths at startup; dev keepps the context menu for Inspect,
+  Ctrl+Shift+I still opens devtools. Refresh data by focusing the window (see App.tsx) or by
+  reopening the tab, not by reloading the page.
+
 - **design references:** target look is a frosted-glass commit feed (Dribbble-style, violet/rose/warm palette). The user judges ugliness by: row density, font-scale hierarchy, background saturation. "Ours should be close to the reference" means those three.
 - **headless verification:** headless Chrome inherits the system `prefers-color-scheme` (dark on this machine). To screenshot the light theme, pre-seed `localStorage.setItem("git-mapper:theme","light")` before the app loads (server the built `dist/` over http — absolute `/assets/` paths break under `file://`).
 - `vision_analyze` on this setup 401s (upstream credential). Verify visuals with pixel probes (PIL/numpy) or live computed styles instead of screenshots.
