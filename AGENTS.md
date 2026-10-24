@@ -24,20 +24,30 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
 ## Architecture
 
 - `src/App.tsx` — shell: `TitleBar` row (40px) over a flex-1 content area holding the commit list + details panel, per-repo selection state, details-panel open/height state. `Repository[]` lives in state (open tabs persisted to `localStorage` under `git-mapper:open-repos`, written only after the first load lands); empty state = `EmptyState.tsx`.
-- `src/components/TitleBar.tsx` — the window IS undecorated (`decorations: false` in `tauri.conf.json`), so this bar doubles as the title bar: brand, repo tabs (Chrome-style shrink + `tab-fade` on clipped labels), toolbar actions and the caption buttons. Tabs reorder through `@dnd-kit/sortable` (`horizontalListSortingStrategy` + `DragOverlay`); the sensors are **pointer only**, because the keyboard sensor claims Space/Enter on the focused tab and a tab must stay activatable from the keyboard. HTML5 drag-and-drop is not an option here: the webview routes drag events to Tauri's file-drop handler. `data-tauri-drag-region` covers the bar background and the tab strip; the caption buttons need the `core:window:allow-*` entries in `src-tauri/capabilities/default.json`.
+- `src/components/TitleBar.tsx` — the window IS undecorated (`decorations: false` in `tauri.conf.json`), so this bar doubles as the title bar: brand, repo tabs (Chrome-style shrink + `tab-fade` on clipped labels), toolbar actions (a refresh button whose glyph spins for at least 550ms so a fast local read still reads as work, plus settings) and the caption buttons. Tabs reorder through `@dnd-kit/sortable` (`horizontalListSortingStrategy` + `DragOverlay`); the sensors are **pointer only**, because the keyboard sensor claims Space/Enter on the focused tab and a tab must stay activatable from the keyboard. HTML5 drag-and-drop is not an option here: the webview routes drag events to Tauri's file-drop handler. `data-tauri-drag-region` covers the bar background and the tab strip; the caption buttons need the `core:window:allow-*` entries in `src-tauri/capabilities/default.json`.
 - `src-tauri/src/git.rs` — Tauri commands running the `git` CLI: `open_repository` (validates + toplevel/name), `read_status` (branch/ahead/behind), `read_log` (porcelain fields `\x00`-separated, records `\x1e`-separated, decorations lead each record), `read_commit_files` (numstat + name-status + patch, first-parent; root via `--root`). Folder picking is JS-side via `tauri-plugin-dialog` (`dialog:default` capability).
 - `src/data/gitLoader.ts` — the only `invoke()` surface: `loadRepository`, `pickAndLoadRepository`,
   `refreshRepository`, `loadCommitFiles`, plus persisted-path storage. Build the `Repository`/`Commit`
   objects there; components stay invoke-free.
 - **Refresh is surgical.** `refreshRepository` runs two cheap reads (`read_status`, `read_refs`) and
-  compares branch + HEAD + dirty size + a digest of every ref. Unchanged → `null`, no state update.
+  compares branch + HEAD + dirty size + the **worktree digest** + a digest of every ref.
+  Unchanged → `null`, no state update. The digest is why the uncommitted row updates at all: the
+  dirty *count* stays put while a file is edited, so `read_status` also hashes the status list,
+  the tracked `git diff HEAD` and the size/mtime of every untracked file.
   A moved HEAD *or* a moved ref triggers `read_log_delta` (`git log --all ^<oldHead>`): a fetch that
   only adds a branch leaves HEAD alone but its commits are still new to the window. The delta is
   spliced in **git's own order** (`read_log_order`, `git log --all --format=%H`), because a branch
   pushed late can carry commits older than rows already on screen. Empty delta with a moved HEAD, or
   a full page, means history was rewritten or the window shifted → `loadRepository`. Unchanged
   commits keep object identity (`withLanes`, `sameRefs`) so the memoized `CommitRow` skips their
-  render, and the return value lists the rows a caller should flash (`touched`).
+  render, and the return value lists the rows a caller should flash (`touched`) — the
+  uncommitted row included, since it is rebuilt from scratch instead of coming out of the delta.
+  `refreshRepository(repo, force)` only drops the early exit: that is the toolbar refresh
+  button, and it is what makes the uncommitted row refetch through its new digest key.
+- **The uncommitted row owns its file list.** `git diff HEAD` never lists untracked paths, so
+  `read_commit_files(dir, "wip")` appends numstat/name-status/patch entries for every
+  `git ls-files --others --exclude-standard` path (binary → a "not shown" hunk). The dev
+  middleware in `vite.config.ts` mirrors this and the worktree digest — keep the two in sync.
 - `src/lib/` parsers — `gitLogParser`, `gitDiffParser` (DiffLine text carries NO +/- prefix; the renderer adds it), `graphLanes` (git-shaped layout: dense lanes, tips append on the right, merge parents fork just right of the commit, closed lanes shift the rest left, and a commit reserved by several children keeps the leftmost and joins the rest — `MAX_LANES` is a hard width cap). All pure, no React — verifiable with `npx vite-node <probe>` against real git output.
 - Changed files/diffs load lazily per selected commit (`App` keeps `filesByCommitHash`); the commit list never carries them.
 - Window focus re-checks the visible repo only (throttled to one probe per 1.5s, hidden windows skipped). Other tabs are not refreshed — they are off screen and each refresh costs git reads.
@@ -81,6 +91,10 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
   **Colour belongs to the column**, not the branch: lane *k* is always `laneColor(k)`, so two
   neighbouring lines can never share a hue. `MAX_LANES` is 8 because the palette has 8 tokens
   (`--color-lane-1..8`). Dots sit on `rowY(index)`, so keep `ROW_HEIGHT` shared with `CommitRow`.
+- **verifying without the desktop window:** `npm run dev` exposes the same git commands as
+  `POST /api/git` (`{op, args}`), so a headless Chrome probe of `http://127.0.0.1:1420` exercises the
+  real TS path (refresh, wip payloads, flash classes) without rebuilding Rust. Rust-side changes
+  still need the app restarted — Vite HMR only covers the frontend.
 - **headless verification:** headless Chrome inherits the system `prefers-color-scheme` (dark on this machine). To screenshot the light theme, pre-seed `localStorage.setItem("git-mapper:theme","light")` before the app loads (server the built `dist/` over http — absolute `/assets/` paths break under `file://`).
 - `vision_analyze` on this setup 401s (upstream credential). Verify visuals with pixel probes (PIL/numpy) or live computed styles instead of screenshots.
 - Dist builds are hashed (`index-*.js/css`); stale copies in preview dirs cause "old design" confusion — always re-copy `dist/*` before capturing.
