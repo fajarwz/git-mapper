@@ -107,6 +107,17 @@ loader). `npm run lint` is a Tailwind class checker, not a code linter. `npm run
   same commit as several parallel lines that fanned into one dot rows later (that was the
   `jersium-marketplace` breakage). `laneX` is not clamped: lanes past the palette still get their
   own x, and the graph width comes from `layout.laneCount`.
+  **The layout records the pieces.** `layoutGraph` returns, per row, `transitions` (kind
+  `continue` / `shift` / `fork` / `join`, source lane, destination lane, colour, target hash) and
+  `gaps` (a parent outside the loaded window, or one already drawn because the input was not
+  ordered). `buildEdges` only turns those into coordinates: it never matches hashes or guesses a
+  connection. Add a test before teaching the layout a new transition kind.
+- **The log is read in `--date-order`.** That promise (no parent before all of its children) is
+  what the single-sweep lane allocation relies on. Plain date order can place a parent above its
+  child after a clock skew; `--topo-order` is valid but groups each branch, leaving every other
+  branch tip's lane open at once (406 lanes on a 400-branch repo against 11 with `--date-order`).
+  `layoutGraph` reports `ordered: false` and drops such connections instead of drawing upward, with
+  `gaps` saying why.
 - **verifying without the desktop window:** `npm run dev` exposes the same git commands as
   `POST /api/git` (`{op, args}`), so a headless Chrome probe of `http://127.0.0.1:1420` exercises the
   real TS path (refresh, wip payloads, flash classes) without rebuilding Rust. Rust-side changes
