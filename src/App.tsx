@@ -18,9 +18,20 @@ import {
   pickAndLoadRepository,
   readStoredPaths,
   refreshRepository,
+  UNCOMMITTED_HASH,
   storePaths,
 } from "./data/gitLoader";
 import type { Repository } from "./types";
+
+/**
+ * Key for the loaded-files cache. It has to include the repo: the uncommitted row uses the same
+ * pseudo hash ("wip") in every repository, so a hash-only key showed one repo's working-tree
+ * changes in another. The uncommitted entry also carries the change count, so an edit made
+ * elsewhere refetches instead of replaying the previous list.
+ */
+function filesKey(repoPath: string, hash: string, changed: number): string {
+  return hash === UNCOMMITTED_HASH ? `${repoPath}::~wip:${changed}` : `${repoPath}::${hash}`;
+}
 
 function App() {
   const [repos, setRepos] = useState<Repository[]>([]);
@@ -104,26 +115,29 @@ function App() {
         (commit) => commit.hash === (selectedCommitByRepo[repo.id] ?? repo.defaultCommitHash),
       ) ?? repo.commits[0] ?? null)
     : null;
-  const files = selectedCommit ? (filesByCommitHash[selectedCommit.hash] ?? []) : [];
+  const selectedFilesKey =
+    repo && selectedCommit ? filesKey(repo.path, selectedCommit.hash, repo.changed) : null;
+  const files = selectedFilesKey ? (filesByCommitHash[selectedFilesKey] ?? []) : [];
   const selectedFile =
     files.find((file) => file.path === (selectedFileByRepo[repo?.id ?? ""] ?? null)) ??
     files[0] ??
     null;
 
   // Real diffs load per selected commit; files stay out of the commit list on purpose.
-  const selectedHash = selectedCommit?.hash;
   useEffect(() => {
-    if (!repo || !selectedHash || filesByCommitHash[selectedHash]) return;
+    if (!repo || !selectedCommit || !selectedFilesKey) return;
+    if (filesByCommitHash[selectedFilesKey]) return;
+    const cacheKey = selectedFilesKey;
     let cancelled = false;
     setFilesLoading(true);
-    loadCommitFiles(repo.path, selectedHash)
+    loadCommitFiles(repo.path, selectedCommit.hash)
       .then((loaded) => {
-        if (!cancelled) setFilesByCommitHash((prev) => ({ ...prev, [selectedHash]: loaded }));
+        if (!cancelled) setFilesByCommitHash((prev) => ({ ...prev, [cacheKey]: loaded }));
       })
       .catch((loadError) => {
         if (!cancelled) {
           console.error("Could not read changed files", loadError);
-          setFilesByCommitHash((prev) => ({ ...prev, [selectedHash]: [] }));
+          setFilesByCommitHash((prev) => ({ ...prev, [cacheKey]: [] }));
         }
       })
       .finally(() => {
@@ -132,7 +146,7 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [repo, selectedHash, filesByCommitHash]);
+  }, [repo, selectedCommit, selectedFilesKey, filesByCommitHash]);
 
   const handleSelectRepo = useCallback((id: string) => {
     setActiveRepoId(id);
@@ -282,12 +296,10 @@ function App() {
         repos={repos}
         activeId={repo?.id ?? null}
         repo={repo}
-        detailsOpen={detailsOpen && !noRepo}
         adding={opening}
         onSelect={handleSelectRepo}
         onAdd={handleAdd}
         onClose={handleCloseRepo}
-        onToggleDetails={() => setDetailsOpen((open) => !open)}
         onOpenSettings={() => setSettingsOpen(true)}
       />
 
