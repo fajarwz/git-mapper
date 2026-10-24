@@ -53,7 +53,7 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
 
 - **Never reload the webview.** WebView2's context-menu Reload (and F5 / Ctrl+R) reloads the
   custom-protocol origin and lands on Edge's "can't reach this page" instead of the app.
-  `src/lib/webview.ts` blocks both paths at startup; dev keepps the context menu for Inspect,
+  `src/lib/webview.ts` blocks both paths at startup; dev keeps the context menu for Inspect,
   Ctrl+Shift+I still opens devtools. Refresh data by focusing the window (see App.tsx) or by
   reopening the tab, not by reloading the page.
 
