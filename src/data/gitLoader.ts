@@ -3,7 +3,7 @@ import { open as pickDirectory } from "@tauri-apps/plugin-dialog";
 import type { ChangedFile, Commit, CommitRef, Repository } from "../types";
 import { STORAGE_KEYS } from "../lib/persisted";
 import { orderRefs } from "../lib/refOrder";
-import { computeLanes } from "../lib/graphLanes";
+import { layoutGraph } from "../lib/graphLanes";
 import { parseCommitFiles } from "../lib/gitDiffParser";
 import { parseLog } from "../lib/gitLogParser";
 
@@ -78,7 +78,7 @@ function mergeRefs(decorations: CommitRef[], tips: CommitRef[]): CommitRef[] {
 }
 
 function toCommits(parsed: ReturnType<typeof parseLog>): Commit[] {
-  const lanes = computeLanes(parsed.map((c) => ({ hash: c.hash, parents: c.parents })));
+  const layout = layoutGraph(parsed.map((c) => ({ hash: c.hash, parents: c.parents })));
   return parsed.map((commit, index) => ({
     hash: commit.hash,
     subject: commit.subject,
@@ -86,7 +86,8 @@ function toCommits(parsed: ReturnType<typeof parseLog>): Commit[] {
     author: commit.author,
     authorEmail: commit.authorEmail,
     date: commit.date,
-    lane: lanes[index] ?? 0,
+    lane: layout.lanes[index] ?? 0,
+    color: layout.colors.get(commit.hash) ?? layout.lanes[index] ?? 0,
     parents: commit.parents,
     refs: commit.refs,
   }));
@@ -169,6 +170,7 @@ function uncommittedCommit(commits: Commit[], changed: number): Commit {
     authorEmail: "",
     date: new Date().toISOString(),
     lane: 0,
+    color: 0,
     parents: [head.hash],
     refs: [],
   };
@@ -176,12 +178,13 @@ function uncommittedCommit(commits: Commit[], changed: number): Commit {
 
 /** Places lanes over the real commits plus, when present, the uncommitted row on top. */
 function withLanes(commits: Commit[]): Commit[] {
-  const lanes = computeLanes(commits.map((c) => ({ hash: c.hash, parents: c.parents })));
-  // Reuse the commit object when its lane is unchanged: rows are memoized, so identical
-  // objects mean identical renders and no DOM work for history that did not move.
+  const layout = layoutGraph(commits.map((c) => ({ hash: c.hash, parents: c.parents })));
+  // Reuse the commit object when its lane and colour are unchanged: rows are memoized, so
+  // identical objects mean identical renders and no DOM work for history that did not move.
   return commits.map((commit, index) => {
-    const lane = lanes[index] ?? 0;
-    return commit.lane === lane ? commit : { ...commit, lane };
+    const lane = layout.lanes[index] ?? 0;
+    const color = layout.colors.get(commit.hash) ?? lane;
+    return commit.lane === lane && commit.color === color ? commit : { ...commit, lane, color };
   });
 }
 

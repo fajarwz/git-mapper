@@ -36,7 +36,7 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
   a full page, means history was rewritten or the window shifted → `loadRepository`. Unchanged
   commits keep object identity (`withLanes`, `sameRefs`) so the memoized `CommitRow` skips their
   render, and the return value lists the rows a caller should flash (`touched`).
-- `src/lib/` parsers — `gitLogParser`, `gitDiffParser` (DiffLine text carries NO +/- prefix; the renderer adds it), `graphLanes` (greedy lane assignment: a commit takes the lane a child reserved for it, every reservation of a commit is cleared when it is drawn, and lanes past `MAX_LANES` recycle round-robin — a real layout engine is still future work). All pure, no React — verifiable with `npx vite-node <probe>` against real git output.
+- `src/lib/` parsers — `gitLogParser`, `gitDiffParser` (DiffLine text carries NO +/- prefix; the renderer adds it), `graphLanes` (git-shaped layout: dense lanes, tips append on the right, merge parents fork just right of the commit, closed lanes shift the rest left, and a commit reserved by several children keeps the leftmost and joins the rest — `MAX_LANES` is a hard width cap). All pure, no React — verifiable with `npx vite-node <probe>` against real git output.
 - Changed files/diffs load lazily per selected commit (`App` keeps `filesByCommitHash`); the commit list never carries them.
 - Window focus re-checks the visible repo only (throttled to one probe per 1.5s, hidden windows skipped). Other tabs are not refreshed — they are off screen and each refresh costs git reads.
 - `src/lib/graphGeometry.ts` — `ROW_HEIGHT` is shared between `CommitRow` and the SVG graph. Change both together or dots misalign with rows.
@@ -66,10 +66,11 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
   reopening the tab, not by reloading the page.
 
 - **design references:** target look is a frosted-glass commit feed (Dribbble-style, violet/rose/warm palette). The user judges ugliness by: row density, font-scale hierarchy, background saturation. "Ours should be close to the reference" means those three.
-- **Graph geometry:** `buildEdges` moves a branch sideways at most one lane per row (one lane per
-  row of vertical space, then a straight run down the parent's lane). Never cram a multi-lane
-  shift into a single row: that reads as a node jumping across the graph. Lane dots sit on
-  `rowY(index)`, so any geometry change must keep `ROW_HEIGHT` shared with `CommitRow`.
+- **Graph geometry:** lines are drawn row to row, never across rows. `layoutGraph` returns, per row,
+  the lanes above and below the commit, so `buildEdges` can draw every fork, join and lane shift as
+  a bend inside that row's band and merge everything vertical into one path per lane and colour.
+  Drawing a child-to-parent curve instead is what produced long diagonals that read as nodes
+  jumping across the graph. Dots sit on `rowY(index)`, so keep `ROW_HEIGHT` shared with `CommitRow`.
 - **headless verification:** headless Chrome inherits the system `prefers-color-scheme` (dark on this machine). To screenshot the light theme, pre-seed `localStorage.setItem("git-mapper:theme","light")` before the app loads (server the built `dist/` over http — absolute `/assets/` paths break under `file://`).
 - `vision_analyze` on this setup 401s (upstream credential). Verify visuals with pixel probes (PIL/numpy) or live computed styles instead of screenshots.
 - Dist builds are hashed (`index-*.js/css`); stale copies in preview dirs cause "old design" confusion — always re-copy `dist/*` before capturing.

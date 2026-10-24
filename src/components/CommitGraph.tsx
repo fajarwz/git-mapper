@@ -1,4 +1,6 @@
+import { useMemo } from "react";
 import type { Commit } from "../types";
+import { layoutGraph } from "../lib/graphLanes";
 import {
   DOT_RADIUS,
   ROW_HEIGHT,
@@ -15,14 +17,19 @@ interface CommitGraphProps {
 }
 
 /**
- * SVG graph for the whole history. Rendered in the same scroll container as the rows and using
- * the same ROW_HEIGHT, so a commit's dot always lines up with its row.
+ * SVG graph for the whole history. Lanes come from layoutGraph and every line is drawn inside one
+ * row band, so forks and joins sit exactly on the commit that causes them. Same ROW_HEIGHT as the
+ * commit rows, so a dot always lines up with its row.
  */
 export function CommitGraph({ commits, selectedHash }: CommitGraphProps) {
-  const laneCount = Math.max(...commits.map((commit) => commit.lane), 0) + 1;
-  const width = graphWidth(laneCount);
+  const layout = useMemo(
+    () => layoutGraph(commits.map((commit) => ({ hash: commit.hash, parents: commit.parents }))),
+    [commits],
+  );
+  const edges = useMemo(() => buildEdges(layout), [layout]);
+
+  const width = graphWidth(layout.laneCount);
   const height = commits.length * ROW_HEIGHT;
-  const edges = buildEdges(commits);
 
   return (
     <svg data-commit-graph className="block" width={width} height={height} aria-hidden="true">
@@ -38,10 +45,12 @@ export function CommitGraph({ commits, selectedHash }: CommitGraphProps) {
       ))}
 
       {commits.map((commit, index) => {
-        const x = laneX(commit.lane);
+        const lane = layout.lanes[index] ?? 0;
+        const x = laneX(lane);
         const y = rowY(index);
         const selected = commit.hash === selectedHash;
         const checkedOut = commit.refs.some((ref) => ref.isCurrent);
+        const color = laneColor(layout.colors.get(commit.hash) ?? lane);
 
         return (
           <g key={commit.hash}>
@@ -56,13 +65,13 @@ export function CommitGraph({ commits, selectedHash }: CommitGraphProps) {
               />
             )}
             {checkedOut ? (
-              // HEAD sits here: hollow ring, same lane colour as the edges.
+              // HEAD sits here: hollow ring, same lane colour as its line.
               <circle
                 cx={x}
                 cy={y}
                 r={DOT_RADIUS + 1.5}
                 fill="var(--color-surface)"
-                stroke={laneColor(commit.lane)}
+                stroke={color}
                 strokeWidth={2.4}
               />
             ) : (
@@ -70,7 +79,7 @@ export function CommitGraph({ commits, selectedHash }: CommitGraphProps) {
                 cx={x}
                 cy={y}
                 r={DOT_RADIUS}
-                fill={laneColor(commit.lane)}
+                fill={color}
                 stroke="var(--color-surface)"
                 strokeWidth={2}
               />

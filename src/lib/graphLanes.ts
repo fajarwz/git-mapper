@@ -1,44 +1,80 @@
 /**
- * Greedy lane assignment walking commits newest-first: a commit occupies the
- * lane where one of its children reserved it, otherwise the lowest free lane.
- * Its primary parent continues in the same lane; secondary parents (merge
- * branches) reserve free lanes. Deliberately simple — a real layout engine
- * is a separate pass — but with a hard cap: repos with many parallel branches
- * would otherwise grow arbitrarily wide. When the cap is full the round-robin
- * victim slot is recycled, so single-use lanes collapse instead of spreading.
+ * Lane layout, newest-first, in the shape git itself draws.
+ *
+ * `pending` holds the commits that still have a line running down the graph, one entry per lane,
+ * left to right. For each commit:
+ *
+ * - it takes the lane already reserved for it; a commit nothing reserved (a branch tip) opens a
+ *   lane on the right, which is what keeps existing lanes from shuffling;
+ * - its entry becomes its first parent in the same lane, so a linear run is one straight line;
+ * - extra parents (merges) are inserted just to the right of it, the fork git draws as `|\`;
+ * - when a commit has no parent its lane closes and every lane to its right shifts one step left;
+ * - a commit reserved in several lanes (the parent of several children) keeps the leftmost lane;
+ *   the other reservations are dropped, which is the `|/` join.
+ *
+ * Lanes stay dense: no holes, no "lowest free lane" reuse. Rows keep both lists (`above` before the
+ * commit is consumed, `after` once its parents are in place) so the renderer can draw every line as
+ * a short piece inside one row band: straight where a lane continues, a small bend where a lane is
+ * forked, joined or shifted. Nothing is ever drawn across several rows, which is what makes forks
+ * and joins land on the commit that causes them.
  */
-export const MAX_LANES = 6;
+export const MAX_LANES = 10;
 
-export function computeLanes(
-  commits: Array<{ hash: string; parents: string[] }>,
-): number[] {
-  const slots: Array<string | null> = [];
-  let victim = 0;
-  const claimFreeOrVictim = (): number => {
-    // Slots past the array end are free too, so the list only grows up to the cap.
-    const free = slots.findIndex((slot, index) => index < MAX_LANES && slot == null);
-    if (free !== -1) return free;
-    // Full above the cap: recycle the round-robin victim slot.
-    const picked = victim % MAX_LANES;
-    victim = picked + 1;
-    return picked;
-  };
+export interface LaneRow {
+  /** Lane contents (hashes) arriving at this row, index = lane. */
+  above: string[];
+  /** Lane contents leaving this row downwards, index = lane. */
+  after: string[];
+}
 
-  return commits.map(({ hash, parents }) => {
-    let lane = slots.indexOf(hash);
-    // A commit can be the parent of several children, so it can be reserved in several lanes.
-    // Drop every reservation before re-reserving, otherwise the leftovers keep those lanes
-    // occupied for a commit that is already drawn: later commits then land lanes away from
-    // their parent and the connecting line looks like it jumps two columns instead of one.
-    for (let index = 0; index < slots.length; index += 1) {
-      if (slots[index] === hash) slots[index] = null;
+export interface LaneLayout {
+  /** Lane index per commit: where its dot sits. */
+  lanes: number[];
+  rows: LaneRow[];
+  /** Lanes actually needed, for the SVG width. */
+  laneCount: number;
+  /** Colour slot per commit hash, assigned when the branch first opens a lane. */
+  colors: Map<string, number>;
+}
+
+export function layoutGraph(commits: Array<{ hash: string; parents: string[] }>): LaneLayout {
+  const pending: string[] = [];
+  const lanes: number[] = [];
+  const rows: LaneRow[] = [];
+  const colors = new Map<string, number>();
+  let laneCount = 1;
+
+  commits.forEach(({ hash, parents }) => {
+    // A commit nothing reserved yet is a branch tip: it opens a lane on the right.
+    if (!pending.includes(hash)) {
+      pending.push(hash);
+      if (!colors.has(hash)) colors.set(hash, pending.length - 1);
     }
-    if (lane === -1) lane = claimFreeOrVictim();
-    slots[lane] = parents[0] ?? null;
+    const lane = pending.indexOf(hash);
+    const above = pending.slice();
+
+    if (parents.length > 0) {
+      pending[lane] = parents[0];
+    } else {
+      pending.splice(lane, 1); // root: the lane ends here
+    }
+
+    // Extra parents fork into lanes just to the right of this one.
     for (const parent of parents.slice(1)) {
-      if (slots.includes(parent)) continue;
-      slots[claimFreeOrVictim()] = parent;
+      if (pending.includes(parent)) continue;
+      pending.splice(Math.min(lane + 1, pending.length), 0, parent);
+      if (!colors.has(parent)) colors.set(parent, Math.min(lane + 1, pending.length - 1));
     }
-    return lane;
+
+    // Another child may also have reserved this commit further right: that reservation ends here.
+    for (let index = pending.length - 1; index >= 0; index -= 1) {
+      if (index !== lane && pending[index] === hash) pending.splice(index, 1);
+    }
+
+    laneCount = Math.max(laneCount, above.length, pending.length);
+    lanes.push(lane);
+    rows.push({ above, after: pending.slice() });
   });
+
+  return { lanes, rows, laneCount, colors };
 }

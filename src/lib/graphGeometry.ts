@@ -1,12 +1,13 @@
-import type { Commit } from "../types";
+import { MAX_LANES } from "./graphLanes";
+import type { LaneLayout } from "./graphLanes";
 
 /** Fixed row height in px. The commit rows and the SVG graph both use it so they stay aligned. */
 export const ROW_HEIGHT = 32;
 export const LANE_WIDTH = 16;
 export const GRAPH_PADDING_X = 14;
 export const DOT_RADIUS = 3.5;
-/** Hard lane cap; beyond it graphLanes recycles lanes so the graph can never exceed this width. */
-export const MAX_LANES = 6;
+/** Hard lane cap, shared with the layout: past it lanes are drawn on top of each other. */
+export { MAX_LANES };
 
 /** Lane colours as tokens, so the graph follows the active theme. */
 export const LANE_COLORS = [
@@ -40,57 +41,102 @@ export interface GraphEdge {
   color: string;
 }
 
+interface Vertical {
+  lane: number;
+  from: number;
+  to: number;
+  color: string;
+}
+
+function bend(fromX: number, fromY: number, toX: number, toY: number): string {
+  if (Math.abs(fromX - toX) < 0.01) return `M ${fromX} ${fromY} L ${toX} ${toY}`;
+  const half = (toY - fromY) * 0.5;
+  return `M ${fromX} ${fromY} C ${fromX} ${fromY + half}, ${toX} ${toY - half} ${toX} ${toY}`;
+}
+
 /**
- * Builds one path per commit -> parent link. Lane positions come from computeLanes, so this is
- * only geometry, not a layout algorithm.
+ * Turns the layout into SVG paths.
  *
- * A link that changes lane bends sideways, and it never moves more than one lane per row: the
- * bend is spread over as many rows as it has lanes to cross (one lane per row), then the line
- * runs straight down the parent's lane. Cramming a two-lane shift into a single row is what
- * makes a branch look like it jumps across the graph instead of sliding over.
+ * Bends stay inside one row band: a lane that forks, joins or shifts leans across the row of the
+ * commit that causes it, so divergence and convergence sit exactly where the history has them
+ * instead of on a long diagonal. Everything vertical is merged into one path per lane and colour,
+ * so the element count follows the number of lanes, not the number of rows.
  */
-export function buildEdges(commits: Commit[]): GraphEdge[] {
-  const indexByHash = new Map<string, number>();
-  commits.forEach((commit, index) => indexByHash.set(commit.hash, index));
-
+export function buildEdges(layout: LaneLayout): GraphEdge[] {
   const edges: GraphEdge[] = [];
-  commits.forEach((commit, index) => {
-    const fromX = laneX(commit.lane);
-    const fromY = rowY(index);
+  const colorOf = (hash: string) => laneColor(layout.colors.get(hash) ?? 0);
+  const runs = new Map<string, Vertical>();
 
-    commit.parents.forEach((parentHash) => {
-      const parentIndex = indexByHash.get(parentHash);
-      if (parentIndex === undefined) return;
+  const addVertical = (lane: number, from: number, to: number, color: string) => {
+    if (to - from < 0.01) return;
+    const key = `${lane}:${color}`;
+    const run = runs.get(key);
+    // Contiguous pieces of the same lane and colour become one line.
+    if (run && Math.abs(run.to - from) < 0.01) {
+      run.to = to;
+      return;
+    }
+    runs.set(key, { lane, from, to, color });
+  };
 
-      const parent = commits[parentIndex];
-      const toX = laneX(parent.lane);
-      const toY = rowY(parentIndex);
+  layout.rows.forEach(({ above, after }, row) => {
+    const lane = layout.lanes[row];
+    const midY = rowY(row);
+    const inY = midY - ROW_HEIGHT / 2;
+    const outY = midY + ROW_HEIGHT / 2;
 
-      // An edge takes the colour of the lane it ends in, so the vertical run keeps one colour.
-      const color = laneColor(parent.lane);
+    const available = above.map((hash, index) => ({ hash, index, used: false }));
 
-      let path: string;
-      if (fromX === toX) {
-        path = `M ${fromX} ${fromY} L ${toX} ${toY}`;
-      } else {
-        const rows = parentIndex - index;
-        const lanesMoved = Math.abs(parent.lane - commit.lane);
-        // One lane per row while there is room; a steep convergence still has to bend in-row.
-        const steps = Math.max(1, Math.min(lanesMoved, rows));
-        const bend = Math.min(ROW_HEIGHT * steps, toY - fromY);
-        // Spreading the move over several rows is a plain diagonal, so the x position advances
-        // exactly one lane per row. A single-row move gets the eased curve instead.
-        path =
-          steps === 1
-            ? `M ${fromX} ${fromY} ` +
-              `C ${fromX} ${fromY + bend * 0.55}, ${toX} ${fromY + bend * 0.45} ${toX} ${fromY + bend} ` +
-              `L ${toX} ${toY}`
-            : `M ${fromX} ${fromY} L ${toX} ${fromY + bend} L ${toX} ${toY}`;
+    after.forEach((hash, to) => {
+      const color = colorOf(hash);
+      const source = available.find((entry) => !entry.used && entry.hash === hash);
+      if (source) {
+        source.used = true;
+        if (source.index === to) {
+          addVertical(to, inY, outY, color);
+        } else {
+          edges.push({
+            key: `r${row}:${source.index}->${to}`,
+            path: bend(laneX(source.index), inY, laneX(to), outY),
+            color,
+          });
+        }
+        return;
       }
-
-      edges.push({ key: `${commit.hash}->${parentHash}`, path, color });
+      // Not running before this row: it forked off the commit's dot.
+      edges.push({
+        key: `r${row}:dot->${to}`,
+        path: bend(laneX(lane), midY, laneX(to), outY),
+        color,
+      });
     });
+
+    // Whatever is left above ends in the dot: another child's reservation joining in, or the
+    // commit itself arriving on its lane.
+    for (const entry of available) {
+      if (entry.used) continue;
+      edges.push({
+        key: `r${row}:${entry.index}->dot`,
+        path: bend(laneX(entry.index), inY, laneX(lane), midY),
+        color: colorOf(entry.hash),
+      });
+    }
+
+    // Gaps between rows.
+    if (row < layout.rows.length - 1) {
+      const gapFrom = outY;
+      const gapTo = rowY(row + 1) - ROW_HEIGHT / 2;
+      after.forEach((hash, index) => addVertical(index, gapFrom, gapTo, colorOf(hash)));
+    }
   });
+
+  for (const [key, run] of runs) {
+    edges.push({
+      key: `run:${key}`,
+      path: `M ${laneX(run.lane)} ${run.from} L ${laneX(run.lane)} ${run.to}`,
+      color: run.color,
+    });
+  }
 
   return edges;
 }
