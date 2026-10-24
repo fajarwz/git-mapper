@@ -16,6 +16,8 @@ interface ResizeHandleProps {
   orientation?: Orientation;
   /** "splitter" spans a panel edge, "column" sits in a table header cell. */
   variant?: "splitter" | "column";
+  /** Horizontal draggables only: true = pointer down grows the pane above (bottom-edge grab). */
+  invert?: boolean;
   className?: string;
 }
 
@@ -54,6 +56,7 @@ export function ResizeHandle({
   onReset,
   orientation = "vertical",
   variant = "splitter",
+  invert = false,
   className = "",
 }: ResizeHandleProps) {
   const [dragging, setDragging] = useState(false);
@@ -77,8 +80,11 @@ export function ResizeHandle({
   function handlePointerMove(event: PointerEvent<HTMLDivElement>) {
     if (!origin.current) return;
     const pointer = isVertical ? event.clientX : event.clientY;
-    const delta = pointer - origin.current.pointer;
-    onResize(clamp(origin.current.startSize + (isVertical ? delta : -delta)));
+    const raw = pointer - origin.current.pointer;
+    // Vertical: pointer right grows. Horizontal: pointer up grows, unless the
+    // handle grabs a bottom edge (then pointer down grows).
+    const delta = isVertical ? raw : invert ? raw : -raw;
+    onResize(clamp(origin.current.startSize + delta));
   }
 
   function handlePointerUp(event: PointerEvent<HTMLDivElement>) {

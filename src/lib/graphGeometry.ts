@@ -1,10 +1,12 @@
 import type { Commit } from "../types";
 
 /** Fixed row height in px. The commit rows and the SVG graph both use it so they stay aligned. */
-export const ROW_HEIGHT = 44;
+export const ROW_HEIGHT = 32;
 export const LANE_WIDTH = 16;
 export const GRAPH_PADDING_X = 14;
-export const DOT_RADIUS = 4.5;
+export const DOT_RADIUS = 3.5;
+/** Hard lane cap; beyond it graphLanes recycles lanes so the graph can never exceed this width. */
+export const MAX_LANES = 6;
 
 /** Lane colours as tokens, so the graph follows the active theme. */
 export const LANE_COLORS = [
@@ -21,7 +23,7 @@ export function laneColor(lane: number): string {
 }
 
 export function laneX(lane: number): number {
-  return GRAPH_PADDING_X + lane * LANE_WIDTH;
+  return GRAPH_PADDING_X + Math.min(lane, MAX_LANES - 1) * LANE_WIDTH;
 }
 
 export function rowY(index: number): number {
@@ -29,7 +31,7 @@ export function rowY(index: number): number {
 }
 
 export function graphWidth(laneCount: number): number {
-  return GRAPH_PADDING_X * 2 + Math.max(laneCount - 1, 0) * LANE_WIDTH;
+  return GRAPH_PADDING_X * 2 + Math.max(Math.min(laneCount, MAX_LANES) - 1, 0) * LANE_WIDTH;
 }
 
 export interface GraphEdge {

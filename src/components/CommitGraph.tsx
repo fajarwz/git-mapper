@@ -41,6 +41,7 @@ export function CommitGraph({ commits, selectedHash }: CommitGraphProps) {
         const x = laneX(commit.lane);
         const y = rowY(index);
         const selected = commit.hash === selectedHash;
+        const checkedOut = commit.refs.some((ref) => ref.isCurrent);
 
         return (
           <g key={commit.hash}>
@@ -54,14 +55,26 @@ export function CommitGraph({ commits, selectedHash }: CommitGraphProps) {
                 strokeWidth={1.4}
               />
             )}
-            <circle
-              cx={x}
-              cy={y}
-              r={DOT_RADIUS}
-              fill={laneColor(commit.lane)}
-              stroke="var(--color-surface)"
-              strokeWidth={2}
-            />
+            {checkedOut ? (
+              // HEAD sits here: hollow ring, same lane colour as the edges.
+              <circle
+                cx={x}
+                cy={y}
+                r={DOT_RADIUS + 1.5}
+                fill="var(--color-surface)"
+                stroke={laneColor(commit.lane)}
+                strokeWidth={2.4}
+              />
+            ) : (
+              <circle
+                cx={x}
+                cy={y}
+                r={DOT_RADIUS}
+                fill={laneColor(commit.lane)}
+                stroke="var(--color-surface)"
+                strokeWidth={2}
+              />
+            )}
             <title>{`${commit.hash} ${commit.subject}`}</title>
           </g>
         );

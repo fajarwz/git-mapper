@@ -1,13 +1,16 @@
 import type { Repository } from "../types";
-import { PlusIcon, RepoIcon } from "./icons";
+import { CloseIcon, PlusIcon, RepoIcon } from "./icons";
 
 interface RepoTabsProps {
   repos: Repository[];
-  activeId: string;
+  activeId: string | null;
   onSelect: (id: string) => void;
+  onAdd: () => void;
+  onClose: (id: string) => void;
+  adding: boolean;
 }
 
-export function RepoTabs({ repos, activeId, onSelect }: RepoTabsProps) {
+export function RepoTabs({ repos, activeId, onSelect, onAdd, onClose, adding }: RepoTabsProps) {
   return (
     <div
       className="flex items-center gap-1 overflow-x-auto overflow-y-hidden"
@@ -16,31 +19,47 @@ export function RepoTabs({ repos, activeId, onSelect }: RepoTabsProps) {
     >
       {repos.map((repo) => {
         const active = repo.id === activeId;
-
         return (
-          <button
+          <div
             key={repo.id}
-            type="button"
-            role="tab"
-            aria-selected={active}
             data-active={active}
-            title={repo.path}
-            onClick={() => onSelect(repo.id)}
-            className="inline-flex h-8 shrink-0 cursor-default items-center gap-2 rounded-full border border-transparent px-3 text-left text-ink-soft transition-colors hover:bg-hover-glass focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent data-[active=true]:border-hairline data-[active=true]:bg-glass-strong data-[active=true]:text-ink data-[active=true]:soft-shadow"
+            className="inline-flex h-8 shrink-0 items-center gap-1.5 rounded-full border border-transparent pl-3 text-left text-ink-soft transition-colors hover:bg-hover-glass focus-within:ring-2 focus-within:ring-primary/70 focus-within:ring-offset-2 focus-within:ring-offset-transparent data-[active=true]:border-hairline data-[active=true]:bg-glass-strong data-[active=true]:text-ink data-[active=true]:soft-shadow"
           >
-            <RepoIcon />
-            <span className="text-[13px] font-semibold">{repo.name}</span>
-            <span className="font-mono text-[11px] text-ink-dim">{repo.branch}</span>
-          </button>
+            <button
+              type="button"
+              role="tab"
+              aria-selected={active}
+              title={repo.path}
+              onClick={() => onSelect(repo.id)}
+              className="flex cursor-default items-center gap-2 bg-transparent p-0 text-left"
+            >
+              <RepoIcon />
+              <span className="text-[13px] font-semibold">{repo.name}</span>
+              <span className="font-mono text-[11px] text-ink-dim">{repo.branch}</span>
+            </button>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onClose(repo.id);
+              }}
+              aria-label={`Close ${repo.name}`}
+              title={`Close ${repo.name}`}
+              className="grid h-5 w-5 shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink"
+            >
+              <CloseIcon size={9} />
+            </button>
+          </div>
         );
       })}
 
       <button
         type="button"
-        className="ml-1 grid h-8 w-8 shrink-0 cursor-default place-items-center rounded-full border border-dashed border-rule text-ink-dim opacity-70"
-        title="Opening a repository is not part of this UI-only build"
+        onClick={onAdd}
+        disabled={adding}
         aria-label="Open repository"
-        disabled
+        title="Open a repository folder"
+        className="ml-1 grid h-8 w-8 shrink-0 cursor-default place-items-center rounded-full border border-dashed border-rule text-ink-dim hover:bg-hover-glass hover:text-ink disabled:opacity-60"
       >
         <PlusIcon />
       </button>

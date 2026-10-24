@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Repository } from "../types";
 import { graphWidth } from "../lib/graphGeometry";
@@ -24,6 +24,9 @@ interface CommitListProps {
   repo: Repository;
   selectedHash: string;
   onSelect: (hash: string) => void;
+  loadingMore: boolean;
+  onNearBottom: () => void;
+  onCheckoutBranch: (branch: string) => void;
 }
 
 function widthOf(element: HTMLElement | null, fallback: number): number {
@@ -32,7 +35,7 @@ function widthOf(element: HTMLElement | null, fallback: number): number {
 
 const HEADER_CELL = "relative flex h-full min-w-0 items-center";
 
-export function CommitList({ repo, selectedHash, onSelect }: CommitListProps) {
+export function CommitList({ repo, selectedHash, onSelect, loadingMore, onNearBottom, onCheckoutBranch }: CommitListProps) {
   const laneCount = Math.max(...repo.commits.map((commit) => commit.lane), 0) + 1;
   const baseGraphWidth = graphWidth(laneCount);
 
@@ -45,6 +48,15 @@ export function CommitList({ repo, selectedHash, onSelect }: CommitListProps) {
   const graphColumnRef = useRef<HTMLDivElement>(null);
   const messageCellRef = useRef<HTMLSpanElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const lastScrollTop = useRef(0);
+
+  // Keep the viewport anchored across data reloads (branch switch, page append):
+  // re-apply the last scroll offset whenever the commit list is replaced.
+  useEffect(() => {
+    const el = scrollRef.current;
+    if (el && lastScrollTop.current > 0) el.scrollTop = lastScrollTop.current;
+  }, [repo.commits]);
 
   const graphColumnWidth = baseGraphWidth + graphExtra;
 
@@ -103,7 +115,7 @@ export function CommitList({ repo, selectedHash, onSelect }: CommitListProps) {
     >
       <div
         data-commit-header
-        className={`grid h-11 shrink-0 items-center gap-2 border-b border-rule bg-sheet pr-3 text-[11.5px] font-semibold text-ink-dim ${COMMIT_HEADER_GRID}`}
+        className={`grid h-8 shrink-0 items-center gap-2 border-b border-rule bg-sheet pr-3 text-[11.5px] font-semibold text-ink-dim ${COMMIT_HEADER_GRID}`}
       >
         <span aria-hidden="true" />
 
@@ -155,7 +167,15 @@ export function CommitList({ repo, selectedHash, onSelect }: CommitListProps) {
         <span aria-hidden="true" />
       </div>
 
-      <div className="flex min-h-0 flex-1 overflow-y-auto overflow-x-hidden">
+      <div
+        ref={scrollRef}
+        className="flex min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+        onScroll={(event) => {
+          const el = event.currentTarget;
+          lastScrollTop.current = el.scrollTop;
+          if (el.scrollTop + el.clientHeight >= el.scrollHeight - 320) onNearBottom();
+        }}
+      >
         <div ref={graphColumnRef} className="w-[var(--graph-width)] shrink-0">
           <CommitGraph commits={repo.commits} selectedHash={selectedHash} />
         </div>
@@ -166,8 +186,12 @@ export function CommitList({ repo, selectedHash, onSelect }: CommitListProps) {
               commit={commit}
               selected={commit.hash === selectedHash}
               onSelect={onSelect}
+              onCheckoutBranch={onCheckoutBranch}
             />
           ))}
+          {loadingMore && (
+            <p className="m-0 py-2 text-center text-[12px] text-ink-dim">Loading more history…</p>
+          )}
         </div>
       </div>
 

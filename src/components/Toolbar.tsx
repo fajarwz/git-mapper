@@ -3,7 +3,7 @@ import { GLASS_CONTROL, PANEL } from "../lib/ui";
 import { BranchIcon, ChevronDownIcon, SettingsIcon } from "./icons";
 
 interface ToolbarProps {
-  repo: Repository;
+  repo: Repository | null;
   detailsOpen: boolean;
   onToggleDetails: () => void;
   onOpenSettings: () => void;
@@ -39,9 +39,9 @@ export function Toolbar({ repo, detailsOpen, onToggleDetails, onOpenSettings }: 
 
       <span
         className="min-w-0 flex-1 truncate rounded-full border border-hairline bg-sheet px-3 py-1.5 font-mono text-[11.5px] text-ink-dim"
-        title={repo.path}
+        title={repo?.path}
       >
-        {repo.path}
+        {repo?.path ?? "No repository open"}
       </span>
 
       <div className="flex shrink-0 items-center gap-2">
@@ -68,19 +68,20 @@ export function Toolbar({ repo, detailsOpen, onToggleDetails, onOpenSettings }: 
           Details
         </button>
 
-        <span className="inline-flex items-center gap-[5px] rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary-ink">
-          <BranchIcon />
-          {repo.branch}
-        </span>
-        {repo.ahead > 0 && (
-          <span className="font-mono text-[11px] font-semibold text-success-ink">↑{repo.ahead}</span>
+        {repo && (
+          <>
+            <span className="inline-flex items-center gap-[5px] rounded-full border border-primary/25 bg-primary/10 px-2.5 py-1 text-[11px] font-semibold text-primary-ink">
+              <BranchIcon />
+              {repo.branch}
+            </span>
+            {repo.ahead > 0 && (
+              <span className="font-mono text-[11px] font-semibold text-success-ink">↑{repo.ahead}</span>
+            )}
+            {repo.behind > 0 && (
+              <span className="font-mono text-[11px] font-semibold text-warning-ink">↓{repo.behind}</span>
+            )}
+          </>
         )}
-        {repo.behind > 0 && (
-          <span className="font-mono text-[11px] font-semibold text-warning-ink">↓{repo.behind}</span>
-        )}
-        <span className="rounded-full border border-dashed border-rule px-2 py-1 text-[9.5px] font-semibold uppercase tracking-[0.1em] text-ink-dim">
-          mock data
-        </span>
       </div>
     </header>
   );
