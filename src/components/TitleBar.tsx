@@ -3,7 +3,6 @@ import type { Repository } from "../types";
 import { GLASS_CONTROL } from "../lib/ui";
 import {
   BranchIcon,
-  ChevronDownIcon,
   CloseIcon,
   PlusIcon,
   RepoIcon,
@@ -77,12 +76,10 @@ interface TitleBarProps {
   repos: Repository[];
   activeId: string | null;
   repo: Repository | null;
-  detailsOpen: boolean;
   adding: boolean;
   onSelect: (id: string) => void;
   onAdd: () => void;
   onClose: (id: string) => void;
-  onToggleDetails: () => void;
   onOpenSettings: () => void;
 }
 
@@ -90,12 +87,10 @@ export function TitleBar({
   repos,
   activeId,
   repo,
-  detailsOpen,
   adding,
   onSelect,
   onAdd,
   onClose,
-  onToggleDetails,
   onOpenSettings,
 }: TitleBarProps) {
   const [maximized, setMaximized] = useState(false);
@@ -214,20 +209,6 @@ export function TitleBar({
         {repo && repo.behind > 0 && (
           <span className="font-mono text-[11px] font-semibold text-warning-ink">↓{repo.behind}</span>
         )}
-
-        <button
-          type="button"
-          onClick={onToggleDetails}
-          aria-pressed={detailsOpen}
-          title={detailsOpen ? "Hide the commit details panel" : "Show the commit details panel"}
-          className={`${GLASS_CONTROL} inline-flex h-7 cursor-default items-center gap-1 px-2.5 text-[11.5px] font-semibold text-ink-soft hover:bg-sheet-strong focus-visible:ring-2 focus-visible:ring-primary/70`}
-        >
-          <ChevronDownIcon
-            size={11}
-            className={`transition-transform duration-150 ${detailsOpen ? "" : "rotate-180"}`}
-          />
-          Details
-        </button>
 
         <button
           type="button"
