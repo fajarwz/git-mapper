@@ -1,5 +1,19 @@
-import { useEffect, useLayoutEffect, useRef, useState } from "react";
-import { createPortal } from "react-dom";
+import { useEffect, useRef, useState } from "react";
+import {
+  DndContext,
+  DragOverlay,
+  PointerSensor,
+  closestCenter,
+  useSensor,
+  useSensors,
+} from "@dnd-kit/core";
+import type { DragEndEvent, DragStartEvent } from "@dnd-kit/core";
+import {
+  SortableContext,
+  horizontalListSortingStrategy,
+  useSortable,
+} from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { Repository } from "../types";
 import { GLASS_CONTROL } from "../lib/ui";
 import {
@@ -73,10 +87,6 @@ function TabLabel({ text }: { text: string }) {
   );
 }
 
-/** The chip look shared by a resting tab and the lifted copy that follows the pointer. */
-const TAB_CHIP =
-  "flex h-7 min-w-0 items-center gap-1.5 rounded-lg border border-hairline bg-glass-strong pl-2.5 pr-1 text-[13px] font-semibold text-ink soft-shadow";
-
 interface TitleBarProps {
   repos: Repository[];
   activeId: string | null;
@@ -85,21 +95,81 @@ interface TitleBarProps {
   onSelect: (id: string) => void;
   onAdd: () => void;
   onClose: (id: string) => void;
-  /** Move the tab at `from` into position `to`, used while dragging. */
+  /** Move the tab at `from` into position `to`, after a drop. */
   onReorder: (from: number, to: number) => void;
   onOpenSettings: () => void;
 }
 
-interface DragState {
-  id: string;
-  name: string;
-  /** Ghost box, in viewport coordinates. */
-  x: number;
-  y: number;
-  width: number;
-  height: number;
-  /** True once the pointer is released and the ghost slides into its slot. */
-  dropping: boolean;
+interface SortableTabProps {
+  item: Repository;
+  active: boolean;
+  suppressed: { current: boolean };
+  onSelect: (id: string) => void;
+  onClose: (id: string) => void;
+}
+
+/**
+ * One tab. @dnd-kit/sortable owns the drag: it measures the row and animates every tab by
+ * transform as you move, so the others slide out of the way smoothly instead of jumping slots,
+ * and it keeps the keyboard route (space to lift, arrows to move) working.
+ */
+function SortableTab({ item, active, suppressed, onSelect, onClose }: SortableTabProps) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: item.id,
+  });
+  // @dnd-kit labels the handle with role="button"; this one is a tab, so keep ours.
+  const { role: _handleRole, ...handleAria } = attributes;
+
+  return (
+    <div
+      ref={setNodeRef}
+      data-tab-id={item.id}
+      data-active={active}
+      data-dragging={isDragging}
+      style={{
+        flex: "1 1 200px",
+        minWidth: 68,
+        maxWidth: 200,
+        transform: CSS.Transform.toString(transform),
+        transition,
+      }}
+      className={`inline-flex h-7 min-w-0 items-center gap-1 rounded-lg border border-transparent bg-glass-soft pl-2.5 text-left text-ink-soft backdrop-blur-md transition-colors hover:bg-hover-glass data-[active=true]:border-hairline data-[active=true]:bg-glass-strong data-[active=true]:text-ink data-[active=true]:soft-shadow data-[dragging=true]:opacity-30`}
+    >
+      <button
+        type="button"
+        role="tab"
+        aria-selected={active}
+        title={item.path}
+        {...listeners}
+        {...handleAria}
+        onClick={() => {
+          if (suppressed.current) {
+            suppressed.current = false;
+            return;
+          }
+          onSelect(item.id);
+        }}
+        className="flex h-full min-w-0 flex-1 cursor-grab touch-none items-center gap-1.5 bg-transparent p-0 pr-1 text-left text-inherit active:cursor-grabbing"
+      >
+        <span className="shrink-0 text-ink-dim">
+          <RepoIcon size={12} />
+        </span>
+        <TabLabel text={item.name} />
+      </button>
+      <button
+        type="button"
+        onClick={(event) => {
+          event.stopPropagation();
+          onClose(item.id);
+        }}
+        aria-label={`Close ${item.name}`}
+        title={`Close ${item.name}`}
+        className="mr-1 grid h-4.5 w-4.5 shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink"
+      >
+        <CloseIcon size={8} />
+      </button>
+    </div>
+  );
 }
 
 export function TitleBar({
@@ -114,144 +184,40 @@ export function TitleBar({
   onOpenSettings,
 }: TitleBarProps) {
   const [maximized, setMaximized] = useState(false);
-
-  // Tabs reorder by pointer, not HTML5 drag-and-drop: the webview hands drag events to Tauri's
-  // own file-drop handler, so `draggable` never fires reliably inside the app.
-  const stripRef = useRef<HTMLDivElement>(null);
+  const [draggedId, setDraggedId] = useState<string | null>(null);
+  // The click that ends a drag must not also select the tab that was dropped.
   const suppressClick = useRef(false);
-  const [drag, setDrag] = useState<DragState | null>(null);
-  const tabRects = useRef(new Map<string, DOMRect>());
 
-  function beginTabDrag(event: React.PointerEvent<HTMLDivElement>, index: number, item: Repository) {
-    if (event.button !== 0) return;
-    if ((event.target as HTMLElement).closest("button[aria-label^='Close']")) return;
+  // Pointer only on purpose: the keyboard sensor claims Space and Enter on the focused tab, and a
+  // tab has to stay activatable from the keyboard. Keyboard reordering would need a grip handle.
+  const sensors = useSensors(
+    // Distance, not delay: a click stays a click, a drag lifts after four pixels.
+    useSensor(PointerSensor, { activationConstraint: { distance: 4 } }),
+  );
 
-    const start = event.currentTarget.getBoundingClientRect();
-    const offsetX = event.clientX - start.left;
-    const offsetY = event.clientY - start.top;
-    suppressClick.current = false;
-
-    let moving = false;
-    let currentIndex = index;
-    let frame = 0;
-
-    const stopAutoScroll = () => {
-      if (frame) cancelAnimationFrame(frame);
-      frame = 0;
-    };
-
-    // Keep the strip scrolling while the pointer sits near either edge, so long strips stay usable.
-    const autoScroll = (clientX: number) => {
-      const strip = stripRef.current;
-      if (!strip) return;
-      const box = strip.getBoundingClientRect();
-      const edge = 28;
-      const direction = clientX < box.left + edge ? -1 : clientX > box.right - edge ? 1 : 0;
-      if (direction === 0) {
-        stopAutoScroll();
-        return;
-      }
-      if (frame) return;
-      const step = () => {
-        const target = stripRef.current;
-        if (!target) {
-          frame = 0;
-          return;
-        }
-        target.scrollLeft += direction * 6;
-        frame = requestAnimationFrame(step);
-      };
-      frame = requestAnimationFrame(step);
-    };
-
-    const onMove = (moveEvent: PointerEvent) => {
-      if (!moving) {
-        // A few pixels of slack so a plain click stays a click.
-        if (Math.hypot(moveEvent.clientX - event.clientX, moveEvent.clientY - event.clientY) < 4) {
-          return;
-        }
-        moving = true;
-        document.body.style.cursor = "grabbing";
-      }
-
-      setDrag({
-        id: item.id,
-        name: item.name,
-        x: moveEvent.clientX - offsetX,
-        y: moveEvent.clientY - offsetY,
-        width: start.width,
-        height: start.height,
-        dropping: false,
-      });
-      autoScroll(moveEvent.clientX);
-
-      const strip = stripRef.current;
-      if (!strip) return;
-      const tabs = [...strip.querySelectorAll<HTMLElement>("[data-tab-id]")];
-      const over = tabs.findIndex((node) => {
-        const rect = node.getBoundingClientRect();
-        return moveEvent.clientX >= rect.left && moveEvent.clientX <= rect.right;
-      });
-      if (over === -1 || over === currentIndex) return;
-      onReorder(currentIndex, over);
-      currentIndex = over;
-    };
-
-    const finish = () => {
-      stopAutoScroll();
-      document.body.style.cursor = "";
-      window.removeEventListener("pointermove", onMove);
-      window.removeEventListener("pointerup", finish);
-      window.removeEventListener("pointercancel", finish);
-
-      if (!moving) {
-        setDrag(null);
-        return;
-      }
-
-      // Slide the ghost into the slot the tab now occupies, then hand the tab back to the strip.
-      suppressClick.current = true;
-      const slot = stripRef.current?.querySelector<HTMLElement>(`[data-tab-id="${item.id}"]`);
-      if (!slot) {
-        setDrag(null);
-        return;
-      }
-      const target = slot.getBoundingClientRect();
-      setDrag((current) =>
-        current
-          ? { ...current, dropping: true, x: target.left, y: target.top, width: target.width }
-          : current,
-      );
-      window.setTimeout(() => setDrag(null), 200);
-    };
-
-    window.addEventListener("pointermove", onMove);
-    window.addEventListener("pointerup", finish);
-    window.addEventListener("pointercancel", finish);
+  function handleDragStart(event: DragStartEvent) {
+    suppressClick.current = true;
+    setDraggedId(String(event.active.id));
   }
 
-  // Tabs that shift because of a reorder slide into place instead of teleporting.
-  useLayoutEffect(() => {
-    const strip = stripRef.current;
-    if (!strip) return;
-    const reduceMotion = window.matchMedia?.("(prefers-reduced-motion: reduce)").matches ?? false;
-    const nodes = [...strip.querySelectorAll<HTMLElement>("[data-tab-id]")];
+  /** The click that ends a drag lands in the same task as the drop, so clear the flag after it. */
+  function armClickSuppressionReset() {
+    window.setTimeout(() => {
+      suppressClick.current = false;
+    }, 0);
+  }
 
-    for (const node of nodes) {
-      const id = node.dataset.tabId;
-      if (!id) continue;
-      const rect = node.getBoundingClientRect();
-      const before = tabRects.current.get(id);
-      tabRects.current.set(id, rect);
-      if (!before || reduceMotion || !node.animate) continue;
-      const delta = before.left - rect.left;
-      if (Math.abs(delta) < 0.5) continue;
-      node.animate(
-        [{ transform: `translateX(${delta}px)` }, { transform: "translateX(0)" }],
-        { duration: 170, easing: "cubic-bezier(0.2, 0.8, 0.3, 1)" },
-      );
-    }
-  }, [repos]);
+  function handleDragEnd(event: DragEndEvent) {
+    setDraggedId(null);
+    armClickSuppressionReset();
+    const { active, over } = event;
+    if (!over || active.id === over.id) return;
+    const from = repos.findIndex((item) => item.id === active.id);
+    const to = repos.findIndex((item) => item.id === over.id);
+    if (from !== -1 && to !== -1) onReorder(from, to);
+  }
+
+  const dragged = repos.find((item) => item.id === draggedId) ?? null;
 
   // The caption button swaps to a restore glyph while the window is maximized.
   useEffect(() => {
@@ -298,73 +264,61 @@ export function TitleBar({
         </span>
       </div>
 
-      <div
-        data-tauri-drag-region
-        role="tablist"
-        aria-label="Open repositories"
-        ref={stripRef}
-        className="no-scrollbar ml-1 flex min-w-0 flex-1 select-none items-center gap-1 overflow-x-auto overflow-y-hidden"
+      <DndContext
+        sensors={sensors}
+        collisionDetection={closestCenter}
+        onDragStart={handleDragStart}
+        onDragEnd={handleDragEnd}
+        onDragCancel={() => {
+          setDraggedId(null);
+          armClickSuppressionReset();
+        }}
       >
-        {repos.map((item, index) => {
-          const active = item.id === activeId;
-          const lifted = drag?.id === item.id;
-          return (
-            <div
-              key={item.id}
-              data-active={active}
-              data-tab-id={item.id}
-              onPointerDown={(event) => beginTabDrag(event, index, item)}
-              style={{ flex: "1 1 200px", minWidth: 68, maxWidth: 200 }}
-              className={`inline-flex h-7 min-w-0 items-center gap-1 rounded-lg border border-transparent bg-glass-soft pl-2.5 text-left text-ink-soft backdrop-blur-md transition-colors hover:bg-hover-glass data-[active=true]:border-hairline data-[active=true]:bg-glass-strong data-[active=true]:text-ink data-[active=true]:soft-shadow ${
-                lifted ? "opacity-0" : ""
-              }`}
-            >
-              <button
-                type="button"
-                role="tab"
-                aria-selected={active}
-                title={item.path}
-                onClick={() => {
-                  if (suppressClick.current) {
-                    suppressClick.current = false;
-                    return;
-                  }
-                  onSelect(item.id);
-                }}
-                className="flex h-full min-w-0 flex-1 cursor-grab items-center gap-1.5 bg-transparent p-0 pr-1 text-left text-inherit active:cursor-grabbing"
-              >
-                <span className="shrink-0 text-ink-dim">
-                  <RepoIcon size={12} />
-                </span>
-                <TabLabel text={item.name} />
-              </button>
-              <button
-                type="button"
-                onClick={(event) => {
-                  event.stopPropagation();
-                  onClose(item.id);
-                }}
-                aria-label={`Close ${item.name}`}
-                title={`Close ${item.name}`}
-                className="mr-1 grid h-4.5 w-4.5 shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink"
-              >
-                <CloseIcon size={8} />
-              </button>
-            </div>
-          );
-        })}
+        <SortableContext items={repos.map((item) => item.id)} strategy={horizontalListSortingStrategy}>
+          <div
+            data-tauri-drag-region
+            role="tablist"
+            aria-label="Open repositories"
+            className="no-scrollbar ml-1 flex min-w-0 flex-1 select-none items-center gap-1 overflow-x-auto overflow-y-hidden"
+          >
+            {repos.map((item) => (
+              <SortableTab
+                key={item.id}
+                item={item}
+                active={item.id === activeId}
+                suppressed={suppressClick}
+                onSelect={onSelect}
+                onClose={onClose}
+              />
+            ))}
 
-        <button
-          type="button"
-          onClick={onAdd}
-          disabled={adding}
-          aria-label="Open repository"
-          title="Open a repository folder"
-          className="grid h-7 w-7 shrink-0 cursor-default place-items-center rounded-lg border border-dashed border-rule bg-glass-soft text-ink-soft backdrop-blur-md hover:bg-glass-strong hover:text-ink disabled:opacity-60"
-        >
-          <PlusIcon />
-        </button>
-      </div>
+            <button
+              type="button"
+              onClick={onAdd}
+              disabled={adding}
+              aria-label="Open repository"
+              title="Open a repository folder"
+              className="grid h-7 w-7 shrink-0 cursor-default place-items-center rounded-lg border border-dashed border-rule bg-glass-soft text-ink-soft backdrop-blur-md hover:bg-glass-strong hover:text-ink disabled:opacity-60"
+            >
+              <PlusIcon />
+            </button>
+          </div>
+        </SortableContext>
+
+        <DragOverlay dropAnimation={{ duration: 180, easing: "cubic-bezier(0.2, 0.8, 0.3, 1)" }}>
+          {dragged ? (
+            <div
+              data-tab-overlay
+              className="flex h-7 min-w-0 scale-[1.03] items-center gap-1.5 rounded-lg border border-hairline bg-glass-strong pl-2.5 pr-1 text-[13px] font-semibold text-ink shadow-panel"
+            >
+              <span className="shrink-0 text-ink-dim">
+                <RepoIcon size={12} />
+              </span>
+              <span className="min-w-0 flex-1 truncate">{dragged.name}</span>
+            </div>
+          ) : null}
+        </DragOverlay>
+      </DndContext>
 
       <div className="flex shrink-0 items-center gap-1.5">
         {repo && (
@@ -421,34 +375,6 @@ export function TitleBar({
           <WindowCloseIcon />
         </button>
       </div>
-
-      {drag &&
-        createPortal(
-          <div
-            data-tab-ghost
-            style={{
-              position: "fixed",
-              left: 0,
-              top: 0,
-              width: drag.width,
-              height: drag.height,
-              zIndex: 60,
-              pointerEvents: "none",
-              transform: `translate3d(${drag.x}px, ${drag.y}px, 0) scale(${drag.dropping ? 1 : 1.04}) rotate(${drag.dropping ? 0 : -1.2}deg)`,
-              transition: drag.dropping
-                ? "transform 190ms cubic-bezier(0.2, 0.8, 0.3, 1)"
-                : "none",
-              willChange: "transform",
-            }}
-            className={`${TAB_CHIP} shadow-panel`}
-          >
-            <span className="shrink-0 text-ink-dim">
-              <RepoIcon size={12} />
-            </span>
-            <span className="min-w-0 flex-1 truncate">{drag.name}</span>
-          </div>,
-          document.body,
-        )}
     </div>
   );
 }
