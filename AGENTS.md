@@ -4,10 +4,9 @@ Guidance for AI agents working in this repo. Written after the full redesign + r
 
 ## Project
 
-**Git Mapper** (formerly Git Trail) — standalone Git history viewer for Windows. Tauri 2 + React 19 + TypeScript + Tailwind CSS v4 + Vite. **UI shell with mock data only**: history, refs, files and diffs are hardcoded mocks; no Git operations exist yet.
+**Git Mapper** (formerly Git Trail) — standalone Git history viewer for Windows. Tauri 2 + React 19 + TypeScript + Tailwind CSS v4 + Vite. Reads real Git data: the Tauri backend runs the `git` CLI and returns porcelain output; TS parsers turn it into `types.ts` shapes. Read-only (no mutating Git operations yet).
 
-- Project folder is still `C:\DATA\lab\tauri\git-trail` (user renames it later. When that happens, update `path` in `src/data/gitMapperRepo.ts:11`).
-- Package/crate/identifier/brand are already `git-mapper` / `git_mapper_lib` / `com.fajar.git-mapper` / "Git Mapper".
+- Package/crate/identifier/brand are `git-mapper` / `git_mapper_lib` / `com.fajar.git-mapper` / "Git Mapper".
 
 ## Commands
 
@@ -22,9 +21,12 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
 
 ## Architecture
 
-- `src/App.tsx` — shell: grid rows `[52px toolbar | 40px repo tabs | 1fr workspace | 26px status bar]`, per-repo selection state, details-panel open/height state.
-- `src/data/` — `repositories.ts` exports the two mock repos (`gitMapperRepo`, `ledgerApiRepo`); everything is typed in `types.ts`.
-- `src/lib/graphGeometry.ts` — `ROW_HEIGHT = 44` is shared between `CommitRow` (h-11) and the SVG graph. Change both together or dots misalign with rows.
+- `src/App.tsx` — shell: grid rows `[52px toolbar | 40px repo tabs | 1fr workspace | 26px status bar]`, per-repo selection state, details-panel open/height state. `Repository[]` lives in state (open tabs persisted to `localStorage` under `git-mapper:open-repos`); empty state = `EmptyState.tsx`.
+- `src-tauri/src/git.rs` — Tauri commands running the `git` CLI: `open_repository` (validates + toplevel/name), `read_status` (branch/ahead/behind), `read_log` (porcelain fields `\x00`-separated, records `\x1e`-separated, decorations lead each record), `read_commit_files` (numstat + name-status + patch, first-parent; root via `--root`). Folder picking is JS-side via `tauri-plugin-dialog` (`dialog:default` capability).
+- `src/data/gitLoader.ts` — the only `invoke()` surface: `loadRepository`, `pickAndLoadRepository`, `loadCommitFiles`, plus persisted-path storage. Build the `Repository`/`Commit` objects there; components stay invoke-free.
+- `src/lib/` parsers — `gitLogParser`, `gitDiffParser` (DiffLine text carries NO +/- prefix; the renderer adds it), `graphLanes` (greedy lane assignment; a proper layout engine is future work). All pure, no React — verifiable with `npx vite-node <probe>` against real git output.
+- Changed files/diffs load lazily per selected commit (`App` keeps `filesByCommitHash`); the commit list never carries them.
+- `src/lib/graphGeometry.ts` — `ROW_HEIGHT` is shared between `CommitRow` and the SVG graph. Change both together or dots misalign with rows.
 - `src/lib/ui.ts` — `PANEL` and `GLASS_CONTROL` class strings; every panel/button picks these up.
 - `src/lib/tableLayout.ts` — column widths, grid templates, resize min/max.
 - `src/lib/theme.ts` + inline script in `index.html` — theme resolution; storage key `git-mapper:theme`; the head script must stay in sync with that key.
@@ -34,7 +36,7 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
 
 1. **Tokens only.** No hardcoded hex in components (exception: inline SVG strokes in the Toolbar `BrandMark`). Re-point tokens in `.dark`; components follow without `dark:`-variant spans.
 2. **Use `panel-shadow` / `soft-shadow`** (custom `@utility` in index.css), never Tailwind's `shadow-panel`/`shadow-soft`. Reason: Tailwind v4 inlines `@theme` literals into generated utilities, so `.dark` overrides of shadow vars silently never applied. The custom utilities route through `var()` and theme correctly.
-3. Rows are 44px, body text 14px, commit subjects 13.5px, meta 12.5px. Full type/spacing scale lives in `index.css` + component classes; keep hierarchy bouncy (big accents, airy spacing) — density is what made the previous design look dated.
+3. Row heights and type sizes live in code (`graphGeometry.ts`, component classes) — don't pin them here; they get tuned. Full type/spacing scale lives in `index.css` + component classes; keep hierarchy bouncy (big accents, airy spacing) — density is what made the previous design look dated.
 4. Background depth strategy: vivid full-canvas gradient (light theme gets a linear violet→rose→warm base because radial spots alone measured sat 0.07 and washed out) + subtle shadows. Don't add heavy drop shadows.
 5. Pills/badges: no borders, saturated tone fills (`bg-primary/12` etc.). Glass panels: `border-hairline` + `panel-shadow` + `backdrop-blur-xl` via `PANEL`.
 
@@ -47,4 +49,4 @@ No tests, no linter configured. `npm run build` + `cargo check` pass = verifiabl
 
 ## Roadmap (not built yet)
 
-Real `git` plumbing (history, refs, working tree), graph lane layout algorithm, mutating Git operations, open/close repository UI. Swap `src/data/repositories.ts` for a loader returning the same `Repository[]` shape when real data lands.
+Proper graph lane layout engine, mutating Git operations (stage, commit, branch), search/filter over history, pagination for repos with >500 commits (`read_log` caps at 500).
