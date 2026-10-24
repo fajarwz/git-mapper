@@ -25,3 +25,6 @@ dist-ssr
 
 # Rust build cache
 src-tauri/target
+
+# Hermes agent scratch (plans, probes)
+.hermes/
