@@ -51,6 +51,8 @@ interface StatusInfo {
   ahead: number;
   behind: number;
   dirty: boolean;
+  /** Changed paths in the working tree, untracked files counted individually. */
+  changed: number;
 }
 
 /** Decoration refs first, then for-each-ref tips not already present (dedupe by type+name). */
@@ -126,11 +128,11 @@ async function readRefs(dir: string): Promise<string> {
     : ((await devApi("read_refs", { dir })) as { text: string }).text;
 }
 
-function uncommittedCommit(commits: Commit[]): Commit {
+function uncommittedCommit(commits: Commit[], changed: number): Commit {
   const head = commits[0];
   return {
     hash: UNCOMMITTED_HASH,
-    subject: "Uncommitted changes",
+    subject: changed > 0 ? `Uncommitted changes (${changed})` : "Uncommitted changes",
     author: "",
     authorEmail: "",
     date: new Date().toISOString(),
@@ -160,7 +162,7 @@ export async function loadRepository(dir: string): Promise<Repository> {
   }));
   const finalCommits =
     status.dirty && commits.length > 0
-      ? withLanes([uncommittedCommit(commits), ...commits])
+      ? withLanes([uncommittedCommit(commits, status.changed), ...commits])
       : commits;
   return {
     id: info.path,

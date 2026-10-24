@@ -21,7 +21,7 @@ function gitDevApi(): Plugin {
       return { path, name: path.split(/[\\/]/).pop() ?? path };
     },
     read_status: ({ dir }) => {
-      const out = run(String(dir), ["status", "-sb"]);
+      const out = run(String(dir), ["status", "-sb", "--untracked-files=all"]);
       const line = out.split("\n").find((l) => l.startsWith("## ")) ?? "";
       const head = line.slice(3).trim();
       const [branchPart, tail] = head.split("...");
@@ -31,11 +31,15 @@ function gitDevApi(): Plugin {
         if (m[1] === "ahead") ahead = Number(m[2]);
         else behind = Number(m[2]);
       }
+      const changed = out
+        .split("\n")
+        .filter((l) => l.trim() !== "" && !l.startsWith("## ")).length;
       return {
         branch: branchPart ?? "HEAD detached",
         ahead,
         behind,
-        dirty: out.split("\n").some((l) => l.trim() !== "" && !l.startsWith("## ")),
+        dirty: changed > 0,
+        changed,
       };
     },
     read_log: ({ dir, limit, skip }) => ({

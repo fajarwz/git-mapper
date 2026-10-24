@@ -15,6 +15,8 @@ pub struct StatusInfo {
     pub behind: u32,
     /// True when the working tree has any change (staged, unstaged or untracked).
     pub dirty: bool,
+    /// Changed paths in the working tree, untracked files counted individually.
+    pub changed: u32,
 }
 
 #[derive(Serialize)]
@@ -58,13 +60,19 @@ pub fn open_repository(dir: &str) -> Result<RepoInfo, String> {
 
 #[tauri::command]
 pub fn read_status(dir: &str) -> Result<StatusInfo, String> {
-    let out = run_git(dir, &["status", "-sb"])?;
+    // -uall so untracked files are counted one by one instead of per directory.
+    let out = run_git(dir, &["status", "-sb", "--untracked-files=all"])?;
+    let changed = out
+        .lines()
+        .filter(|l| !l.trim().is_empty() && !l.starts_with("## "))
+        .count() as u32;
     // First line: "## main...origin/main [ahead 1, behind 2]" with any piece optional.
     let mut info = StatusInfo {
         branch: String::new(),
         ahead: 0,
         behind: 0,
-        dirty: out.lines().any(|l| !l.starts_with("## ")),
+        dirty: changed > 0,
+        changed,
     };
     if let Some(line) = out.lines().find(|l| l.starts_with("## ")) {
         let head = line.trim_start_matches("## ");
