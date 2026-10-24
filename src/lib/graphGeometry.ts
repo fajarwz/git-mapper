@@ -1,5 +1,5 @@
 import { LINE_COLOR_COUNT } from "./graphLanes";
-import type { LaneLayout, LaneSlot } from "./graphLanes";
+import type { LaneLayout, LaneTransition } from "./graphLanes";
 
 /** Fixed row height in px. The commit rows and the SVG graph both use it so they stay aligned. */
 export const ROW_HEIGHT = 32;
@@ -25,8 +25,8 @@ export function lineColor(color: number): string {
 }
 
 /**
- * X of a lane. No clamping: lanes 8, 9, 10 used to share the x of lane 7, which drew distinct
- * lines on top of each other and made their colours look wrong. The graph grows instead.
+ * X of a lane. No clamping: two active lanes must never share a coordinate, so a graph that needs
+ * more lanes than the palette gets wider instead of drawing lines on top of each other.
  */
 export function laneX(lane: number): number {
   return GRAPH_PADDING_X + lane * LANE_WIDTH;
@@ -36,7 +36,7 @@ export function rowY(index: number): number {
   return index * ROW_HEIGHT + ROW_HEIGHT / 2;
 }
 
-/** Width that fits every lane the layout uses, dot radius and stroke included. */
+/** Width that fits every lane the layout uses. */
 export function graphWidth(laneCount: number): number {
   const lanes = Math.max(laneCount, 1);
   return GRAPH_PADDING_X * 2 + (lanes - 1) * LANE_WIDTH;
@@ -62,18 +62,12 @@ function bend(fromX: number, fromY: number, toX: number, toY: number): string {
 }
 
 /**
- * Turns the layout into SVG paths.
+ * Turns the layout's recorded transitions into SVG paths.
  *
- * Every piece takes the colour of the **line** it belongs to, never of the column it passes
- * through: a line that shifts lanes is drawn in one hue on both sides of the shift, a line joining
- * another keeps its own hue down to the dot, and a line forked off a merge commit starts with the
- * colour the layout gave it. Colour is decided once, in layoutGraph.
- *
- * Bends stay inside one row band: a lane that forks, joins or shifts leans across the row of the
- * commit that causes it, so divergence and convergence sit exactly where the history has them
- * instead of on a long diagonal. Straight pieces are collected per lane and colour and merged while
- * they stay contiguous, so a line that runs for thirty rows is one path. Every piece that cannot be
- * merged starts its own path.
+ * Nothing is derived here: the sweep already decided which lane each piece starts and ends in, what
+ * kind of piece it is and which colour it carries, so this function only converts coordinates.
+ * Pieces that stay in one lane are collected per lane and colour and merged while they stay
+ * contiguous, so a line running for thirty rows is one path.
  */
 export function buildEdges(layout: LaneLayout): GraphEdge[] {
   const edges: GraphEdge[] = [];
@@ -92,67 +86,49 @@ export function buildEdges(layout: LaneLayout): GraphEdge[] {
     open.set(key, run);
   };
 
-  layout.rows.forEach(({ above, after, tip, join }, row) => {
-    const lane = layout.lanes[row];
-    const midY = rowY(row);
+  layout.rows.forEach((row, index) => {
+    const midY = rowY(index);
     const inY = midY - ROW_HEIGHT / 2;
     const outY = midY + ROW_HEIGHT / 2;
+    const gapTo = index < layout.rows.length - 1 ? rowY(index + 1) - ROW_HEIGHT / 2 : outY;
 
-    const available = above.map((slot: LaneSlot, index: number) => ({ slot, index, used: false }));
-
-    after.forEach((slot, to) => {
-      const color = lineColor(slot.color);
-      const source = available.find((entry) => !entry.used && entry.slot.hash === slot.hash);
-      if (source) {
-        source.used = true;
-        if (source.index === to) {
-          addVertical(to, inY, outY, color);
-        } else {
-          // Same line, new column: the hue travels with it.
+    row.transitions.forEach((transition: LaneTransition, order: number) => {
+      const color = lineColor(transition.color);
+      const key = `r${index}:${transition.kind}:${order}`;
+      switch (transition.kind) {
+        case "continue":
+          addVertical(transition.to, inY, outY, color);
+          break;
+        case "shift":
           edges.push({
-            key: `r${row}:${source.index}->${to}`,
-            path: bend(laneX(source.index), inY, laneX(to), outY),
+            key,
+            path: bend(laneX(transition.from), inY, laneX(transition.to), outY),
             color,
           });
-        }
-        return;
+          break;
+        case "fork":
+          // Leaves the dot: first parent, merge parent, or a tip joining a line below.
+          edges.push({
+            key,
+            path: bend(laneX(transition.from), midY, laneX(transition.to), outY),
+            color,
+          });
+          break;
+        case "join":
+        default:
+          // Another child's line arrives at this dot, in its own colour.
+          edges.push({
+            key,
+            path: bend(laneX(transition.from), inY, laneX(transition.to), midY),
+            color,
+          });
+          break;
       }
-      // Not running before this row: a line forked off the commit's dot, in its own new colour.
-      edges.push({
-        key: `r${row}:dot->${to}`,
-        path: bend(laneX(lane), midY, laneX(to), outY),
-        color,
-      });
     });
 
-    // Whatever is left above ends in the dot: another child's reservation joining in, or the
-    // commit itself arriving on its own lane. A tip has neither, nothing may be drawn above it.
-    for (const entry of available) {
-      if (entry.used) continue;
-      if (tip && entry.index === lane) continue;
-      edges.push({
-        key: `r${row}:${entry.index}->dot`,
-        path: bend(laneX(entry.index), inY, laneX(lane), midY),
-        // The joining line keeps its own colour down to the dot.
-        color: lineColor(entry.slot.color),
-      });
-    }
-
-    // This commit's line ends in a parent that already had one: draw the short piece that bends
-    // into that parent's lane. Without it a tip that joins an existing line leaves its dot dangling
-    // next to the line it belongs to.
-    if (join !== null && after[join]) {
-      edges.push({
-        key: `r${row}:dot->join${join}`,
-        path: bend(laneX(lane), midY, laneX(join), outY),
-        color: lineColor(after[join].color),
-      });
-    }
-
-    // Gaps between rows.
-    if (row < layout.rows.length - 1) {
-      const gapTo = rowY(row + 1) - ROW_HEIGHT / 2;
-      after.forEach((slot, index) => addVertical(index, outY, gapTo, lineColor(slot.color)));
+    // Gaps between rows: the lines still running leave this row band and enter the next one.
+    if (index < layout.rows.length - 1) {
+      row.after.forEach((slot, lane) => addVertical(lane, outY, gapTo, lineColor(slot.color)));
     }
   });
 

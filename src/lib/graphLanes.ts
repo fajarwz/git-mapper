@@ -1,45 +1,68 @@
 /**
- * Lane layout, newest-first, in the shape git itself draws.
+ * Lane layout: an active-lane sweep over a newest-first commit list, recording every graph piece
+ * as it goes.
  *
- * `pending` holds the commits that still have a line running down the graph, one entry per lane,
- * left to right. Each entry carries the line's **colour** as well as its commit, because a line
- * keeps its hue while it shifts lanes: the lane decides *where* a line is drawn, the slot decides
- * which colour it is. The colour is a palette index (see `lineColor` in graphGeometry), which keeps
- * this module free of CSS so it can be checked on its own.
+ * The model is a set of active lanes, one entry per line that is still running. Each entry carries
+ * the commit the line is heading for and the line's colour, so colour belongs to the line and not
+ * to the column it happens to occupy. Lanes are the position of a line, slots are its identity.
  *
- * For each commit:
+ * Per row:
  *
- * - it takes the lane already reserved for it; a commit nothing reserved (a branch tip) opens a
- *   lane on the right, which is what keeps existing lanes from shuffling;
- * - its entry becomes its first parent in the same lane with the same colour, so a linear run is
- *   one straight line in one hue;
- * - extra parents (merges) are inserted just to the right of it, the fork git draws, and
- *   each one starts a **new** line with its own colour;
- * - when a commit has no parent its lane closes and every lane to its right shifts one step left.
- *   The lines to the right move but keep their colours, which is the point of carrying the colour
- *   in the slot instead of deriving it from the lane index;
- * - a commit is reserved in **one** lane at a time. A second child of the same parent bends into
- *   the line that already exists for it, at the child's own row: that is the `|/` join. Keeping a
- *   lane per reservation drew the same commit as several parallel lines.
+ * - the commit takes the lane whose line is waiting for it; a commit nothing reserved is a branch
+ *   tip and opens a lane on the right, which keeps existing lanes from shuffling. A tip that points
+ *   at a commit already on screen is the same line, so it adopts that line's colour;
+ * - its first parent continues in the same lane with the same colour, unless that parent already
+ *   has a line, in which case this row's line ends and bends into it (the `|/` join);
+ * - each extra parent (merge) opens a new line just to the right, with its own colour;
+ * - a commit with no parent closes its lane and the lanes to its right shift one step left, keeping
+ *   their colours;
+ * - a parent outside the loaded list ends its line at this row: nothing is invented for it;
+ * - a parent that was already drawn (input not topologically ordered) is recorded as a gap and
+ *   skipped, so no edge ever points upward.
  *
- * Lanes stay dense: no holes, no "lowest free lane" reuse. Rows keep both lists (`above` before the
- * commit is consumed, `after` once its parents are in place) so the renderer can draw every line as
- * a short piece inside one row band: straight where a line continues, a small bend where a lane is
- * forked, joined or shifted. Nothing is ever drawn across several rows, which is what makes forks
- * and joins land on the commit that causes them.
+ * Every transition is recorded here with its kind and colour, so the renderer draws what the sweep
+ * decided instead of re-deriving connections from lane indices.
  *
- * Colour allocation: a new line takes the palette entry used by the fewest active lines, skipping
- * the colours of the lanes that will sit either side of it, ties going to the lowest index. That is
- * deterministic for identical input, keeps neighbours apart, and never repaints a line already on
- * screen.
+ * Colour rule: a new line takes the palette entry used by the fewest active lines, skipping the
+ * colours of the lanes on either side of it, ties to the lowest index. Deterministic for identical
+ * input, stable for lines that already exist, never repaints a line on screen.
  */
 export const LINE_COLOR_COUNT = 8;
 
 export interface LaneSlot {
-  /** Commit this line is waiting for. */
+  /** Commit this line is heading for. */
   hash: string;
-  /** Palette index of the line, carried forward while the line continues. */
+  /** Palette index of the line. */
   color: number;
+}
+
+export type TransitionKind =
+  /** A running line keeps its lane: a vertical piece through this row. */
+  | "continue"
+  /** A running line moves to another lane; same line, same colour. */
+  | "shift"
+  /** A line leaves the dot: its first parent, a merge parent, or a tip joining a line below. */
+  | "fork"
+  /** Another child's line arrives at this commit dot. */
+  | "join";
+
+export interface LaneTransition {
+  kind: TransitionKind;
+  /** Lane the piece starts in. For `fork` that is the dot lane, for `join` the incoming one. */
+  from: number;
+  /** Lane the piece ends in. For `join` that is the dot lane. */
+  to: number;
+  /** Palette index this piece is drawn with. */
+  color: number;
+  /** Commit the piece points at (`join`: the commit it arrives at). */
+  hash: string;
+}
+
+/** A parent the layout could not draw a line to, and why. */
+export interface LaneGap {
+  hash: string;
+  /** `unloaded` sits outside the loaded window; `out-of-order` was already drawn above. */
+  reason: "unloaded" | "out-of-order";
 }
 
 export interface LaneRow {
@@ -49,24 +72,23 @@ export interface LaneRow {
   after: LaneSlot[];
   /** True when nothing reserved this commit: it opens a lane, so it has no line above it. */
   tip: boolean;
-  /**
-   * Lane in `after` where this commit's first parent already had a line, so this row's line bends
-   * into it instead of continuing in place. null when the line carries on in its own lane.
-   */
-  join: number | null;
+  transitions: LaneTransition[];
+  gaps: LaneGap[];
 }
 
 export interface LaneLayout {
-  /** Lane index per commit: where its dot sits. */
+  /** Lane per commit: where its dot sits. */
   lanes: number[];
   /** Palette index per commit: the colour of the line its dot belongs to. */
   colors: number[];
   rows: LaneRow[];
-  /** Lanes actually needed, for the SVG width. */
+  /** Lanes needed at the widest row, for the SVG width. */
   laneCount: number;
+  /** False when a parent appeared above its child (input was not newest-first topological). */
+  ordered: boolean;
 }
 
-/** Least-used palette entry around `at`, neighbours' colours skipped, ties to the lowest index. */
+/** Least-used palette entry around `at`, neighbour colours skipped, ties to the lowest index. */
 function pickColor(slots: LaneSlot[], at: number): number {
   const uses = new Array<number>(LINE_COLOR_COUNT).fill(0);
   for (const slot of slots) {
@@ -86,8 +108,7 @@ function pickColor(slots: LaneSlot[], at: number): number {
   }
   if (best !== -1) return best;
 
-  // Every entry sits next to the new line (only possible with the whole palette active): fall
-  // back to the least-used entry rather than repainting a line or going off-palette.
+  // Every entry sits next to the new line (only possible with the whole palette active).
   best = 0;
   for (let color = 1; color < LINE_COLOR_COUNT; color += 1) {
     if (uses[color] < uses[best]) best = color;
@@ -96,15 +117,19 @@ function pickColor(slots: LaneSlot[], at: number): number {
 }
 
 export function layoutGraph(commits: Array<{ hash: string; parents: string[] }>): LaneLayout {
+  const input = new Set(commits.map((commit) => commit.hash));
   const pending: LaneSlot[] = [];
   const lanes: number[] = [];
   const colors: number[] = [];
   const rows: LaneRow[] = [];
+  const drawn = new Set<string>();
   let laneCount = 1;
+  let ordered = true;
 
   commits.forEach(({ hash, parents }) => {
-    // A commit nothing reserved yet is a branch tip: it opens a lane on the right. A tip that
-    // points at a commit already on screen is the same line, so it takes that line's colour.
+    // Defensive only: the same hash twice could not own two dots.
+    if (drawn.has(hash)) ordered = false;
+
     let lane = pending.findIndex((slot) => slot.hash === hash);
     const tip = lane === -1;
     if (tip) {
@@ -113,48 +138,84 @@ export function layoutGraph(commits: Array<{ hash: string; parents: string[] }>)
       pending.push({ hash, color: parentLine ? parentLine.color : pickColor(pending, lane) });
     }
 
-    // Snapshot before any mutation: this row's geometry must not change under it.
+    // Snapshot before any mutation: this row's incoming geometry must not change under it.
     const above = pending.map((slot) => ({ ...slot }));
     const color = pending[lane].color;
+    const gaps: LaneGap[] = parents
+      .filter((parent) => !input.has(parent))
+      .map((parent) => ({ hash: parent, reason: "unloaded" as const }));
+    // Parents whose line already exists, so the dot connects to it instead of opening a new one.
+    const stubs: string[] = [];
+    const first = parents[0];
 
-    let join: number | null = null;
-    if (parents.length > 0) {
-      const first = parents[0];
-      const reserved = pending.findIndex((slot, index) => index !== lane && slot.hash === first);
-      if (reserved === -1) {
-        // The first parent continues this line, in this lane, with this colour.
-        pending[lane] = { hash: first, color };
-      } else {
-        // Another child already holds a line for that parent. Git keeps ONE line per pending
-        // commit and bends every child into it here; reserving a second lane drew the same commit
-        // as several parallel lines that fanned into one dot many rows later.
-        pending.splice(lane, 1);
-      }
-    } else {
+    if (first === undefined) {
       pending.splice(lane, 1); // root: the lane ends here
+    } else if (drawn.has(first)) {
+      // The parent is already above this row, so the input is not topological. Never draw a line
+      // that points upward: drop the connection and mark the layout unordered.
+      ordered = false;
+      gaps.push({ hash: first, reason: "out-of-order" });
+      pending.splice(lane, 1);
+    } else if (pending.some((slot, index) => index !== lane && slot.hash === first)) {
+      // Another child already holds a line for that parent: this line ends and bends into it.
+      pending.splice(lane, 1);
+      stubs.push(first);
+    } else {
+      pending[lane] = { hash: first, color };
     }
 
-    // Extra parents fork into new lines just to the right of this one.
     for (const parent of parents.slice(1)) {
-      if (pending.some((slot) => slot.hash === parent)) continue;
+      if (drawn.has(parent)) {
+        ordered = false;
+        gaps.push({ hash: parent, reason: "out-of-order" });
+        continue;
+      }
+      if (pending.some((slot) => slot.hash === parent)) {
+        stubs.push(parent); // that line already exists: connect to it instead of opening another
+        continue;
+      }
       const at = Math.min(lane + 1, pending.length);
       pending.splice(at, 0, { hash: parent, color: pickColor(pending, at) });
     }
 
-    // Every lane holds a different commit by now: reservations join the existing line above, so a
-    // hash can never sit in two lanes and nothing has to be swept here.
-
     const after = pending.map((slot) => ({ ...slot }));
-    if (parents.length > 0) {
-      const at = after.findIndex((slot) => slot.hash === parents[0]);
-      if (at !== -1 && at !== lane) join = at;
-    }
 
-    laneCount = Math.max(laneCount, above.length, pending.length);
+    // Record the pieces. A hash occupies one lane at most, so a line appearing below is either the
+    // same line moving (`continue` / `shift`) or a line that starts at this dot (`fork`).
+    const transitions: LaneTransition[] = [];
+    after.forEach((slot, to) => {
+      const from = above.findIndex((entry) => entry.hash === slot.hash);
+      if (from === -1) {
+        transitions.push({ kind: "fork", from: lane, to, color: slot.color, hash: slot.hash });
+      } else {
+        transitions.push({
+          kind: from === to ? "continue" : "shift",
+          from,
+          to,
+          color: slot.color,
+          hash: slot.hash,
+        });
+      }
+    });
+    // A parent whose line already runs beside this row: the dot bends into that line.
+    for (const hash of stubs) {
+      const at = after.findIndex((slot) => slot.hash === hash);
+      if (at !== -1) {
+        transitions.push({ kind: "fork", from: lane, to: at, color: after[at].color, hash });
+      }
+    }
+    above.forEach((slot, from) => {
+      if (after.some((entry) => entry.hash === slot.hash)) return;
+      if (tip && from === lane) return; // a tip has nothing above its dot
+      transitions.push({ kind: "join", from, to: lane, color: slot.color, hash: slot.hash });
+    });
+
+    laneCount = Math.max(laneCount, above.length, after.length);
+    drawn.add(hash);
     lanes.push(lane);
     colors.push(color);
-    rows.push({ above, after, tip, join });
+    rows.push({ above, after, tip, transitions, gaps });
   });
 
-  return { lanes, colors, rows, laneCount };
+  return { lanes, colors, rows, laneCount, ordered };
 }
