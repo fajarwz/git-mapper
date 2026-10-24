@@ -6,14 +6,15 @@ export const COMMIT_ROW_GRID =
   "grid-cols-[var(--col-message)_var(--col-author)_var(--col-date)_var(--col-hash)_var(--col-spacer)]";
 
 export const DEFAULT_AUTHOR_WIDTH = 132;
-export const DEFAULT_DATE_WIDTH = 104;
+/** Wide enough for a full "23 Oct 2026 12:09" stamp without truncating. */
+export const DEFAULT_DATE_WIDTH = 122;
 export const HASH_WIDTH = 74;
 
 export const MIN_MESSAGE_WIDTH = 160;
 export const MAX_MESSAGE_WIDTH = 1200;
 export const MIN_AUTHOR_WIDTH = 72;
 export const MAX_AUTHOR_WIDTH = 280;
-export const MIN_DATE_WIDTH = 72;
+export const MIN_DATE_WIDTH = 112;
 export const MAX_DATE_WIDTH = 220;
 
 export const MAX_GRAPH_EXTRA = 280;

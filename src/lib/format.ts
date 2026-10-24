@@ -1,29 +1,20 @@
 import type { DiffLine, FileStatus } from "../types";
 
-const dateFormatter = new Intl.DateTimeFormat("en-GB", {
+const DATE_PARTS = new Intl.DateTimeFormat("en-GB", {
   day: "numeric",
   month: "short",
   year: "numeric",
   hour: "2-digit",
   minute: "2-digit",
+  hour12: false,
 });
 
+/** "23 Oct 2026 12:09" — absolute commit timestamps, never relative offsets. */
 export function formatAbsoluteDate(isoDate: string): string {
-  return dateFormatter.format(new Date(isoDate));
-}
-
-export function relativeDate(isoDate: string, now: number = Date.now()): string {
-  const seconds = Math.max(0, Math.round((now - Date.parse(isoDate)) / 1000));
-  if (seconds < 60) return "just now";
-  const minutes = Math.floor(seconds / 60);
-  if (minutes < 60) return `${minutes}m ago`;
-  const hours = Math.floor(minutes / 60);
-  if (hours < 24) return `${hours}h ago`;
-  const days = Math.floor(hours / 24);
-  if (days < 7) return `${days}d ago`;
-  const weeks = Math.floor(days / 7);
-  if (weeks < 5) return `${weeks}w ago`;
-  return dateFormatter.format(new Date(isoDate)).split(",")[0];
+  const parts = DATE_PARTS.formatToParts(new Date(isoDate));
+  const get = (type: Intl.DateTimeFormatPartTypes) =>
+    parts.find((part) => part.type === type)?.value ?? "";
+  return `${get("day")} ${get("month")} ${get("year")} ${get("hour")}:${get("minute")}`;
 }
 
 export const STATUS_LABELS: Record<FileStatus, string> = {

@@ -46,9 +46,8 @@ export function CommitRow({ commit, selected, onSelect, onCheckoutBranch }: Comm
       <time
         className={`truncate text-[12px] text-ink-dim ${metaWeight}`}
         dateTime={commit.date}
-        title={formatAbsoluteDate(commit.date)}
       >
-        {commit.relativeDate}
+        {formatAbsoluteDate(commit.date)}
       </time>
 
       <span className={`truncate font-mono text-[11px] text-ink-dim ${metaWeight}`}>{commit.hash}</span>

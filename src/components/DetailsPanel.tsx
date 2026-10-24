@@ -111,11 +111,7 @@ export function DetailsPanel({
               <div className="flex min-w-0 flex-col gap-0.5 text-[12px] text-ink-dim">
                 <span className="text-[12.5px] font-semibold text-ink-soft">{commit.author}</span>
                 <span className="truncate">{commit.authorEmail}</span>
-                <span>
-                  {formatAbsoluteDate(commit.date)}
-                  <span className="px-1 text-ink-dim/60">·</span>
-                  {commit.relativeDate}
-                </span>
+                <span>{formatAbsoluteDate(commit.date)}</span>
                 {commit.parents.length > 0 && (
                   <span className="break-words font-mono text-[10.5px]">
                     {commit.parents.length > 1 ? "parents" : "parent"}: {commit.parents.join(", ")}
