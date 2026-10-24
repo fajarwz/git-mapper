@@ -55,6 +55,8 @@ export interface Repository {
   head: string;
   /** Changed path count at load time, so working-tree edits are noticed too. */
   changed: number;
+  /** Digest of the working tree at load time: notices content edits the count cannot. */
+  worktree: string;
   /** Digest of all branch/remote/tag refs at load time; a fetch changes it. */
   refsDigest: string;
   commits: Commit[];

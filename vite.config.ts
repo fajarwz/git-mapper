@@ -4,8 +4,80 @@ import tailwindcss from "@tailwindcss/vite";
 import svgr from "vite-plugin-svgr";
 // @ts-expect-error type error without @types/node package
 import process from "node:process";
+// @ts-expect-error type error without @types/node package
+import fs from "node:fs";
+// @ts-expect-error type error without @types/node package
+import path from "node:path";
 import { execFileSync } from "node:child_process";
 const host = process.env.TAURI_DEV_HOST;
+
+/** FNV-1a: the stamps below are only compared for equality between two reads. */
+function digest(text: string): string {
+  let hash = 2166136261 >>> 0;
+  for (let index = 0; index < text.length; index += 1) {
+    hash = (hash ^ text.charCodeAt(index)) >>> 0;
+    hash = Math.imul(hash, 16777619) >>> 0;
+  }
+  return `${hash.toString(16)}:${text.length}`;
+}
+
+/** Mirrors worktree_stamp in src-tauri/src/git.rs: status list + tracked patch + untracked stats. */
+function worktreeStamp(dir: string, statusOut: string, changed: number): string {
+  let stamp = statusOut;
+  if (changed === 0) return digest(stamp);
+  try {
+    stamp += execFileSync("git", ["diff", "--no-color", "HEAD"], { cwd: dir, encoding: "utf8" });
+  } catch {
+    // Unborn branch: no HEAD to diff against; the status list alone has to do.
+  }
+  for (const line of statusOut.split("\n")) {
+    if (!line.startsWith("?? ")) continue;
+    const file = line.slice(3);
+    try {
+      const meta = fs.statSync(path.join(dir, file));
+      stamp += `\u0001${file}:${meta.size}:${meta.mtimeMs}`;
+    } catch {
+      // Vanished between the status read and here.
+    }
+  }
+  return digest(stamp);
+}
+
+/** Mirrors untracked_entry in src-tauri/src/git.rs: `git diff` never lists untracked paths. */
+function untrackedEntry(
+  dir: string,
+  file: string,
+): { numstat: string; nameStatus: string; patch: string } {
+  const header = `diff --git a/${file} b/${file}\nnew file mode 100644\n`;
+  let bytes: Buffer;
+  try {
+    bytes = fs.readFileSync(path.join(dir, file));
+  } catch {
+    bytes = Buffer.alloc(0);
+  }
+  const binary = bytes.length > 2 * 1024 * 1024 || bytes.includes(0);
+  if (binary) {
+    return {
+      numstat: `-\t-\t${file}\n`,
+      nameStatus: `A\t${file}\n`,
+      patch: `${header}--- /dev/null\n+++ b/${file}\n@@ Binary file, not shown @@\n`,
+    };
+  }
+  const lines = bytes.toString("utf8").split("\n");
+  // A trailing newline does not invent an extra line.
+  if (lines.length > 0 && lines[lines.length - 1] === "") lines.pop();
+  if (lines.length === 0) {
+    return { numstat: `0\t0\t${file}\n`, nameStatus: `A\t${file}\n`, patch: header };
+  }
+  const cr = String.fromCharCode(13);
+  const body = lines.map((line) => `+${line.endsWith(cr) ? line.slice(0, -1) : line}
+`).join("");
+  return {
+    numstat: `${lines.length}\t0\t${file}\n`,
+    nameStatus: `A\t${file}\n`,
+    patch: `${header}--- /dev/null\n+++ b/${file}\n@@ -0,0 +1,${lines.length} @@\n${body}`,
+  };
+}
 
 // Browser-tab fallback for the Git plumbing: same command names as
 // src-tauri/src/git.rs, run directly by the dev server. Dev-only.
@@ -48,6 +120,7 @@ function gitDevApi(): Plugin {
         dirty: changed > 0,
         changed,
         head: headSha,
+        worktree: worktreeStamp(String(dir), out, changed),
       };
     },
     read_log: ({ dir, limit, skip }) => ({
@@ -89,11 +162,25 @@ function gitDevApi(): Plugin {
     read_commit_files: ({ dir, hash }) => {
       const h = String(hash);
       if (h === "wip") {
-        return {
-          numstat: run(String(dir), ["diff", "--numstat", "--no-color", "HEAD"]),
-          name_status: run(String(dir), ["diff", "--name-status", "--no-color", "HEAD"]),
-          diff: run(String(dir), ["diff", "--no-color", "HEAD"]),
+        const safe = (args: string[]) => {
+          try {
+            return run(String(dir), args);
+          } catch {
+            return "";
+          }
         };
+        let numstat = safe(["diff", "--numstat", "--no-color", "HEAD"]);
+        let name_status = safe(["diff", "--name-status", "--no-color", "HEAD"]);
+        let diff = safe(["diff", "--no-color", "HEAD"]);
+        // Untracked files are invisible to `git diff`; add them the way git prints a new file.
+        for (const file of safe(["ls-files", "--others", "--exclude-standard", "-z"]).split("\0")) {
+          if (!file) continue;
+          const entry = untrackedEntry(String(dir), file);
+          numstat += entry.numstat;
+          name_status += entry.nameStatus;
+          diff += entry.patch;
+        }
+        return { numstat, name_status, diff };
       }
       let isRoot = false;
       try {

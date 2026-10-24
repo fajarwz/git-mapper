@@ -26,11 +26,11 @@ import type { Repository } from "./types";
 /**
  * Key for the loaded-files cache. It has to include the repo: the uncommitted row uses the same
  * pseudo hash ("wip") in every repository, so a hash-only key showed one repo's working-tree
- * changes in another. The uncommitted entry also carries the change count, so an edit made
- * elsewhere refetches instead of replaying the previous list.
+ * changes in another. The uncommitted entry is keyed by the working-tree digest instead of the
+ * hash, so a save (or a new untracked file) refetches the list and the patch.
  */
-function filesKey(repoPath: string, hash: string, changed: number): string {
-  return hash === UNCOMMITTED_HASH ? `${repoPath}::~wip:${changed}` : `${repoPath}::${hash}`;
+function filesKey(repoPath: string, hash: string, worktree: string): string {
+  return hash === UNCOMMITTED_HASH ? `${repoPath}::~wip:${worktree}` : `${repoPath}::${hash}`;
 }
 
 function App() {
@@ -116,7 +116,9 @@ function App() {
       ) ?? repo.commits[0] ?? null)
     : null;
   const selectedFilesKey =
-    repo && selectedCommit ? filesKey(repo.path, selectedCommit.hash, repo.changed) : null;
+    repo && selectedCommit
+      ? filesKey(repo.path, selectedCommit.hash, repo.worktree)
+      : null;
   const files = selectedFilesKey ? (filesByCommitHash[selectedFilesKey] ?? []) : [];
   const selectedFile =
     files.find((file) => file.path === (selectedFileByRepo[repo?.id ?? ""] ?? null)) ??

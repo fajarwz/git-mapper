@@ -1,5 +1,5 @@
 use serde::Serialize;
-use std::path::PathBuf;
+use std::path::{Path, PathBuf};
 use std::process::Command;
 
 #[derive(Serialize)]
@@ -19,6 +19,9 @@ pub struct StatusInfo {
     pub changed: u32,
     /// Current HEAD commit; empty on an unborn branch. Lets the UI detect work done elsewhere.
     pub head: String,
+    /// Digest of the working tree itself. `changed` only counts paths, so an edit inside an
+    /// already-modified file would look identical; this digest notices the content moving.
+    pub worktree: String,
 }
 
 #[derive(Serialize)]
@@ -41,6 +44,81 @@ fn run_git(dir: &str, args: &[&str]) -> Result<String, String> {
                 Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
             }
         })
+}
+
+/// Cheap FNV-1a digest: these stamps are only ever compared for equality between two reads,
+/// so a short, stable hash is enough — no crypto, no git plumbing call.
+fn digest(text: &str) -> String {
+    let mut hash: u64 = 0xcbf2_9ce4_8422_2325;
+    for byte in text.as_bytes() {
+        hash ^= u64::from(*byte);
+        hash = hash.wrapping_mul(0x1000_0000_01b3);
+    }
+    format!("{hash:x}:{}", text.len())
+}
+
+/// Fingerprint of the working tree: the status list (paths + codes) plus the tracked patch,
+/// plus size/mtime of every untracked file (git keeps those out of any diff).
+/// Only the equality of two stamps matters, so the length and hash of the text both go in.
+fn worktree_stamp(dir: &str, status_out: &str, changed: u32) -> String {
+    let mut stamp = status_out.to_string();
+    if changed == 0 {
+        return digest(&stamp);
+    }
+    // An edit inside a path the status list already had only shows up in the patch.
+    if let Ok(patch) = run_git(dir, &["diff", "--no-color", "HEAD"]) {
+        stamp.push_str(&patch);
+    }
+    // Untracked files are absent from that patch; stat them instead of reading them.
+    for line in status_out.lines() {
+        let Some(path) = line.strip_prefix("?? ") else {
+            continue;
+        };
+        if let Ok(meta) = std::fs::metadata(Path::new(dir).join(path)) {
+            let modified = meta
+                .modified()
+                .ok()
+                .and_then(|time| time.duration_since(std::time::UNIX_EPOCH).ok())
+                .map(|age| age.as_nanos())
+                .unwrap_or(0);
+            stamp.push_str(&format!("\u{1}{path}:{}:{modified}", meta.len()));
+        }
+    }
+    digest(&stamp)
+}
+
+/// Untracked files never appear in `git diff HEAD`, so the working-tree view builds their
+/// numstat / name-status / patch entries itself, shaped the way git prints a new file.
+fn untracked_entry(dir: &str, path: &str) -> (String, String, String) {
+    const MAX_TEXT_BYTES: u64 = 2 * 1024 * 1024;
+    let bytes = std::fs::read(Path::new(dir).join(path)).unwrap_or_default();
+    let binary = bytes.len() as u64 > MAX_TEXT_BYTES || bytes.contains(&0);
+    let header = format!("diff --git a/{path} b/{path}\nnew file mode 100644\n");
+    if binary {
+        // Nothing readable to patch: a single hunk line so the panel still says why it is empty.
+        return (
+            format!("-\t-\t{path}\n"),
+            format!("A\t{path}\n"),
+            format!("{header}--- /dev/null\n+++ b/{path}\n@@ Binary file, not shown @@\n"),
+        );
+    }
+    let text = String::from_utf8_lossy(&bytes);
+    let mut body = String::new();
+    let mut lines = 0usize;
+    for line in text.split_terminator('\n') {
+        body.push('+');
+        body.push_str(line.strip_suffix('\r').unwrap_or(line));
+        body.push('\n');
+        lines += 1;
+    }
+    if lines == 0 {
+        return (format!("0\t0\t{path}\n"), format!("A\t{path}\n"), header);
+    }
+    (
+        format!("{lines}\t0\t{path}\n"),
+        format!("A\t{path}\n"),
+        format!("{header}--- /dev/null\n+++ b/{path}\n@@ -0,0 +1,{lines} @@\n{body}"),
+    )
 }
 
 #[tauri::command]
@@ -68,6 +146,7 @@ pub fn read_status(dir: &str) -> Result<StatusInfo, String> {
         .lines()
         .filter(|l| !l.trim().is_empty() && !l.starts_with("## "))
         .count() as u32;
+    let worktree = worktree_stamp(dir, &out, changed);
     // First line: "## main...origin/main [ahead 1, behind 2]" with any piece optional.
     let head = run_git(dir, &["rev-parse", "--verify", "HEAD"])
         .map(|sha| sha.trim().to_string())
@@ -79,6 +158,7 @@ pub fn read_status(dir: &str) -> Result<StatusInfo, String> {
         dirty: changed > 0,
         changed,
         head,
+        worktree,
     };
     if let Some(line) = out.lines().find(|l| l.starts_with("## ")) {
         let head = line.trim_start_matches("## ");
@@ -186,14 +266,26 @@ pub fn checkout_branch(dir: &str, branch: &str) -> Result<(), String> {
 #[tauri::command]
 pub fn read_commit_files(dir: &str, hash: &str) -> Result<FilePayload, String> {
     if hash == "wip" {
-        let numstat: Vec<String> = vec!["diff".into(), "--numstat".into(), "--no-color".into(), "HEAD".into()];
-        let name_status: Vec<String> = vec!["diff".into(), "--name-status".into(), "--no-color".into(), "HEAD".into()];
-        let diff: Vec<String> = vec!["diff".into(), "--no-color".into(), "HEAD".into()];
-        return Ok(FilePayload {
-            numstat: run_git(dir, &numstat.iter().map(String::as_str).collect::<Vec<&str>>())?,
-            name_status: run_git(dir, &name_status.iter().map(String::as_str).collect::<Vec<&str>>())?,
-            diff: run_git(dir, &diff.iter().map(String::as_str).collect::<Vec<&str>>())?,
-        });
+        // Unborn branch: `diff HEAD` has nothing to compare against, so start from empty.
+        let diff = run_git(dir, &["diff", "--no-color", "HEAD"]).unwrap_or_default();
+        let numstat =
+            run_git(dir, &["diff", "--numstat", "--no-color", "HEAD"]).unwrap_or_default();
+        let name_status =
+            run_git(dir, &["diff", "--name-status", "--no-color", "HEAD"]).unwrap_or_default();
+        // `git diff` ignores untracked paths entirely, so a brand-new file would never show up.
+        let untracked = run_git(dir, &["ls-files", "--others", "--exclude-standard", "-z"])?;
+        let mut payload = FilePayload {
+            numstat,
+            name_status,
+            diff,
+        };
+        for path in untracked.split('\u{0}').filter(|entry| !entry.is_empty()) {
+            let (num, status, patch) = untracked_entry(dir, path);
+            payload.numstat.push_str(&num);
+            payload.name_status.push_str(&status);
+            payload.diff.push_str(&patch);
+        }
+        return Ok(payload);
     }
 
     let is_root_rev = format!("{hash}^1");

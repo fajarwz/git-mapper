@@ -56,6 +56,8 @@ interface StatusInfo {
   changed: number;
   /** HEAD commit sha; empty on an unborn branch. */
   head: string;
+  /** Digest of the working tree: catches an edit inside a file the count already included. */
+  worktree: string;
 }
 
 /** Cheap, stable digest: we only ever compare ref snapshots for equality. */
@@ -224,6 +226,7 @@ export async function loadRepository(dir: string): Promise<Repository> {
     behind: status.behind,
     head: status.head,
     changed: status.changed,
+    worktree: status.worktree,
     refsDigest: hashText(refsRaw),
     commits: finalCommits,
     defaultCommitHash: commits[0]?.hash ?? "",
@@ -231,35 +234,45 @@ export async function loadRepository(dir: string): Promise<Repository> {
 }
 
 /**
- * Focus refresh. Two cheap reads decide whether anything moved on disk (branch, HEAD, dirty
- * size, and a digest of every branch/remote/tag ref). When only refs moved the commit objects
- * are reused untouched; when history moved only the new commits are read.
+ * Refresh. Two cheap reads decide whether anything moved on disk (branch, HEAD, dirty size,
+ * working-tree digest, and a digest of every branch/remote/tag ref). When only refs moved the
+ * commit objects are reused untouched; when history moved only the new commits are read.
+ *
+ * `force` drops only the "nothing changed" early exit — the reads and the work they cause stay
+ * the same, so the refresh button costs no more than a focus probe that finds movement.
  *
  * New commits are not always newer than what is on screen: someone else pushes a branch whose
  * commits were written days ago, and `git log --all` files them by date, below rows already
  * shown. So the spliced list follows git's own order (read_log_order) instead of prepending.
  *
  * Returns null when nothing changed. `touched` lists the commits a caller should flash: new
- * arrivals and rows whose ref pills moved.
+ * arrivals, rows whose ref pills moved, and the uncommitted row when the working tree moved.
  */
 export interface RefreshedRepository {
   repo: Repository;
   touched: string[];
 }
 
-export async function refreshRepository(repo: Repository): Promise<RefreshedRepository | null> {
+export async function refreshRepository(
+  repo: Repository,
+  force = false,
+): Promise<RefreshedRepository | null> {
   const [status, refsRaw] = await Promise.all([readStatus(repo.path), readRefs(repo.path)]);
   const branch = status.branch || "HEAD detached";
   const refsDigest = hashText(refsRaw);
   const hadWip = repo.commits.some((commit) => commit.hash === UNCOMMITTED_HASH);
   const dirtyCount = status.dirty ? status.changed : 0;
   const knownDirtyCount = hadWip ? repo.changed : 0;
+  // The path count stays put while a file is edited, so the tree digest does the real work.
+  const worktreeMoved = status.worktree !== repo.worktree;
 
   if (
+    !force &&
     branch === repo.branch &&
     status.head === repo.head &&
     refsDigest === repo.refsDigest &&
-    dirtyCount === knownDirtyCount
+    dirtyCount === knownDirtyCount &&
+    !worktreeMoved
   ) {
     return null;
   }
@@ -295,6 +308,11 @@ export async function refreshRepository(repo: Repository): Promise<RefreshedRepo
   const touched: string[] = fresh
     .filter((commit) => previousByHash.get(commit.hash) !== commit)
     .map((commit) => commit.hash);
+  // The uncommitted row is rebuilt from scratch on every refresh and never part of the log
+  // delta, so it takes its flash by hand: a save in the editor is visible right away.
+  if (status.dirty && (worktreeMoved || dirtyCount !== knownDirtyCount)) {
+    touched.push(UNCOMMITTED_HASH);
+  }
   const freshHashes = new Set(touched);
   const existing = repo.commits
     .filter((commit) => commit.hash !== UNCOMMITTED_HASH && !freshHashes.has(commit.hash))
@@ -346,6 +364,7 @@ export async function refreshRepository(repo: Repository): Promise<RefreshedRepo
       behind: status.behind,
       head: status.head,
       changed: status.changed,
+      worktree: status.worktree,
       refsDigest,
       commits: withLanes(commits),
       defaultCommitHash:
