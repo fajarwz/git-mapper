@@ -6,10 +6,10 @@ export const ROW_HEIGHT = 32;
 export const LANE_WIDTH = 16;
 export const GRAPH_PADDING_X = 14;
 export const DOT_RADIUS = 3.5;
-/** Hard lane cap, shared with the layout: past it lanes are drawn on top of each other. */
+/** Lane cap. Every lane gets its own hue, so the cap also keeps colours unique. */
 export { MAX_LANES };
 
-/** Lane colours as tokens, so the graph follows the active theme. */
+/** One hue per lane, so adjacent columns always read apart. Tokens, so themes carry over. */
 export const LANE_COLORS = [
   "var(--color-lane-1)",
   "var(--color-lane-2)",
@@ -17,6 +17,8 @@ export const LANE_COLORS = [
   "var(--color-lane-4)",
   "var(--color-lane-5)",
   "var(--color-lane-6)",
+  "var(--color-lane-7)",
+  "var(--color-lane-8)",
 ];
 
 export function laneColor(lane: number): string {
@@ -59,27 +61,29 @@ function bend(fromX: number, fromY: number, toX: number, toY: number): string {
  *
  * Bends stay inside one row band: a lane that forks, joins or shifts leans across the row of the
  * commit that causes it, so divergence and convergence sit exactly where the history has them
- * instead of on a long diagonal. Everything vertical is merged into one path per lane and colour,
- * so the element count follows the number of lanes, not the number of rows.
+ * instead of on a long diagonal. Straight pieces are collected per lane and colour and merged while
+ * they stay contiguous, so a line that runs for thirty rows is one path. Every piece that cannot be
+ * merged starts its own path — merging by key alone would silently drop the earlier piece.
  */
 export function buildEdges(layout: LaneLayout): GraphEdge[] {
   const edges: GraphEdge[] = [];
-  const colorOf = (hash: string) => laneColor(layout.colors.get(hash) ?? 0);
-  const runs = new Map<string, Vertical>();
 
+  const runs: Vertical[] = [];
+  const open = new Map<string, Vertical>();
   const addVertical = (lane: number, from: number, to: number, color: string) => {
     if (to - from < 0.01) return;
     const key = `${lane}:${color}`;
-    const run = runs.get(key);
-    // Contiguous pieces of the same lane and colour become one line.
-    if (run && Math.abs(run.to - from) < 0.01) {
-      run.to = to;
+    const previous = open.get(key);
+    if (previous && Math.abs(previous.to - from) < 0.01) {
+      previous.to = to;
       return;
     }
-    runs.set(key, { lane, from, to, color });
+    const run = { lane, from, to, color };
+    runs.push(run);
+    open.set(key, run);
   };
 
-  layout.rows.forEach(({ above, after }, row) => {
+  layout.rows.forEach(({ above, after, tip }, row) => {
     const lane = layout.lanes[row];
     const midY = rowY(row);
     const inY = midY - ROW_HEIGHT / 2;
@@ -88,7 +92,8 @@ export function buildEdges(layout: LaneLayout): GraphEdge[] {
     const available = above.map((hash, index) => ({ hash, index, used: false }));
 
     after.forEach((hash, to) => {
-      const color = colorOf(hash);
+      // A line takes the hue of the column it sits in on the next row.
+      const color = laneColor(to);
       const source = available.find((entry) => !entry.used && entry.hash === hash);
       if (source) {
         source.used = true;
@@ -112,31 +117,31 @@ export function buildEdges(layout: LaneLayout): GraphEdge[] {
     });
 
     // Whatever is left above ends in the dot: another child's reservation joining in, or the
-    // commit itself arriving on its lane.
+    // commit itself arriving on its own lane. A tip has neither — nothing may be drawn above it.
     for (const entry of available) {
       if (entry.used) continue;
+      if (tip && entry.index === lane) continue;
       edges.push({
         key: `r${row}:${entry.index}->dot`,
         path: bend(laneX(entry.index), inY, laneX(lane), midY),
-        color: colorOf(entry.hash),
+        color: laneColor(lane),
       });
     }
 
     // Gaps between rows.
     if (row < layout.rows.length - 1) {
-      const gapFrom = outY;
       const gapTo = rowY(row + 1) - ROW_HEIGHT / 2;
-      after.forEach((hash, index) => addVertical(index, gapFrom, gapTo, colorOf(hash)));
+      after.forEach((_hash, index) => addVertical(index, outY, gapTo, laneColor(index)));
     }
   });
 
-  for (const [key, run] of runs) {
+  runs.forEach((run, index) => {
     edges.push({
-      key: `run:${key}`,
+      key: `run${index}`,
       path: `M ${laneX(run.lane)} ${run.from} L ${laneX(run.lane)} ${run.to}`,
       color: run.color,
     });
-  }
+  });
 
   return edges;
 }

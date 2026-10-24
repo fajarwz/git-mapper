@@ -18,13 +18,15 @@
  * forked, joined or shifted. Nothing is ever drawn across several rows, which is what makes forks
  * and joins land on the commit that causes them.
  */
-export const MAX_LANES = 10;
+export const MAX_LANES = 8;
 
 export interface LaneRow {
   /** Lane contents (hashes) arriving at this row, index = lane. */
   above: string[];
   /** Lane contents leaving this row downwards, index = lane. */
   after: string[];
+  /** True when nothing reserved this commit: it opens a lane, so it has no line above it. */
+  tip: boolean;
 }
 
 export interface LaneLayout {
@@ -33,23 +35,18 @@ export interface LaneLayout {
   rows: LaneRow[];
   /** Lanes actually needed, for the SVG width. */
   laneCount: number;
-  /** Colour slot per commit hash, assigned when the branch first opens a lane. */
-  colors: Map<string, number>;
 }
 
 export function layoutGraph(commits: Array<{ hash: string; parents: string[] }>): LaneLayout {
   const pending: string[] = [];
   const lanes: number[] = [];
   const rows: LaneRow[] = [];
-  const colors = new Map<string, number>();
   let laneCount = 1;
 
   commits.forEach(({ hash, parents }) => {
     // A commit nothing reserved yet is a branch tip: it opens a lane on the right.
-    if (!pending.includes(hash)) {
-      pending.push(hash);
-      if (!colors.has(hash)) colors.set(hash, pending.length - 1);
-    }
+    const tip = !pending.includes(hash);
+    if (tip) pending.push(hash);
     const lane = pending.indexOf(hash);
     const above = pending.slice();
 
@@ -63,7 +60,6 @@ export function layoutGraph(commits: Array<{ hash: string; parents: string[] }>)
     for (const parent of parents.slice(1)) {
       if (pending.includes(parent)) continue;
       pending.splice(Math.min(lane + 1, pending.length), 0, parent);
-      if (!colors.has(parent)) colors.set(parent, Math.min(lane + 1, pending.length - 1));
     }
 
     // Another child may also have reserved this commit further right: that reservation ends here.
@@ -73,8 +69,8 @@ export function layoutGraph(commits: Array<{ hash: string; parents: string[] }>)
 
     laneCount = Math.max(laneCount, above.length, pending.length);
     lanes.push(lane);
-    rows.push({ above, after: pending.slice() });
+    rows.push({ above, after: pending.slice(), tip });
   });
 
-  return { lanes, rows, laneCount, colors };
+  return { lanes, rows, laneCount };
 }
