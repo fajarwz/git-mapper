@@ -1,0 +1,56 @@
+export type RefType = "branch" | "remote" | "tag";
+
+/** A label rendered beside the commit subject: local branch, remote branch or tag. */
+export interface CommitRef {
+  type: RefType;
+  name: string;
+  /** True for the branch the working copy currently has checked out. */
+  isCurrent?: boolean;
+}
+
+export type FileStatus = "added" | "modified" | "deleted" | "renamed";
+
+export type DiffLineType = "hunk" | "context" | "add" | "remove";
+
+export interface DiffLine {
+  type: DiffLineType;
+  text: string;
+}
+
+export interface ChangedFile {
+  path: string;
+  status: FileStatus;
+  additions: number;
+  deletions: number;
+  diff: DiffLine[];
+}
+
+export interface Commit {
+  /** Short hash, the only form this mock UI displays. */
+  hash: string;
+  subject: string;
+  body?: string;
+  author: string;
+  authorEmail: string;
+  /** ISO timestamp used for the absolute date in the details panel. */
+  date: string;
+  relativeDate: string;
+  /** Graph column this commit's dot sits in. Authored per row while the layout engine is out of scope. */
+  lane: number;
+  /** Hashes of the parent commits, in order. Empty for the root commit. */
+  parents: string[];
+  refs: CommitRef[];
+  files: ChangedFile[];
+}
+
+export interface Repository {
+  id: string;
+  name: string;
+  path: string;
+  branch: string;
+  ahead: number;
+  behind: number;
+  commits: Commit[];
+  /** Commit pre-selected when the tab is first shown. */
+  defaultCommitHash: string;
+}
