@@ -317,7 +317,9 @@ export function TitleBar({
 
       <div className="flex shrink-0 items-center gap-1.5">
         {repo && (
-          <span className="inline-flex max-w-47.5 items-center gap-1.25 rounded-full border border-primary/25 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary-ink">
+          // The edge takes primary-ink, not primary: primary-ink is re-pointed in .dark
+          // (violet -> lavender), so the hairline stays visible on the dark glass too.
+          <span className="inline-flex max-w-47.5 items-center gap-1.25 rounded-full border border-primary-ink/35 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary-ink">
             <BranchIcon size={11} />
             <span className="truncate">{repo.branch}</span>
           </span>

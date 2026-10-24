@@ -25,7 +25,7 @@ export function RefPill({ ref, lane, onCheckout }: RefPillProps) {
     <span
       onDoubleClick={checkoutable ? () => onCheckout?.(ref.name) : undefined}
       className={`inline-flex h-5 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 text-[10.5px] leading-none ${
-        ref.isCurrent ? "font-bold text-surface" : "border-1.5 bg-transparent"
+        ref.isCurrent ? "font-bold text-surface" : "border-[1.5px] bg-transparent"
       } ${checkoutable ? "cursor-pointer" : ""}`}
       style={
         ref.isCurrent
