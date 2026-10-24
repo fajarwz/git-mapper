@@ -6,8 +6,8 @@ import {
   ROW_HEIGHT,
   buildEdges,
   graphWidth,
+  laneColor,
   laneX,
-  lineColor,
   rowY,
 } from "../lib/graphGeometry";
 
@@ -48,8 +48,8 @@ export function CommitGraph({ commits, layout, selectedHash }: CommitGraphProps)
         const y = rowY(index);
         const selected = commit.hash === selectedHash;
         const checkedOut = commit.refs.some((ref) => ref.isCurrent);
-        // The dot belongs to a line, so it takes the line's colour, not its column's.
-        const color = lineColor(layout.colors[index] ?? 0);
+        // The dot sits in a lane, so it takes that lane's colour.
+        const color = laneColor(layout.lanes[index] ?? 0);
 
         return (
           <g key={commit.hash}>

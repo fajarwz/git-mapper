@@ -1,11 +1,11 @@
 import type { CommitRef } from "../types";
-import { lineColor } from "../lib/graphGeometry";
+import { laneColor } from "../lib/graphGeometry";
 import { BranchIcon, RemoteIcon, TagIcon } from "./icons";
 
 interface RefPillProps {
   ref: CommitRef;
-  /** Palette index of the commit's line, so the pill matches its graph node. */
-  color: number;
+  /** The commit's graph lane, so the pill matches its node. */
+  lane: number;
   /** Only local branches are checkout-able; double-clicking the pill switches to it. */
   onCheckout?: (branch: string) => void;
 }
@@ -17,7 +17,7 @@ const ICONS = {
 };
 
 /** Branch / remote / tag label shown inline after a commit subject. */
-export function RefPill({ ref, color, onCheckout }: RefPillProps) {
+export function RefPill({ ref, lane, onCheckout }: RefPillProps) {
   const Icon = ICONS[ref.type];
   const checkoutable = ref.type === "branch" && !ref.isCurrent && onCheckout !== undefined;
 
@@ -29,11 +29,11 @@ export function RefPill({ ref, color, onCheckout }: RefPillProps) {
       } ${checkoutable ? "cursor-pointer" : ""}`}
       style={
         ref.isCurrent
-          ? { backgroundColor: lineColor(color) }
+          ? { backgroundColor: laneColor(lane) }
           : {
-              borderColor: lineColor(color),
+              borderColor: laneColor(lane),
               // Text slightly darker than the bordering dot colour for small-text contrast.
-              color: `color-mix(in oklab, ${lineColor(color)}, var(--color-ink) 55%)`,
+              color: `color-mix(in oklab, ${laneColor(lane)}, var(--color-ink) 55%)`,
             }
       }
       title={
@@ -52,7 +52,7 @@ export function RefPill({ ref, color, onCheckout }: RefPillProps) {
           style={{
             // On the filled (checked-out) pill the divider takes the text colour;
             // on outline pills it takes the lane colour.
-            borderLeft: `1px solid ${ref.isCurrent ? "var(--color-surface)" : lineColor(color)}`,
+            borderLeft: `1px solid ${ref.isCurrent ? "var(--color-surface)" : laneColor(lane)}`,
           }}
         >
           {ref.withRemote}

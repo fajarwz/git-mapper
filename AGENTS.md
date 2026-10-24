@@ -96,12 +96,11 @@ loader). `npm run lint` is a Tailwind class checker, not a code linter. `npm run
   fork, join and lane shift as a bend inside that row's band, merge vertical pieces into one path
   per lane and colour, and leave tips without a line above them. Drawing a child-to-parent curve
   instead is what produced long diagonals that read as nodes jumping across the graph.
-  **Colour belongs to the line.** Each lane slot carries `{hash, color}`: the lane says *where* a
-  line is drawn, the slot says which colour it has, so a line keeps its hue when lanes shift and
-  the dot, its segments and its pills all use `lineColor(commit.color)`. Claiming colour from the
-  lane index (`laneColor(lane)`) is the bug that made lines repaint mid-run; there are 8 palette
-  entries (`--color-lane-1..8`), and a new line takes the least-used one, skipping its neighbours.
-  Dots sit on `rowY(index)`, so keep `ROW_HEIGHT` shared with `CommitRow`.
+  **Colour belongs to the lane.** Lane *k* is always `laneColor(k)`, and every piece is drawn in
+  the colour of the lane it ends in, so a line that moves takes the new lane's hue at the bend and
+  neighbouring lanes never share one. The dot, its segments and its ref pills all use
+  `laneColor(commit.lane)`, so a row and its node always match. Do not carry a colour in the line:
+  a shifting line keeping its old hue is what made the graph read as broken.
   **One line per pending commit.** A parent reserved by several children is drawn ONCE; each extra
   child records `join` and bends into that line at its own row. Reserving a lane per child drew the
   same commit as several parallel lines that fanned into one dot rows later (that was the

@@ -7,7 +7,7 @@ export const LANE_WIDTH = 16;
 export const GRAPH_PADDING_X = 14;
 export const DOT_RADIUS = 3.5;
 
-/** One hue per line. Tokens, so themes carry over; indexed by the layout's colour slot. */
+/** One hue per lane. Tokens, so themes carry over. */
 export const LINE_COLORS = [
   "var(--color-lane-1)",
   "var(--color-lane-2)",
@@ -19,9 +19,12 @@ export const LINE_COLORS = [
   "var(--color-lane-8)",
 ];
 
-/** Palette entry for a line. Takes a colour slot, never a lane index: lanes move, lines do not. */
-export function lineColor(color: number): string {
-  return LINE_COLORS[color % LINE_COLOR_COUNT];
+/**
+ * Colour of a lane. Every piece is drawn in the colour of the lane it ends in, so a line that moves
+ * takes the new lane's hue at the bend and neighbouring lanes never share one.
+ */
+export function laneColor(lane: number): string {
+  return LINE_COLORS[lane % LINE_COLOR_COUNT];
 }
 
 /**
@@ -93,7 +96,8 @@ export function buildEdges(layout: LaneLayout): GraphEdge[] {
     const gapTo = index < layout.rows.length - 1 ? rowY(index + 1) - ROW_HEIGHT / 2 : outY;
 
     row.transitions.forEach((transition: LaneTransition, order: number) => {
-      const color = lineColor(transition.color);
+      // Colour belongs to the lane the piece ends in, so a bend carries the next lane's hue.
+      const color = laneColor(transition.to);
       const key = `r${index}:${transition.kind}:${order}`;
       switch (transition.kind) {
         case "continue":
@@ -128,7 +132,7 @@ export function buildEdges(layout: LaneLayout): GraphEdge[] {
 
     // Gaps between rows: the lines still running leave this row band and enter the next one.
     if (index < layout.rows.length - 1) {
-      row.after.forEach((slot, lane) => addVertical(lane, outY, gapTo, lineColor(slot.color)));
+      row.after.forEach((_hash, lane) => addVertical(lane, outY, gapTo, laneColor(lane)));
     }
   });
 

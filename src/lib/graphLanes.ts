@@ -2,9 +2,8 @@
  * Lane layout: an active-lane sweep over a newest-first commit list, recording every graph piece
  * as it goes.
  *
- * The model is a set of active lanes, one entry per line that is still running. Each entry carries
- * the commit the line is heading for and the line's colour, so colour belongs to the line and not
- * to the column it happens to occupy. Lanes are the position of a line, slots are its identity.
+ * The model is a set of active lanes, one entry per line that is still running: the commit that
+ * line is heading for. Lanes are dense, so a freed lane shifts the ones to its right leftwards.
  *
  * Per row:
  *
@@ -23,18 +22,14 @@
  * Every transition is recorded here with its kind and colour, so the renderer draws what the sweep
  * decided instead of re-deriving connections from lane indices.
  *
- * Colour rule: a new line takes the palette entry used by the fewest active lines, skipping the
- * colours of the lanes on either side of it, ties to the lowest index. Deterministic for identical
- * input, stable for lines that already exist, never repaints a line on screen.
+ * Colour rule: a lane owns its colour, and every piece is drawn in the colour of the lane it ends
+ * in. A line that moves to another lane therefore changes hue exactly at that lane, and two
+ * neighbouring lanes always differ. Colour is a pure function of the lane (see `laneColor`).
  */
 export const LINE_COLOR_COUNT = 8;
 
-export interface LaneSlot {
-  /** Commit this line is heading for. */
-  hash: string;
-  /** Palette index of the line. */
-  color: number;
-}
+/** One line, identified by the commit it is heading for. Colour comes from its lane. */
+export type LaneSlot = string;
 
 export type TransitionKind =
   /** A running line keeps its lane: a vertical piece through this row. */
@@ -50,10 +45,8 @@ export interface LaneTransition {
   kind: TransitionKind;
   /** Lane the piece starts in. For `fork` that is the dot lane, for `join` the incoming one. */
   from: number;
-  /** Lane the piece ends in. For `join` that is the dot lane. */
+  /** Lane the piece ends in. Its colour is this lane's colour. */
   to: number;
-  /** Palette index this piece is drawn with. */
-  color: number;
   /** Commit the piece points at (`join`: the commit it arrives at). */
   hash: string;
 }
@@ -77,10 +70,8 @@ export interface LaneRow {
 }
 
 export interface LaneLayout {
-  /** Lane per commit: where its dot sits. */
+  /** Lane per commit: where its dot sits, and which colour it carries. */
   lanes: number[];
-  /** Palette index per commit: the colour of the line its dot belongs to. */
-  colors: number[];
   rows: LaneRow[];
   /** Lanes needed at the widest row, for the SVG width. */
   laneCount: number;
@@ -88,39 +79,10 @@ export interface LaneLayout {
   ordered: boolean;
 }
 
-/** Least-used palette entry around `at`, neighbour colours skipped, ties to the lowest index. */
-function pickColor(slots: LaneSlot[], at: number): number {
-  const uses = new Array<number>(LINE_COLOR_COUNT).fill(0);
-  for (const slot of slots) {
-    uses[slot.color] += 1;
-  }
-
-  const neighbours = new Set<number>();
-  for (const index of [at - 1, at]) {
-    const slot = slots[index];
-    if (slot) neighbours.add(slot.color);
-  }
-
-  let best = -1;
-  for (let color = 0; color < LINE_COLOR_COUNT; color += 1) {
-    if (neighbours.has(color)) continue;
-    if (best === -1 || uses[color] < uses[best]) best = color;
-  }
-  if (best !== -1) return best;
-
-  // Every entry sits next to the new line (only possible with the whole palette active).
-  best = 0;
-  for (let color = 1; color < LINE_COLOR_COUNT; color += 1) {
-    if (uses[color] < uses[best]) best = color;
-  }
-  return best;
-}
-
 export function layoutGraph(commits: Array<{ hash: string; parents: string[] }>): LaneLayout {
   const input = new Set(commits.map((commit) => commit.hash));
   const pending: LaneSlot[] = [];
   const lanes: number[] = [];
-  const colors: number[] = [];
   const rows: LaneRow[] = [];
   const drawn = new Set<string>();
   let laneCount = 1;
@@ -130,17 +92,16 @@ export function layoutGraph(commits: Array<{ hash: string; parents: string[] }>)
     // Defensive only: the same hash twice could not own two dots.
     if (drawn.has(hash)) ordered = false;
 
-    let lane = pending.findIndex((slot) => slot.hash === hash);
+    let lane = pending.indexOf(hash);
     const tip = lane === -1;
     if (tip) {
-      const parentLine = parents[0] ? pending.find((slot) => slot.hash === parents[0]) : undefined;
       lane = pending.length;
-      pending.push({ hash, color: parentLine ? parentLine.color : pickColor(pending, lane) });
+      pending.push(hash);
     }
 
     // Snapshot before any mutation: this row's incoming geometry must not change under it.
-    const above = pending.map((slot) => ({ ...slot }));
-    const color = pending[lane].color;
+
+    const above = pending.slice();
     const gaps: LaneGap[] = parents
       .filter((parent) => !input.has(parent))
       .map((parent) => ({ hash: parent, reason: "unloaded" as const }));
@@ -156,12 +117,12 @@ export function layoutGraph(commits: Array<{ hash: string; parents: string[] }>)
       ordered = false;
       gaps.push({ hash: first, reason: "out-of-order" });
       pending.splice(lane, 1);
-    } else if (pending.some((slot, index) => index !== lane && slot.hash === first)) {
+    } else if (pending.some((slot, index) => index !== lane && slot === first)) {
       // Another child already holds a line for that parent: this line ends and bends into it.
       pending.splice(lane, 1);
       stubs.push(first);
     } else {
-      pending[lane] = { hash: first, color };
+      pending[lane] = first;
     }
 
     for (const parent of parents.slice(1)) {
@@ -170,52 +131,45 @@ export function layoutGraph(commits: Array<{ hash: string; parents: string[] }>)
         gaps.push({ hash: parent, reason: "out-of-order" });
         continue;
       }
-      if (pending.some((slot) => slot.hash === parent)) {
+      if (pending.includes(parent)) {
         stubs.push(parent); // that line already exists: connect to it instead of opening another
         continue;
       }
       const at = Math.min(lane + 1, pending.length);
-      pending.splice(at, 0, { hash: parent, color: pickColor(pending, at) });
+      pending.splice(at, 0, parent);
     }
 
-    const after = pending.map((slot) => ({ ...slot }));
+    const after = pending.slice();
 
     // Record the pieces. A hash occupies one lane at most, so a line appearing below is either the
     // same line moving (`continue` / `shift`) or a line that starts at this dot (`fork`).
     const transitions: LaneTransition[] = [];
     after.forEach((slot, to) => {
-      const from = above.findIndex((entry) => entry.hash === slot.hash);
+      const from = above.indexOf(slot);
       if (from === -1) {
-        transitions.push({ kind: "fork", from: lane, to, color: slot.color, hash: slot.hash });
+        transitions.push({ kind: "fork", from: lane, to, hash: slot });
       } else {
-        transitions.push({
-          kind: from === to ? "continue" : "shift",
-          from,
-          to,
-          color: slot.color,
-          hash: slot.hash,
-        });
+        transitions.push({ kind: from === to ? "continue" : "shift", from, to, hash: slot });
       }
     });
     // A parent whose line already runs beside this row: the dot bends into that line.
     for (const hash of stubs) {
-      const at = after.findIndex((slot) => slot.hash === hash);
+      const at = after.indexOf(hash);
       if (at !== -1) {
-        transitions.push({ kind: "fork", from: lane, to: at, color: after[at].color, hash });
+        transitions.push({ kind: "fork", from: lane, to: at, hash });
       }
     }
     above.forEach((slot, from) => {
-      if (after.some((entry) => entry.hash === slot.hash)) return;
+      if (after.includes(slot)) return;
       if (tip && from === lane) return; // a tip has nothing above its dot
-      transitions.push({ kind: "join", from, to: lane, color: slot.color, hash: slot.hash });
+      transitions.push({ kind: "join", from, to: lane, hash: slot });
     });
 
     laneCount = Math.max(laneCount, above.length, after.length);
     drawn.add(hash);
     lanes.push(lane);
-    colors.push(color);
     rows.push({ above, after, tip, transitions, gaps });
   });
 
-  return { lanes, colors, rows, laneCount, ordered };
+  return { lanes, rows, laneCount, ordered };
 }

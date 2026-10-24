@@ -86,7 +86,6 @@ function toCommits(parsed: ReturnType<typeof parseLog>): Commit[] {
     authorEmail: commit.authorEmail,
     date: commit.date,
     lane: layout.lanes[index] ?? 0,
-    color: layout.colors[index] ?? 0,
     parents: commit.parents,
     refs: commit.refs,
   }));
@@ -169,7 +168,6 @@ function uncommittedCommit(commits: Commit[], changed: number): Commit {
     authorEmail: "",
     date: new Date().toISOString(),
     lane: 0,
-    color: 0,
     parents: [head.hash],
     refs: [],
   };
@@ -182,8 +180,7 @@ function withLanes(commits: Commit[]): Commit[] {
   // identical objects mean identical renders and no DOM work for history that did not move.
   return commits.map((commit, index) => {
     const lane = layout.lanes[index] ?? 0;
-    const color = layout.colors[index] ?? 0;
-    return commit.lane === lane && commit.color === color ? commit : { ...commit, lane, color };
+    return commit.lane === lane ? commit : { ...commit, lane };
   });
 }
 

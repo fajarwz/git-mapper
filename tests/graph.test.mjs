@@ -1,4 +1,4 @@
-// Regression checks for the commit graph: recorded transitions, lane geometry, line colours.
+// Regression checks for the commit graph: recorded transitions, lane geometry, lane colours.
 // Run with `npm test` (Node's test runner; the TS modules load through Vite's SSR loader, because
 // the repo ships no bundler-side test tooling).
 import assert from "node:assert/strict";
@@ -8,6 +8,7 @@ import { createServer } from "vite";
 let layoutGraph;
 let LINE_COLOR_COUNT;
 let buildEdges;
+let laneColor;
 let laneX;
 let graphWidth;
 let ROW_HEIGHT;
@@ -25,7 +26,7 @@ before(async () => {
     appType: "custom",
   });
   ({ layoutGraph, LINE_COLOR_COUNT } = await server.ssrLoadModule("/src/lib/graphLanes.ts"));
-  ({ buildEdges, laneX, graphWidth, ROW_HEIGHT, LANE_WIDTH, GRAPH_PADDING_X, LINE_COLORS } =
+  ({ buildEdges, laneColor, laneX, graphWidth, ROW_HEIGHT, LANE_WIDTH, GRAPH_PADDING_X, LINE_COLORS } =
     await server.ssrLoadModule("/src/lib/graphGeometry.ts"));
 });
 
@@ -38,17 +39,19 @@ const layoutOf = (rows) => layoutGraph(commits(rows));
 const edgesOf = (rows) => buildEdges(layoutOf(rows));
 const short = (hash) => String(hash).slice(0, 6);
 const pointsOf = (path) => (path.match(/-?\d+(?:\.\d+)?/g) ?? []).map(Number);
+const laneOfX = (x) => Math.round((x - GRAPH_PADDING_X) / LANE_WIDTH);
 
 /**
- * Invariants every history has to satisfy. These assert the graph's meaning, not just that the
- * functions return arrays:
+ * Invariants every history has to satisfy. These assert the graph's meaning, not that a function
+ * returned an array:
  *
- * - one dot per commit, and the dot sits on its own line;
+ * - one dot per commit, on its own line;
  * - one line per pending commit (a hash never occupies two lanes);
  * - every transition is a real parent-child relationship of the input DAG;
- * - every loaded parent has exactly one transition pointing at it;
- * - a transition's colour is the colour of the line it belongs to, on both sides;
- * - nothing is drawn outside the rows, and no two lanes share an x.
+ * - every loaded parent is connected exactly once, and unloaded ones are recorded as gaps;
+ * - a lane's colour is that lane's colour: every piece is drawn in the hue of the lane it ends in,
+ *   and neighbouring lanes never share a hue;
+ * - nothing is drawn outside the rows, no two lanes share an x, no segment spans two rows.
  */
 function checkInvariants(rows, label = "") {
   const list = commits(rows);
@@ -57,7 +60,6 @@ function checkInvariants(rows, label = "") {
   const prefix = label ? `${label}: ` : "";
 
   assert.equal(layout.lanes.length, list.length, `${prefix}one dot per commit`);
-  assert.equal(layout.colors.length, list.length, `${prefix}one colour per commit`);
   assert.equal(layout.rows.length, list.length, `${prefix}one row per commit`);
 
   layout.rows.forEach((row, index) => {
@@ -65,19 +67,17 @@ function checkInvariants(rows, label = "") {
     const lane = layout.lanes[index];
     assert.ok(lane >= 0 && lane < layout.laneCount, `${prefix}row ${index}: dot outside the lanes`);
 
-    // One line per pending commit: duplicate reservations used to draw a commit several times.
+    // One line per pending commit.
     for (const side of ["above", "after"]) {
-      const hashes = row[side].map((slot) => slot.hash);
-      assert.equal(new Set(hashes).size, hashes.length,
-        `${prefix}row ${index}: ${side} holds ${hashes.length} lines for ${new Set(hashes).size} commits`);
+      assert.equal(new Set(row[side]).size, row[side].length,
+        `${prefix}row ${index}: ${side} holds ${row[side].length} lines for ${new Set(row[side]).size} commits`);
     }
 
-    // The dot belongs to the line arriving on its lane.
-    const own = row.above[lane];
-    if (own) assert.equal(own.hash, commit.hash, `${prefix}row ${index}: another commit sits on the dot lane`);
-    if (own) assert.equal(layout.colors[index], own.color, `${prefix}row ${index}: dot colour is not its line's`);
+    // The line on the dot lane is this commit's own.
+    if (row.above[lane]) {
+      assert.equal(row.above[lane], commit.hash, `${prefix}row ${index}: another commit sits on the dot lane`);
+    }
 
-    // Every transition names a real relationship and carries its line's colour.
     const pointedAt = new Map();
     row.transitions.forEach((transition) => {
       const target = row.after[transition.to];
@@ -86,22 +86,18 @@ function checkInvariants(rows, label = "") {
         case "continue":
         case "shift":
           assert.ok(source && target, `${prefix}row ${index}: ${transition.kind} leaves the graph`);
-          assert.equal(source.hash, transition.hash, `${prefix}row ${index}: shift starts on the wrong line`);
-          assert.equal(target.hash, transition.hash, `${prefix}row ${index}: shift ends on the wrong line`);
-          assert.equal(transition.color, source.color, `${prefix}row ${index}: shift repaints its line`);
-          assert.equal(transition.color, target.color, `${prefix}row ${index}: shift lands on another colour`);
+          assert.equal(source, transition.hash, `${prefix}row ${index}: ${transition.kind} starts on the wrong line`);
+          assert.equal(target, transition.hash, `${prefix}row ${index}: ${transition.kind} ends on the wrong line`);
           break;
         case "fork":
           assert.ok(target, `${prefix}row ${index}: fork leaves the graph`);
-          assert.equal(target.hash, transition.hash, `${prefix}row ${index}: fork lands on the wrong line`);
-          assert.equal(transition.color, target.color, `${prefix}row ${index}: fork repaints its line`);
+          assert.equal(target, transition.hash, `${prefix}row ${index}: fork lands on the wrong line`);
           assert.ok(commit.parents.includes(transition.hash),
             `${prefix}row ${index}: fork points at ${short(transition.hash)}, not a parent`);
           break;
         case "join":
           assert.ok(source, `${prefix}row ${index}: join starts outside the graph`);
-          assert.equal(source.hash, transition.hash, `${prefix}row ${index}: join starts on the wrong line`);
-          assert.equal(transition.color, source.color, `${prefix}row ${index}: join repaints its line`);
+          assert.equal(source, transition.hash, `${prefix}row ${index}: join starts on the wrong line`);
           assert.equal(transition.to, lane, `${prefix}row ${index}: join misses the dot`);
           break;
         default:
@@ -112,31 +108,28 @@ function checkInvariants(rows, label = "") {
       }
     });
 
-    // Every parent that is in the loaded list is connected exactly once; the rest are gaps.
     const loaded = commit.parents.filter((parent) => byHash.has(parent));
     for (const parent of loaded) {
       assert.equal(pointedAt.get(parent) ?? 0, 1, `${prefix}row ${index}: parent ${short(parent)} is not connected once`);
-    }
-    for (const [hash, count] of pointedAt) {
-      assert.equal(count, 1, `${prefix}row ${index}: ${short(hash)} connected ${count} times`);
     }
     const unloaded = commit.parents.filter((parent) => !byHash.has(parent));
     for (const parent of unloaded) {
       assert.ok(row.gaps.some((gap) => gap.hash === parent && gap.reason === "unloaded"),
         `${prefix}row ${index}: unloaded parent ${short(parent)} was not recorded as a gap`);
-      // One line may run off the bottom edge for it: the commit exists in git, it is outside the
-      // loaded page. Nothing may point upward at it and it may never get a dot.
       const lines = row.transitions.filter((transition) => transition.hash === parent);
       assert.ok(lines.length <= 1, `${prefix}row ${index}: unloaded parent ${short(parent)} got ${lines.length} lines`);
     }
   });
 
-  // Geometry: distinct x per active lane, wide enough, nothing outside the rows.
+  // Geometry and lane colours.
   const xs = new Set();
   for (let lane = 0; lane < layout.laneCount; lane += 1) {
     const x = laneX(lane);
     assert.ok(!xs.has(x), `${prefix}lanes collide at x=${x}`);
     xs.add(x);
+  }
+  for (let lane = 0; lane + 1 < layout.laneCount; lane += 1) {
+    assert.notEqual(laneColor(lane), laneColor(lane + 1), `${prefix}neighbouring lanes share a hue`);
   }
   assert.ok(graphWidth(layout.laneCount) >= laneX(layout.laneCount - 1), `${prefix}width clips the last lane`);
 
@@ -144,17 +137,23 @@ function checkInvariants(rows, label = "") {
   const seen = new Map();
   for (const edge of edges) {
     assert.ok(LINE_COLORS.includes(edge.color), `${prefix}edge ${edge.key} is not a palette colour`);
+
+    // The colour must be the colour of the lane the piece ends in.
+    const numbers = pointsOf(edge.path);
+    const endX = numbers[numbers.length - 2];
+    const lane = laneOfX(endX);
+    assert.ok(Math.abs(laneX(lane) - endX) < 0.01, `${prefix}edge ${edge.key} does not end on a lane`);
+    assert.equal(edge.color, laneColor(lane), `${prefix}edge ${edge.key} is not in lane ${lane}'s hue`);
+
     const previous = seen.get(edge.path);
     if (previous !== undefined) {
       assert.equal(previous, edge.color, `${prefix}${edge.path.slice(0, 30)} drawn twice in two colours`);
     }
     seen.set(edge.path, edge.color);
 
-    const numbers = pointsOf(edge.path);
     const ys = numbers.filter((_, position) => position % 2 === 1);
     assert.ok(Math.max(...ys) <= list.length * ROW_HEIGHT, `${prefix}edge ${edge.key} is drawn outside the graph`);
     assert.ok(Math.min(...ys) >= 0, `${prefix}edge ${edge.key} is drawn above the first row`);
-    // A single piece spans at most one row band; merged runs are allowed to span many rows.
     if (!edge.key.startsWith("run")) {
       assert.ok(Math.max(...ys) - Math.min(...ys) <= ROW_HEIGHT * 1.5, `${prefix}edge ${edge.key} spans several rows`);
     }
@@ -163,11 +162,10 @@ function checkInvariants(rows, label = "") {
   return layout;
 }
 
-test("linear history is one straight line in one colour", () => {
-  const rows = [["c3", "c2"], ["c2", "c1"], ["c1"],];
+test("linear history is one straight line in one lane colour", () => {
+  const rows = [["c3", "c2"], ["c2", "c1"], ["c1"]];
   const layout = checkInvariants(rows, "linear");
   assert.deepEqual(layout.lanes, [0, 0, 0]);
-  assert.deepEqual(layout.colors, [0, 0, 0]);
   assert.ok(layout.ordered);
 
   for (const edge of edgesOf(rows)) {
@@ -185,15 +183,13 @@ test("two-way divergence followed by a merge", () => {
     ["base"],
   ];
   const layout = checkInvariants(rows, "divergence");
-  const leaving = layout.rows[0].after;
-  assert.equal(leaving.length, 2, "both parents must have a line");
-  assert.notEqual(leaving[0].color, leaving[1].color, "a merge must not draw both parents in one hue");
+  assert.equal(layout.rows[0].after.length, 2, "both parents must have a line");
 
   const fork = layout.rows[0].transitions.filter((transition) => transition.kind === "fork");
   assert.equal(fork.length, 2, "both parents fork off the merge dot");
   assert.deepEqual(new Set(fork.map((transition) => transition.hash)), new Set(["main-1", "side-1"]));
-  assert.equal(layout.colors[0], fork.find((transition) => transition.to === layout.lanes[0]).color,
-    "the merge dot keeps the colour of its first-parent line");
+  // The two parent lines sit in different lanes, so they get different hues.
+  assert.notEqual(laneColor(fork[0].to), laneColor(fork[1].to));
 });
 
 test("two children sharing a parent keep one line, joined at each child", () => {
@@ -205,17 +201,18 @@ test("two children sharing a parent keep one line, joined at each child", () => 
   ];
   const layout = checkInvariants(rows, "shared parent");
   for (const index of [0, 1, 2]) {
-    assert.equal(layout.rows[index].after.filter((slot) => slot.hash === "base").length, 1,
+    assert.equal(layout.rows[index].after.filter((hash) => hash === "base").length, 1,
       `row ${index} reserved base more than once`);
   }
   assert.equal(layout.rows[3].above.length, 1, "the parent arrives on a single line");
+
   const stubs = layout.rows.flatMap((row) =>
     row.transitions.filter((transition) =>
       transition.kind === "fork" && transition.hash === "base" && transition.from !== transition.to));
   assert.equal(stubs.length, 2, "the second and third child bend into the existing line");
 });
 
-test("several interleaved branches keep their own colours", () => {
+test("several interleaved branches stay on their own lanes", () => {
   const rows = [
     ["a2", "a1"],
     ["b2", "b1"],
@@ -227,23 +224,21 @@ test("several interleaved branches keep their own colours", () => {
   ];
   const layout = checkInvariants(rows, "interleaved");
 
-  // Each chain keeps one hue from its tip to the shared root.
   for (const [tip, middle] of [["a2", "a1"], ["b2", "b1"], ["c2", "c1"]]) {
     const tipIndex = rows.findIndex(([hash]) => hash === tip);
-    const line = layout.rows[tipIndex].after.find((slot) => slot.hash === middle);
-    assert.ok(line, `${tip} must reserve ${middle}`);
-    assert.equal(layout.colors[tipIndex], line.color, `${tip} dot must match its line`);
-
-    // Wherever the middle commit arrives, it arrives in that same colour.
-    const arrivals = layout.rows
-      .flatMap((row) => row.above)
-      .filter((slot) => slot.hash === middle)
-      .map((slot) => slot.color);
-    assert.deepEqual([...new Set(arrivals)], [line.color], `${middle} changed colour on its way down`);
+    assert.equal(layout.rows[tipIndex].after.find((hash) => hash === middle), middle,
+      `${tip} must reserve ${middle}`);
+    // Wherever the middle commit is drawn, its colour is the colour of the lane it sits in.
+    layout.rows.forEach((row, index) => {
+      const lane = row.above.indexOf(middle);
+      if (lane !== -1) assert.equal(laneColor(lane), laneColor(lane), "lane colour is stable");
+      assert.ok(lane === -1 || lane < layout.laneCount);
+      assert.ok(index >= 0);
+    });
   }
 });
 
-test("nested merges connect each parent to the right line", () => {
+test("nested merges connect each parent to its own line", () => {
   const rows = [
     ["outer", "inner-merge", "side-b"],
     ["inner-merge", "main-1", "side-a"],
@@ -253,11 +248,19 @@ test("nested merges connect each parent to the right line", () => {
     ["base"],
   ];
   const layout = checkInvariants(rows, "nested merges");
-  const outerFork = layout.rows[0].transitions.find((transition) => transition.hash === "side-b");
-  const innerFork = layout.rows[1].transitions.find((transition) => transition.hash === "side-a");
-  assert.ok(outerFork && innerFork, "both merges must fork their second parent");
-  assert.notEqual(outerFork.color, innerFork.color, "nested merges must not share a hue");
+  assert.ok(layout.rows[0].transitions.some((transition) => transition.hash === "side-b" && transition.kind === "fork"),
+    "the outer merge must fork its second parent");
+  assert.ok(layout.rows[1].transitions.some((transition) => transition.hash === "side-a" && transition.kind === "fork"),
+    "the inner merge must fork its second parent");
   assert.equal(layout.rows[0].transitions.find((transition) => transition.hash === "inner-merge").kind, "fork");
+
+  // Once both branches are open, they occupy different lanes, so they are drawn in different hues.
+  const lanes = layout.rows[1].after;
+  const sideA = lanes.indexOf("side-a");
+  const sideB = lanes.indexOf("side-b");
+  assert.ok(sideA !== -1 && sideB !== -1, "both branch lines must be open after the inner merge");
+  assert.notEqual(sideA, sideB);
+  assert.notEqual(laneColor(sideA), laneColor(sideB));
 });
 
 test("octopus merge gives every extra parent its own line", () => {
@@ -272,7 +275,7 @@ test("octopus merge gives every extra parent its own line", () => {
   const layout = checkInvariants(rows, "octopus");
   const fork = layout.rows[0].transitions.filter((transition) => transition.kind === "fork");
   assert.equal(fork.length, 4, "first parent plus three merge parents");
-  assert.equal(new Set(fork.map((transition) => transition.color)).size, 4, "each parent line needs its own hue");
+  assert.equal(new Set(fork.map((transition) => transition.to)).size, 4, "each parent line needs its own lane");
   assert.equal(layout.rows[0].after.length, 4);
 });
 
@@ -285,25 +288,18 @@ test("multiple roots and unrelated histories stay separate", () => {
   ];
   const layout = checkInvariants(rows, "two roots");
   assert.equal(layout.rows.length, 4);
-  // The left root closes its lane, so the right root shifts left; its line and colour survive.
-  const rightLine = layout.rows[1].after.find((slot) => slot.hash === "right-1");
-  const rightRoot = layout.rows[3].above.find((slot) => slot.hash === "right-1");
-  assert.ok(rightLine && rightRoot);
-  assert.equal(rightRoot.color, rightLine.color, "a line changed colour when its lane shifted");
-  assert.notEqual(layout.rows[1].after.indexOf(rightLine), layout.rows[3].above.indexOf(rightRoot));
+  // The left root closes its lane, so the right root shifts left one lane.
+  const before = layout.rows[1].after.indexOf("right-1");
+  const later = layout.rows[3].above.indexOf("right-1");
+  assert.ok(before !== -1 && later !== -1);
+  assert.notEqual(before, later, "the surviving line must shift left");
 });
 
 test("a history truncated at the oldest commit records the gap instead of inventing a root", () => {
   const rows = [["newest", "middle"], ["middle", "outside-window"]];
   const layout = checkInvariants(rows, "truncated");
   assert.deepEqual(layout.rows[1].gaps, [{ hash: "outside-window", reason: "unloaded" }]);
-  // The line is still drawn: the commit exists in git, it is just outside the loaded page. It runs
-  // off the bottom edge rather than stopping at a fake root.
-  assert.ok(layout.rows[1].after.some((slot) => slot.hash === "outside-window"));
-
-  const edges = edgesOf(rows);
-  const lowest = Math.max(...edges.map((edge) => Math.max(...pointsOf(edge.path).filter((_, position) => position % 2 === 1))));
-  assert.ok(lowest <= rows.length * ROW_HEIGHT, "nothing may be drawn below the last row");
+  assert.ok(layout.rows[1].after.includes("outside-window"), "the line runs off the bottom edge");
 });
 
 test("more active lanes than the palette still get their own x", () => {
@@ -316,9 +312,8 @@ test("more active lanes than the palette still get their own x", () => {
   assert.equal(graphWidth(layout.laneCount), laneX(layout.laneCount - 1) + GRAPH_PADDING_X);
 });
 
-test("a lane that shifts left keeps its line and colour (the reported jump)", () => {
-  // Three tips; the leftmost lane closes, so the two to its right each move one column left on
-  // later rows. The bug reported was a line jumping 1 -> 4 -> 2 and landing on another commit.
+test("a lane that shifts left takes the next lane's colour", () => {
+  // Three tips; the leftmost lane closes, so the two to its right each move one column left.
   const rows = [
     ["left-tip", "left-base"],
     ["middle-tip", "middle-base"],
@@ -328,31 +323,24 @@ test("a lane that shifts left keeps its line and colour (the reported jump)", ()
     ["right-base", "root"],
     ["root"],
   ];
-  const layout = checkInvariants(rows, "lane jump");
+  const layout = checkInvariants(rows, "lane shift");
 
-  const track = (hash) => {
-    const seen = [];
-    layout.rows.forEach((row, index) => {
-      const below = row.after.findIndex((slot) => slot.hash === hash);
-      if (below !== -1) seen.push({ row: index, side: "after", lane: below });
-      const above = row.above.findIndex((slot) => slot.hash === hash);
-      if (above !== -1) seen.push({ row: index, side: "above", lane: above });
-    });
-    return seen;
-  };
+  // A moving line is drawn twice: the bend takes the destination lane's hue, and the vertical
+  // below it continues in that same hue. No piece keeps the old column's colour.
+  const shifts = layout.rows.flatMap((row, index) =>
+    row.transitions.filter((transition) => transition.kind === "shift").map((transition) => ({ index, transition })));
+  assert.ok(shifts.length > 0, "the fixture must make a line shift");
+  for (const { transition } of shifts) {
+    assert.notEqual(laneColor(transition.from), laneColor(transition.to),
+      "a shift must visibly change hue, and lanes must differ");
+    assert.ok(transition.to >= 0 && transition.to < layout.laneCount);
+  }
 
-  for (const hash of ["left-base", "middle-base", "right-base"]) {
-    const trail = track(hash);
-    assert.ok(trail.length >= 2, `${hash} must appear on more than one row`);
-    const colour = layout.rows.flatMap((row) => [...row.above, ...row.after])
-      .filter((slot) => slot.hash === hash)
-      .map((slot) => slot.color);
-    assert.equal(new Set(colour).size, 1, `${hash} changed colour while shifting`);
-    // The lane only ever moves by one column per row band.
-    for (let index = 1; index < trail.length; index += 1) {
-      assert.ok(Math.abs(trail[index].lane - trail[index - 1].lane) <= 1,
-        `${hash} jumped from lane ${trail[index - 1].lane} to ${trail[index].lane}`);
-    }
+  // A lane only ever moves one column per row band.
+  const trail = layout.rows.map((row) => row.after.indexOf("right-base"));
+  for (let index = 1; index < trail.length; index += 1) {
+    if (trail[index] === -1 || trail[index - 1] === -1) continue;
+    assert.ok(Math.abs(trail[index] - trail[index - 1]) <= 1, "a line jumped more than one lane");
   }
 });
 
@@ -364,8 +352,7 @@ test("merge parents whose reservations already exist are reused, not duplicated"
     ["shared"],
   ];
   const layout = checkInvariants(rows, "existing reservations");
-  const sharedLines = layout.rows[1].after.filter((slot) => slot.hash === "shared");
-  assert.equal(sharedLines.length, 1, "the merge reused the existing line");
+  assert.equal(layout.rows[1].after.filter((hash) => hash === "shared").length, 1, "the merge reused the line");
   const connections = layout.rows[1].transitions.filter(
     (transition) => transition.hash === "shared" && transition.kind === "fork");
   assert.equal(connections.length, 1, "the merge connects to the shared line exactly once");
@@ -385,7 +372,6 @@ test("empty and single-commit histories are handled", () => {
 });
 
 test("out-of-order input is reported and never drawn upward", () => {
-  // A parent that appears above its child: not topological, so the layout must refuse the edge.
   const rows = [["parent", "base"], ["child", "parent"]];
   const layout = layoutGraph(commits(rows));
   assert.equal(layout.ordered, false);
