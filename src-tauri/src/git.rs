@@ -141,6 +141,23 @@ pub fn read_log_delta(dir: &str, since: &str, limit: u32) -> Result<String, Stri
     )
 }
 
+/// Commit hashes in the exact order `read_log` returns them. A refresh fetches only the new
+/// commits, so it needs this cheap list to splice them in where git would put them: someone
+/// else's older commit can land below rows that are already on screen.
+#[tauri::command]
+pub fn read_log_order(dir: &str, limit: u32) -> Result<String, String> {
+    run_git(
+        dir,
+        &[
+            "log",
+            "--all",
+            &format!("--max-count={limit}"),
+            "--date=iso-strict",
+            "--pretty=tformat:%H",
+        ],
+    )
+}
+
 /// All branch/remote/tag tips: raw `hash\tfullref` lines for TS-side parsing.
 /// Decorations on log rows miss tips that point outside the loaded window.
 #[tauri::command]

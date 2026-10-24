@@ -146,6 +146,14 @@ function readLogDelta(dir: string, since: string, limit: number): Promise<string
   );
 }
 
+function readLogOrder(dir: string, limit: number): Promise<string> {
+  return call(
+    "read_log_order",
+    { dir, limit },
+    (raw) => (isTauri() ? (raw as string) : (raw as { text: string }).text),
+  );
+}
+
 async function readRefs(dir: string): Promise<string> {
   return isTauri()
     ? invoke<string>("read_refs", { dir })
@@ -225,10 +233,21 @@ export async function loadRepository(dir: string): Promise<Repository> {
 /**
  * Focus refresh. Two cheap reads decide whether anything moved on disk (branch, HEAD, dirty
  * size, and a digest of every branch/remote/tag ref). When only refs moved the commit objects
- * are reused untouched; when history moved only the new commits are read and spliced on top.
- * Returns null when the repo is unchanged, so the caller can skip the state update entirely.
+ * are reused untouched; when history moved only the new commits are read.
+ *
+ * New commits are not always newer than what is on screen: someone else pushes a branch whose
+ * commits were written days ago, and `git log --all` files them by date, below rows already
+ * shown. So the spliced list follows git's own order (read_log_order) instead of prepending.
+ *
+ * Returns null when nothing changed. `touched` lists the commits a caller should flash: new
+ * arrivals and rows whose ref pills moved.
  */
-export async function refreshRepository(repo: Repository): Promise<Repository | null> {
+export interface RefreshedRepository {
+  repo: Repository;
+  touched: string[];
+}
+
+export async function refreshRepository(repo: Repository): Promise<RefreshedRepository | null> {
   const [status, refsRaw] = await Promise.all([readStatus(repo.path), readRefs(repo.path)]);
   const branch = status.branch || "HEAD detached";
   const refsDigest = hashText(refsRaw);
@@ -246,48 +265,105 @@ export async function refreshRepository(repo: Repository): Promise<Repository | 
   }
 
   const tipRefs = parseForEachRef(refsRaw, branch);
+  const headMoved = status.head !== repo.head;
+  // A fetch that only adds a branch leaves HEAD alone, but its commits are new to this window,
+  // so the refs digest counts as movement for the delta read too.
   let fresh: Commit[] = [];
 
-  if (status.head !== repo.head) {
+  const previousByHash = new Map(repo.commits.map((commit) => [commit.hash, commit]));
+
+  if (headMoved || refsDigest !== repo.refsDigest) {
     try {
       const raw = await readLogDelta(repo.path, repo.head, LOG_LIMIT);
-      fresh = toCommits(parseLog(raw)).map((commit) => ({
-        ...commit,
-        refs: mergeRefs(commit.refs, tipRefs.get(commit.hash) ?? []),
-      }));
-      // Nothing new but a different HEAD means history was rewritten or rewound (reset,
-      // rebase) and a page cap means the window shifted; both need the full log again.
-      if (fresh.length === 0 || fresh.length >= LOG_LIMIT) return loadRepository(repo.path);
+      fresh = toCommits(parseLog(raw)).map((commit) => {
+        const refs = mergeRefs(commit.refs, tipRefs.get(commit.hash) ?? []);
+        // The delta also repeats commits already on screen (anything not reachable from HEAD),
+        // so keep the old object unless its pills really moved. Same object = no re-render.
+        const previous = previousByHash.get(commit.hash);
+        return previous && sameRefs(previous.refs, refs) ? previous : { ...commit, refs };
+      });
+      // A page cap means the window shifted, and an empty delta with a moved HEAD means history
+      // was rewritten or rewound (reset, rebase); both need the full log again.
+      if (fresh.length >= LOG_LIMIT || (headMoved && fresh.length === 0)) return fullReload(repo);
     } catch (deltaError) {
       // A rebase or force-push can orphan the old HEAD; the range is meaningless then.
       console.error("Could not read the new commits, reloading the repository", deltaError);
-      return loadRepository(repo.path);
+      return fullReload(repo);
     }
   }
 
-  const freshHashes = new Set(fresh.map((commit) => commit.hash));
+  const touched: string[] = fresh
+    .filter((commit) => previousByHash.get(commit.hash) !== commit)
+    .map((commit) => commit.hash);
+  const freshHashes = new Set(touched);
   const existing = repo.commits
     .filter((commit) => commit.hash !== UNCOMMITTED_HASH && !freshHashes.has(commit.hash))
     .map((commit) => {
       const refs = tipRefs.get(commit.hash) ?? [];
-      return sameRefs(commit.refs, refs) ? commit : { ...commit, refs };
+      if (sameRefs(commit.refs, refs)) return commit;
+      touched.push(commit.hash);
+      return { ...commit, refs };
     });
 
-  const history = [...fresh, ...existing];
+  // Follow git's ordering for the merged window; fall back to prepending only if it fails.
+  let history: Commit[] = [...fresh, ...existing];
+  if (fresh.length > 0) {
+    try {
+      const wanted = Math.max(repo.commits.length, LOG_LIMIT);
+      const order = (await readLogOrder(repo.path, wanted))
+        .split(String.fromCharCode(10))
+        .map((line) => line.trim())
+        .filter((line) => line !== "");
+      const byHash = new Map(history.map((commit) => [commit.hash, commit]));
+      const ordered: Commit[] = [];
+      for (const hash of order) {
+        const commit = byHash.get(hash);
+        if (!commit) continue;
+        ordered.push(commit);
+        byHash.delete(hash);
+      }
+      // Anything git no longer lists in the window (paged deeper, or pushed out) keeps its old
+      // relative order after the rows git does list.
+      for (const commit of history) {
+        const kept = byHash.get(commit.hash);
+        if (kept) ordered.push(kept);
+      }
+      history = ordered;
+    } catch (orderError) {
+      console.error("Could not read the log order, keeping the merged list", orderError);
+    }
+  }
+
   const commits = status.dirty
     ? [uncommittedCommit(history, status.changed), ...history]
     : history;
 
   return {
-    ...repo,
-    branch,
-    ahead: status.ahead,
-    behind: status.behind,
-    head: status.head,
-    changed: status.changed,
-    refsDigest,
-    commits: withLanes(commits),
-    defaultCommitHash: history.find((commit) => commit.hash === status.head)?.hash ?? repo.defaultCommitHash,
+    repo: {
+      ...repo,
+      branch,
+      ahead: status.ahead,
+      behind: status.behind,
+      head: status.head,
+      changed: status.changed,
+      refsDigest,
+      commits: withLanes(commits),
+      defaultCommitHash:
+        history.find((commit) => commit.hash === status.head)?.hash ?? repo.defaultCommitHash,
+    },
+    touched,
+  };
+}
+
+/** Rewritten history or a shifted window: read everything again, and flash what is new. */
+async function fullReload(repo: Repository): Promise<RefreshedRepository> {
+  const reloaded = await loadRepository(repo.path);
+  const known = new Set(repo.commits.map((commit) => commit.hash));
+  return {
+    repo: reloaded,
+    touched: reloaded.commits
+      .filter((commit) => commit.hash !== UNCOMMITTED_HASH && !known.has(commit.hash))
+      .map((commit) => commit.hash),
   };
 }
 
