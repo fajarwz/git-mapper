@@ -17,6 +17,8 @@ import {
   loadRepository,
   pickAndLoadRepository,
   readStoredPaths,
+  readRepoFingerprint,
+  repoFingerprint,
   storePaths,
 } from "./data/gitLoader";
 import type { Repository } from "./types";
@@ -205,6 +207,42 @@ function App() {
       setLoadingMoreByRepo((previous) => ({ ...previous, [repo.id]: false }));
     }
   }
+
+  // Repo data changes while the app sits in the background: a commit from a terminal, an
+  // editor save, a fetch that brings new remote branches. On window focus we re-check the
+  // visible repo only — the other tabs are not on screen and would each pay a full log read.
+  const refreshBusy = useRef(false);
+  useEffect(() => {
+    if (!repo) return;
+    const activeRepo = repo;
+    const known = repoFingerprint(activeRepo);
+    let cancelled = false;
+
+    async function refreshIfChanged() {
+      if (refreshBusy.current || opening || document.visibilityState === "hidden") return;
+      refreshBusy.current = true;
+      try {
+        const current = await readRepoFingerprint(activeRepo.path);
+        if (cancelled || current === known) return;
+        const refreshed = await loadRepository(activeRepo.path);
+        if (cancelled) return;
+        setRepos((previous) => previous.map((item) => (item.id === refreshed.id ? refreshed : item)));
+      } catch (refreshError) {
+        console.error("Could not refresh the repository", refreshError);
+      } finally {
+        refreshBusy.current = false;
+        }
+    }
+
+    const onFocus = () => {
+      void refreshIfChanged();
+    };
+    window.addEventListener("focus", onFocus);
+    return () => {
+      cancelled = true;
+      window.removeEventListener("focus", onFocus);
+    };
+  }, [repo, opening]);
 
   function handleThemeChange(nextTheme: Theme) {
     setTheme(nextTheme);
