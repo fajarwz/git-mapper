@@ -120,7 +120,7 @@ export function DetailsPanel({
               </div>
 
               {commit.body && (
-                <p className="mb-0 mt-0.5 break-words text-[12.5px] leading-relaxed text-ink-soft">
+                <p className="mb-0 mt-0.5 whitespace-pre-wrap break-words text-[12.5px] leading-relaxed text-ink-soft">
                   {commit.body}
                 </p>
               )}
