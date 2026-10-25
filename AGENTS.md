@@ -75,7 +75,7 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
 
 ## Design-system rules (project conventions)
 
-1. **Tokens only.** No hardcoded hex in components; icon markup lives in `src/assets/*.svg` (loaded via svgr `?react` imports through `icons.tsx`) with strokes in `currentColor`. Re-point tokens in `.dark`; components follow without `dark:`-variant spans.
+1. **Tokens only.** No hardcoded hex in components; icon markup lives in `src/assets/*.svg` (loaded via svgr `?react` imports through `icons.tsx`) with strokes in `currentColor`. Re-point tokens in `.dark`; components follow without `dark:`-variant spans. **Exception: theme previews mock a fixed theme**, so they use literal colours — a token like `ink` re-points with the app theme and made the light preview's bar invisible in dark mode.
 2. **Use `panel-shadow` / `soft-shadow`** (custom `@utility` in index.css), never Tailwind's `shadow-panel`/`shadow-soft`. Reason: Tailwind v4 inlines `@theme` literals into generated utilities, so `.dark` overrides of shadow vars silently never applied. The custom utilities route through `var()` and theme correctly.
 3. Row heights and type sizes live in code (`graphGeometry.ts`, component classes) — don't pin them here; they get tuned. Full type/spacing scale lives in `index.css` + component classes; keep hierarchy bouncy (big accents, airy spacing) — density is what made the previous design look dated.
 4. Background depth strategy: vivid full-canvas gradient (light theme gets a linear violet→rose→warm base because radial spots alone measured sat 0.07 and washed out) + subtle shadows. Don't add heavy drop shadows.
