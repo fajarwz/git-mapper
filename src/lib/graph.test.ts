@@ -1,37 +1,21 @@
 // Regression checks for the commit graph: branch colours, lane geometry, smooth curves.
-// Run with `npm test` (Node's test runner; the TS modules load through Vite's SSR loader).
 import assert from "node:assert/strict";
-import { after, before, test } from "node:test";
-import { createServer } from "vite";
+import { test } from "vitest";
 
-let layoutGraph;
-let LINE_COLOR_COUNT;
-let buildEdges;
-let branchColor;
-let laneX;
-let graphWidth;
-let ROW_HEIGHT;
-let LANE_WIDTH;
-let GRAPH_PADDING_X;
-let LINE_COLORS;
-let server;
-
-before(async () => {
-  server = await createServer({
-    root: process.cwd(),
-    configFile: false,
-    logLevel: "error",
-    server: { middlewareMode: true, hmr: false },
-    appType: "custom",
-  });
-  ({ layoutGraph, LINE_COLOR_COUNT } = await server.ssrLoadModule("/src/lib/graphLanes.ts"));
-  ({ buildEdges, branchColor, laneX, graphWidth, ROW_HEIGHT, LANE_WIDTH, GRAPH_PADDING_X, LINE_COLORS } =
-    await server.ssrLoadModule("/src/lib/graphGeometry.ts"));
-});
-
-after(async () => {
-  await server.close();
-});
+import {
+  layoutGraph,
+  LINE_COLOR_COUNT,
+} from "./graphLanes";
+import {
+  buildEdges,
+  branchColor,
+  laneX,
+  graphWidth,
+  ROW_HEIGHT,
+  LANE_WIDTH,
+  GRAPH_PADDING_X,
+  LINE_COLORS,
+} from "./graphGeometry";
 
 const commits = (rows) => rows.map(([hash, ...parents]) => ({ hash, parents }));
 const layoutOf = (rows) => layoutGraph(commits(rows));
