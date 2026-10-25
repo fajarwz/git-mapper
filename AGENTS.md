@@ -122,6 +122,17 @@ loader). `npm run lint` is a Tailwind class checker, not a code linter. `npm run
   branch tip's lane open at once (406 lanes on a 400-branch repo against 11 with `--date-order`).
   `layoutGraph` reports `ordered: false` and drops such connections instead of drawing upward, with
   `gaps` saying why.
+- **Stashes are their own rows, not history.** Only `refs/stash` is a ref and it points at the
+  newest entry, so `for-each-ref` and `log --all` can never see the older ones: `read_stashes`
+  reads the reflog (`git stash list`), and every log read passes `--exclude=refs/stash` so the
+  stash commit and its `index on …` snapshot stop masquerading as commits. `stashRows` builds one
+  row per entry with a `stash@{n}` pill and `stashIndex` set, from the stash commit's FIRST parent
+  only (the commit it was taken on) — its other parents are plumbing. Those rows sit under the
+  uncommitted row and above history, are rebuilt on every refresh (`stashDigest` notices a take or
+  a drop, and a drop renumbers the survivors so the moved pill flashes), and are excluded from the
+  log-order splice and the paging count. The details panel diffs a stash against `^1`; a
+  `stash -u` entry also needs its third parent, a parentless commit holding only the untracked
+  files (`git show <hash>^3`), which `read_commit_files` appends.
 - **verifying without the desktop window:** `npm run dev` exposes the same git commands as
   `POST /api/git` (`{op, args}`), so a headless Chrome probe of `http://127.0.0.1:1420` exercises the
   real TS path (refresh, wip payloads, flash classes) without rebuilding Rust. Rust-side changes
