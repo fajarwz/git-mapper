@@ -170,6 +170,10 @@ function gitDevApi(): Plugin {
       run(String(dir), ["checkout", String(branch)]);
       return null;
     },
+    pull_branch: ({ dir }) =>
+      run(String(dir), ["pull", "--ff-only", "--no-edit"]),
+    push_branch: ({ dir }) =>
+      run(String(dir), ["push", "-u", "origin", "HEAD"]),
     read_commit_files: ({ dir, hash }) => {
       const h = String(hash);
       if (h === "wip") {
