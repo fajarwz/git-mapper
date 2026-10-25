@@ -340,7 +340,7 @@ export function TitleBar({
           // The search box sits straight on the aurora, so it gets the glass backing like
           // every other control in the bar. Esc clears the query first, then blurs.
           <div className="relative flex items-center">
-            <span aria-hidden="true" className="pointer-events-none absolute left-2 text-ink-dim">
+            <span aria-hidden="true" className="pointer-events-none absolute left-2 text-ink-dim z-10">
               <SearchIcon size={12} />
             </span>
             <input
