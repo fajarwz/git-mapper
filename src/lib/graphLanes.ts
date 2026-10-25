@@ -1,193 +1,256 @@
 /**
- * Lane layout: an active-lane sweep over a newest-first commit list, recording every graph piece
- * as it goes.
+ * Git Graph-style layout: branch tracing with stable colours and smooth curves.
  *
- * The model is a set of active lanes, one entry per line that is still running: the commit that
- * line is heading for. Lanes are dense, so a freed lane shifts the ones to its right leftwards.
+ * Each commit is a vertex. Starting from every vertex that still needs a branch or still has
+ * parents to follow, we trace a path down the DAG, creating a Branch. A branch keeps its colour
+ * from its first commit to its last, so a line that changes horizontal lane still keeps its hue
+ * (the defining visual trait of vscode-git-graph).
  *
- * Per row:
- *
- * - the commit takes the lane whose line is waiting for it; a commit nothing reserved is a branch
- *   tip and opens a lane on the right, which keeps existing lanes from shuffling. A tip that points
- *   at a commit already on screen is the same line, so it adopts that line's colour;
- * - its first parent continues in the same lane with the same colour, unless that parent already
- *   has a line, in which case this row's line ends and bends into it (the `|/` join);
- * - each extra parent (merge) opens a new line just to the right, with its own colour;
- * - a commit with no parent closes its lane and the lanes to its right shift one step left, keeping
- *   their colours;
- * - a parent outside the loaded list ends its line at this row: nothing is invented for it;
- * - a parent that was already drawn (input not topologically ordered) is recorded as a gap and
- *   skipped, so no edge ever points upward.
- *
- * Every transition is recorded here with its kind and colour, so the renderer draws what the sweep
- * decided instead of re-deriving connections from lane indices.
- *
- * Colour rule: a lane owns its colour, and every piece is drawn in the colour of the lane it ends
- * in. A line that moves to another lane therefore changes hue exactly at that lane, and two
- * neighbouring lanes always differ. Colour is a pure function of the lane (see `laneColor`).
+ * x-coordinates are allocated densely with an availability counter per vertex (`nextX`), so a lane
+ * is reclaimed as soon as the branch that used it ends. The first-parent chain of each branch stays
+ * on the leftmost available lane, which keeps the main history straight and pushes feature branches
+ * to the right.
  */
 export const LINE_COLOR_COUNT = 8;
 
-/**
- * One line, identified by the commit it is heading for. Colour comes from its lane.
- * `null` is a hole: the line that used to sit there ended at this row.
- */
-export type LaneSlot = string | null;
-
-export type TransitionKind =
-  /** A running line keeps its lane: a vertical piece through this row. */
-  | "continue"
-  /** A running line moves to another lane; same line, same colour. */
-  | "shift"
-  /** A line leaves the dot: its first parent, a merge parent, or a tip joining a line below. */
-  | "fork"
-  /** Another child's line arrives at this commit dot. */
-  | "join";
-
-export interface LaneTransition {
-  kind: TransitionKind;
-  /** Lane the piece starts in. For `fork` that is the dot lane, for `join` the incoming one. */
-  from: number;
-  /** Lane the piece ends in. Its colour is this lane's colour. */
-  to: number;
-  /** Commit the piece points at (`join`: the commit it arrives at). */
-  hash: string;
-}
-
-/** A parent the layout could not draw a line to, and why. */
 export interface LaneGap {
   hash: string;
-  /** `unloaded` sits outside the loaded window; `out-of-order` was already drawn above. */
   reason: "unloaded" | "out-of-order";
 }
 
-export interface LaneRow {
-  /** Lines arriving at this row, index = lane. */
-  above: LaneSlot[];
-  /** Lines leaving this row downwards, index = lane. */
-  after: LaneSlot[];
-  /** True when nothing reserved this commit: it opens a lane, so it has no line above it. */
-  tip: boolean;
-  transitions: LaneTransition[];
-  gaps: LaneGap[];
+export interface GraphPoint {
+  x: number;
+  y: number;
 }
 
-export interface LaneLayout {
-  /** Lane per commit: where its dot sits, and which colour it carries. */
+export interface BranchLine {
+  x1: number;
+  y1: number;
+  x2: number;
+  y2: number;
+  committed: boolean;
+}
+
+export interface BranchPath {
+  color: number;
+  lines: BranchLine[];
+}
+
+export interface GraphLayout {
+  /** Horizontal lane index of each commit's dot. */
   lanes: number[];
-  rows: LaneRow[];
+  /** Branch-colour index of each commit's dot. */
+  branchColors: number[];
+  /** One path per branch, already in draw order. */
+  branches: BranchPath[];
   /** Lanes needed at the widest row, for the SVG width. */
   laneCount: number;
   /** False when a parent appeared above its child (input was not newest-first topological). */
   ordered: boolean;
+  /** Parents that sit outside the loaded window or above their child. */
+  gaps: LaneGap[];
 }
 
-export function layoutGraph(commits: Array<{ hash: string; parents: string[] }>): LaneLayout {
-  const input = new Set(commits.map((commit) => commit.hash));
-  const pending: LaneSlot[] = [];
-  const lanes: number[] = [];
-  const rows: LaneRow[] = [];
-  const drawn = new Set<string>();
-  let laneCount = 1;
-  let ordered = true;
+class Branch {
+  public end = 0;
+  constructor(
+    public readonly color: number,
+    public readonly lines: BranchLine[] = [],
+  ) {}
 
-  commits.forEach(({ hash, parents }) => {
-    // Defensive only: the same hash twice could not own two dots.
-    if (drawn.has(hash)) ordered = false;
+  addLine(x1: number, y1: number, x2: number, y2: number, committed: boolean) {
+    this.lines.push({ x1, y1, x2, y2, committed });
+  }
+}
 
-    let lane = pending.indexOf(hash);
-    const tip = lane === -1;
-    if (tip) {
-      // Reuse the leftmost hole when a line has ended there, otherwise open a lane on the right.
-      const hole = pending.indexOf(null);
-      lane = hole === -1 ? pending.length : hole;
-      if (hole === -1) pending.push(hash);
-      else pending[hole] = hash;
+class Vertex {
+  public x = 0;
+  public branch: Branch | null = null;
+  public nextParentIndex = 0;
+  public nextX = 0;
+  public committed = true;
+  public readonly children: Vertex[] = [];
+  public readonly parents: (Vertex | null)[] = [];
+
+  constructor(
+    public readonly id: number,
+    public readonly hash: string,
+  ) {}
+
+  nextParent(): Vertex | null {
+    while (this.nextParentIndex < this.parents.length) {
+      const p = this.parents[this.nextParentIndex];
+      if (p !== null) return p;
+      this.nextParentIndex++;
     }
+    return null;
+  }
 
-    // Snapshot before any mutation: this row's incoming geometry must not change under it.
+  registerParentProcessed() {
+    this.nextParentIndex++;
+  }
 
-    const above = pending.slice();
-    const gaps: LaneGap[] = parents
-      .filter((parent) => !input.has(parent))
-      .map((parent) => ({ hash: parent, reason: "unloaded" as const }));
-    // Parents whose line already exists, so the dot connects to it instead of opening a new one.
-    const stubs: string[] = [];
-    const first = parents[0];
+  isMerge() {
+    return this.parents.length > 1;
+  }
 
-    if (first === undefined) {
-      pending.splice(lane, 1); // root: the lane ends here and the lanes right of it close up
-    } else if (drawn.has(first)) {
-      // The parent is already above this row, so the input is not topological. Never draw a line
-      // that points upward: drop the connection and mark the layout unordered.
-      ordered = false;
-      gaps.push({ hash: first, reason: "out-of-order" });
-      pending.splice(lane, 1);
-    } else if (pending.some((slot, index) => index !== lane && slot === first)) {
-      // Another child already holds a line for that parent: this line ends and bends into it.
-      stubs.push(first);
-      if (parents.length > 1) {
-        // A merge needs the columns on its right to stay where they are. Collapsing here would
-        // slide its second parent into the dot's own lane, drawing the branch straight down in the
-        // dot's colour, which reads as if the branch never separated.
-        pending[lane] = null;
-      } else {
-        // Nothing else needs the column: close up, as git does at the end of a line.
-        pending.splice(lane, 1);
-      }
-    } else {
-      pending[lane] = first;
+  addToBranch(branch: Branch, x: number) {
+    if (this.branch === null) {
+      this.branch = branch;
+      this.x = x;
     }
+  }
 
-    for (const parent of parents.slice(1)) {
-      if (drawn.has(parent)) {
-        ordered = false;
-        gaps.push({ hash: parent, reason: "out-of-order" });
-        continue;
-      }
-      if (pending.includes(parent)) {
-        stubs.push(parent); // that line already exists: connect to it instead of opening another
-        continue;
-      }
-      const at = Math.min(lane + 1, pending.length);
-      pending.splice(at, 0, parent);
+  point(): GraphPoint {
+    return { x: this.x, y: this.id };
+  }
+
+  nextPoint(): GraphPoint {
+    return { x: this.nextX, y: this.id };
+  }
+
+  registerUnavailablePoint(x: number) {
+    if (x === this.nextX) {
+      this.nextX = x + 1;
     }
+  }
+}
 
-    const after = pending.slice();
+const NULL_VERTEX = new Vertex(-1, "");
 
-    // Record the pieces. A hash occupies one lane at most, so a line appearing below is either the
-    // same line moving (`continue` / `shift`) or a line that starts at this dot (`fork`).
-    const transitions: LaneTransition[] = [];
-    after.forEach((slot, to) => {
-      if (slot === null) return;
-      const from = above.indexOf(slot);
-      if (from === -1) {
-        transitions.push({ kind: "fork", from: lane, to, hash: slot });
-      } else {
-        transitions.push({ kind: from === to ? "continue" : "shift", from, to, hash: slot });
-      }
-    });
-    // A parent whose line already runs beside this row: the dot bends into that line.
-    for (const hash of stubs) {
-      const at = after.indexOf(hash);
-      if (at !== -1) {
-        transitions.push({ kind: "fork", from: lane, to: at, hash });
-      }
-    }
-    above.forEach((slot, from) => {
-      if (slot === null || after.includes(slot)) return;
-      if (tip && from === lane) return; // a tip has nothing above its dot
-      transitions.push({ kind: "join", from, to: lane, hash: slot });
-    });
+export function layoutGraph(
+  commits: Array<{ hash: string; parents: string[]; uncommitted?: boolean }>,
+): GraphLayout {
+  const n = commits.length;
+  const indexByHash = new Map(commits.map((c, i) => [c.hash, i]));
 
-    // A hole at the far right would only pad the graph, so trim it before measuring.
-    while (pending.length > 0 && pending[pending.length - 1] === null) pending.pop();
-
-    laneCount = Math.max(laneCount, above.length, after.length);
-    drawn.add(hash);
-    lanes.push(lane);
-    rows.push({ above, after, tip, transitions, gaps });
+  const vertices = commits.map((c, i) => {
+    const v = new Vertex(i, c.hash);
+    if (c.uncommitted) v.committed = false;
+    return v;
   });
 
-  return { lanes, rows, laneCount, ordered };
+  const gaps: LaneGap[] = [];
+  let ordered = true;
+
+  for (let i = 0; i < n; i++) {
+    for (const parentHash of commits[i].parents) {
+      const parentIndex = indexByHash.get(parentHash);
+      if (parentIndex === undefined) {
+        vertices[i].parents.push(NULL_VERTEX);
+        gaps.push({ hash: parentHash, reason: "unloaded" });
+      } else {
+        if (parentIndex < i) ordered = false;
+        vertices[i].parents.push(vertices[parentIndex]);
+        vertices[parentIndex].children.push(vertices[i]);
+      }
+    }
+  }
+
+  const branches: Branch[] = [];
+  const availableColours: number[] = [];
+  let laneCount = 1;
+
+  function getAvailableColour(startAt: number): number {
+    for (let i = 0; i < availableColours.length; i++) {
+      if (startAt > availableColours[i]) return i;
+    }
+    availableColours.push(0);
+    return availableColours.length - 1;
+  }
+
+  function determinePath(startAt: number) {
+    let i = startAt;
+    let vertex = vertices[i];
+    let parentVertex = vertex.nextParent();
+    let lastPoint = vertex.branch === null ? vertex.nextPoint() : vertex.point();
+
+    laneCount = Math.max(laneCount, lastPoint.x + 1);
+
+    if (
+      parentVertex !== null &&
+      parentVertex.id !== -1 &&
+      vertex.isMerge() &&
+      vertex.branch !== null &&
+      parentVertex.branch !== null
+    ) {
+      // The merge's second parent is already on another branch: trace a connecting path
+      // from this vertex down to that parent, reusing the parent's branch colour.
+      const parentBranch = parentVertex.branch;
+      let foundPointToParent = false;
+      for (i = startAt + 1; i < n; i++) {
+        const curVertex = vertices[i];
+        // If the current vertex is the target parent, land on its existing point.
+        const curPoint = curVertex === parentVertex ? parentVertex.point() : curVertex.nextPoint();
+        if (curVertex === parentVertex) foundPointToParent = true;
+
+        parentBranch.addLine(
+          lastPoint.x,
+          lastPoint.y,
+          curPoint.x,
+          curPoint.y,
+          vertex.committed,
+        );
+        curVertex.registerUnavailablePoint(curPoint.x);
+        laneCount = Math.max(laneCount, curPoint.x + 1);
+        lastPoint = curPoint;
+
+        if (foundPointToParent) {
+          vertex.registerParentProcessed();
+          break;
+        }
+      }
+    } else {
+      const branch = new Branch(getAvailableColour(startAt));
+      vertex.addToBranch(branch, lastPoint.x);
+      vertex.registerUnavailablePoint(lastPoint.x);
+
+      for (i = startAt + 1; i < n; i++) {
+        const curVertex = vertices[i];
+        const curPoint =
+          parentVertex === curVertex && parentVertex.branch !== null
+            ? curVertex.point()
+            : curVertex.nextPoint();
+
+        branch.addLine(lastPoint.x, lastPoint.y, curPoint.x, curPoint.y, vertex.committed);
+        curVertex.registerUnavailablePoint(curPoint.x);
+        laneCount = Math.max(laneCount, curPoint.x + 1);
+        lastPoint = curPoint;
+
+        if (parentVertex === curVertex) {
+          vertex.registerParentProcessed();
+          const parentVertexOnBranch = parentVertex.branch !== null;
+          parentVertex.addToBranch(branch, curPoint.x);
+          vertex = parentVertex;
+          parentVertex = vertex.nextParent();
+          if (parentVertex === null || parentVertexOnBranch) {
+            break;
+          }
+        }
+      }
+
+      if (i === n && parentVertex !== null && parentVertex.id === -1) {
+        // Parent is outside the loaded window; mark the edge as handled.
+        vertex.registerParentProcessed();
+      }
+
+      branch.end = i;
+      branches.push(branch);
+      availableColours[branch.color] = i;
+    }
+  }
+
+  let i = 0;
+  while (i < n) {
+    if (vertices[i].nextParent() !== null || vertices[i].branch === null) {
+      determinePath(i);
+    } else {
+      i++;
+    }
+  }
+
+  const lanes = vertices.map((v) => v.x);
+  const branchColors = vertices.map((v) => v.branch?.color ?? 0);
+
+  return { lanes, branchColors, branches, laneCount, ordered, gaps };
 }

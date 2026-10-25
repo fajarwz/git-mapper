@@ -1,11 +1,11 @@
 import type { CommitRef } from "../types";
-import { laneColor } from "../lib/graphGeometry";
+import { branchColor } from "../lib/graphGeometry";
 import { BranchIcon, RemoteIcon, TagIcon } from "./icons";
 
 interface RefPillProps {
   ref: CommitRef;
-  /** The commit's graph lane, so the pill matches its node. */
-  lane: number;
+  /** The commit's branch colour index, so the pill matches its node. */
+  color: number;
   /** Only local branches are checkout-able; double-clicking the pill switches to it. */
   onCheckout?: (branch: string) => void;
 }
@@ -17,9 +17,10 @@ const ICONS = {
 };
 
 /** Branch / remote / tag label shown inline after a commit subject. */
-export function RefPill({ ref, lane, onCheckout }: RefPillProps) {
+export function RefPill({ ref, color, onCheckout }: RefPillProps) {
   const Icon = ICONS[ref.type];
   const checkoutable = ref.type === "branch" && !ref.isCurrent && onCheckout !== undefined;
+  const colorValue = branchColor(color);
 
   return (
     <span
@@ -29,11 +30,11 @@ export function RefPill({ ref, lane, onCheckout }: RefPillProps) {
       } ${checkoutable ? "cursor-pointer" : ""}`}
       style={
         ref.isCurrent
-          ? { backgroundColor: laneColor(lane) }
+          ? { backgroundColor: colorValue }
           : {
-              borderColor: laneColor(lane),
+              borderColor: colorValue,
               // Text slightly darker than the bordering dot colour for small-text contrast.
-              color: `color-mix(in oklab, ${laneColor(lane)}, var(--color-ink) 55%)`,
+              color: `color-mix(in oklab, ${colorValue}, var(--color-ink) 55%)`,
             }
       }
       title={
@@ -51,8 +52,8 @@ export function RefPill({ ref, lane, onCheckout }: RefPillProps) {
           className="ml-0.5 pl-1 font-medium opacity-90"
           style={{
             // On the filled (checked-out) pill the divider takes the text colour;
-            // on outline pills it takes the lane colour.
-            borderLeft: `1px solid ${ref.isCurrent ? "var(--color-surface)" : laneColor(lane)}`,
+            // on outline pills it takes the branch colour.
+            borderLeft: `1px solid ${ref.isCurrent ? "var(--color-surface)" : colorValue}`,
           }}
         >
           {ref.withRemote}

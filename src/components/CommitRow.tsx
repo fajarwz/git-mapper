@@ -1,7 +1,7 @@
 import { memo } from "react";
 import type { Commit } from "../types";
 import { formatAbsoluteDate } from "../lib/format";
-import { laneColor } from "../lib/graphGeometry";
+import { branchColor } from "../lib/graphGeometry";
 import { COMMIT_ROW_GRID } from "../lib/tableLayout";
 import { RefPill } from "./RefPill";
 
@@ -36,17 +36,17 @@ export const CommitRow = memo(function CommitRow({
       onClick={() => onSelect(commit.hash)}
     >
       <span className="flex min-w-0 items-center gap-2 overflow-hidden">
-        {/* Lane-coloured segment: ties this message to its graph node. */}
+        {/* Branch-coloured segment: ties this message to its graph node. */}
         <span
           aria-hidden="true"
           className="h-3.75 w-0.5 shrink-0 rounded-full"
-          style={{ backgroundColor: laneColor(commit.lane) }}
+          style={{ backgroundColor: branchColor(commit.branchColor) }}
         />
         <span className={`truncate text-[13px] text-ink ${weight}`}>
           {commit.subject}
         </span>
         {commit.refs.map((ref) => (
-          <RefPill key={`${ref.type}:${ref.name}`} ref={ref} lane={commit.lane} onCheckout={onCheckoutBranch} />
+          <RefPill key={`${ref.type}:${ref.name}`} ref={ref} color={commit.branchColor} onCheckout={onCheckoutBranch} />
         ))}
       </span>
 

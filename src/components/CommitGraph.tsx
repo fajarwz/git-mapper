@@ -1,12 +1,13 @@
 import { useMemo } from "react";
 import type { Commit } from "../types";
-import type { LaneLayout } from "../lib/graphLanes";
+import type { GraphLayout } from "../lib/graphLanes";
 import {
   DOT_RADIUS,
   ROW_HEIGHT,
+  UNCOMMITTED_COLOR,
+  branchColor,
   buildEdges,
   graphWidth,
-  laneColor,
   laneX,
   rowY,
 } from "../lib/graphGeometry";
@@ -14,14 +15,14 @@ import {
 interface CommitGraphProps {
   commits: Commit[];
   /** Computed once by CommitList: the graph column is sized from it, so it cannot differ. */
-  layout: LaneLayout;
+  layout: GraphLayout;
   selectedHash: string;
 }
 
 /**
- * SVG graph for the whole history. Lanes come from layoutGraph and every line is drawn inside one
- * row band, so forks and joins sit exactly on the commit that causes them. Same ROW_HEIGHT as the
- * commit rows, so a dot always lines up with its row.
+ * SVG graph for the whole history. Branches keep their colour across lane changes and curves are
+ * drawn as smooth S-curves, matching vscode-git-graph. Same ROW_HEIGHT as the commit rows, so a dot
+ * always lines up with its row.
  */
 export function CommitGraph({ commits, layout, selectedHash }: CommitGraphProps) {
   const edges = useMemo(() => buildEdges(layout), [layout]);
@@ -48,8 +49,8 @@ export function CommitGraph({ commits, layout, selectedHash }: CommitGraphProps)
         const y = rowY(index);
         const selected = commit.hash === selectedHash;
         const checkedOut = commit.refs.some((ref) => ref.isCurrent);
-        // The dot sits in a lane, so it takes that lane's colour.
-        const color = laneColor(layout.lanes[index] ?? 0);
+        // The dot takes its branch colour; uncommitted changes render in gray.
+        const color = commit.hash === "wip" ? UNCOMMITTED_COLOR : branchColor(layout.branchColors[index] ?? 0);
 
         return (
           <g key={commit.hash}>
@@ -64,7 +65,7 @@ export function CommitGraph({ commits, layout, selectedHash }: CommitGraphProps)
               />
             )}
             {checkedOut ? (
-              // HEAD sits here: hollow ring, same lane colour as its line.
+              // HEAD sits here: hollow ring, same branch colour as its line.
               <circle
                 cx={x}
                 cy={y}

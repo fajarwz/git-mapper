@@ -86,6 +86,7 @@ function toCommits(parsed: ReturnType<typeof parseLog>): Commit[] {
     authorEmail: commit.authorEmail,
     date: commit.date,
     lane: layout.lanes[index] ?? 0,
+    branchColor: layout.branchColors[index] ?? 0,
     parents: commit.parents,
     refs: commit.refs,
   }));
@@ -168,6 +169,7 @@ function uncommittedCommit(commits: Commit[], changed: number): Commit {
     authorEmail: "",
     date: new Date().toISOString(),
     lane: 0,
+    branchColor: 0,
     parents: [head.hash],
     refs: [],
   };
@@ -175,12 +177,17 @@ function uncommittedCommit(commits: Commit[], changed: number): Commit {
 
 /** Places lanes over the real commits plus, when present, the uncommitted row on top. */
 function withLanes(commits: Commit[]): Commit[] {
-  const layout = layoutGraph(commits.map((c) => ({ hash: c.hash, parents: c.parents })));
+  const layout = layoutGraph(
+    commits.map((c) => ({ hash: c.hash, parents: c.parents, uncommitted: c.hash === UNCOMMITTED_HASH })),
+  );
   // Reuse the commit object when its lane and colour are unchanged: rows are memoized, so
   // identical objects mean identical renders and no DOM work for history that did not move.
   return commits.map((commit, index) => {
     const lane = layout.lanes[index] ?? 0;
-    return commit.lane === lane ? commit : { ...commit, lane };
+    const branchColor = layout.branchColors[index] ?? 0;
+    return commit.lane === lane && commit.branchColor === branchColor
+      ? commit
+      : { ...commit, lane, branchColor };
   });
 }
 
