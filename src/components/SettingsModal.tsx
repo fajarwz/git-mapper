@@ -179,7 +179,6 @@ export function SettingsModal({
             <h2 id="settings-title" className="m-0 text-[16px] font-bold tracking-tight text-ink">
               Settings
             </h2>
-            <p className="m-0 mt-0.5 text-[11.5px] text-ink-dim">Appearance</p>
           </div>
           <button
             ref={closeRef}
