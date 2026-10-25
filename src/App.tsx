@@ -28,6 +28,8 @@ import {
   loadMoreCommits,
   loadRepository,
   pickAndLoadRepository,
+  pullBranch,
+  pushBranch,
   readStoredPaths,
   refreshRepository,
   UNCOMMITTED_HASH,
@@ -307,6 +309,43 @@ function App() {
     window.requestAnimationFrame(() => setFlashHashes(hashes));
   }, []);
 
+  // Pull / push the checked-out branch, then force a refresh so the counters and the window
+  // follow. A failed sync tints its button for a moment — the message is on the tooltip.
+  const [syncing, setSyncing] = useState(false);
+  const [syncError, setSyncError] = useState<{ op: "pull" | "push"; message: string } | null>(null);
+  const syncErrorTimer = useRef(0);
+
+  const runSync = useCallback(
+    async (op: "pull" | "push") => {
+      if (!repo || !activeRepoPath || syncing || repo.branch === "HEAD detached") return;
+      setSyncing(true);
+      setSyncError(null);
+      try {
+        if (op === "pull") await pullBranch(activeRepoPath);
+        else await pushBranch(activeRepoPath);
+        const refreshed = await refreshRepository(repo, true);
+        if (refreshed) {
+          setRepos((previous) =>
+            previous.map((item) => (item.id === refreshed.repo.id ? refreshed.repo : item)),
+          );
+          showFlash(refreshed.touched);
+        }
+      } catch (syncFailure) {
+        const message = syncFailure instanceof Error ? syncFailure.message : String(syncFailure);
+        console.error(`Could not ${op} ${repo.branch}`, syncFailure);
+        setSyncError({ op, message });
+        window.clearTimeout(syncErrorTimer.current);
+        syncErrorTimer.current = window.setTimeout(() => setSyncError(null), 4000);
+      } finally {
+        setSyncing(false);
+      }
+    },
+    [repo, activeRepoPath, syncing, showFlash],
+  );
+
+  const handlePull = useCallback(() => void runSync("pull"), [runSync]);
+  const handlePush = useCallback(() => void runSync("push"), [runSync]);
+
   // The refresh button: the same probe the focus path runs, minus the "nothing changed, return
   // null" exit, so clicking it always re-reads the working tree. The uncommitted row refetches
   // through the new worktree digest, and its icon spins while the reads are in flight.
@@ -433,6 +472,10 @@ function App() {
         onRefresh={() => void handleRefresh()}
         onOpenSettings={() => setSettingsOpen(true)}
         updateReady={updateStatus.phase === "ready"}
+        onPull={handlePull}
+        onPush={handlePush}
+        syncing={syncing}
+        syncError={syncError}
       />
 
       <div className="flex min-h-0 flex-1 flex-col px-2.5 pb-2.5 pt-1">

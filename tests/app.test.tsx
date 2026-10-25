@@ -69,6 +69,12 @@ class FakeGit {
         return Promise.resolve("H1\trefs/heads/main\nH1\trefs/remotes/origin/main\n");
       case "read_stashes":
         return Promise.resolve(this.stashes);
+      case "pull_branch":
+        this.calls.push("pull_branch:ran");
+        return Promise.resolve("");
+      case "push_branch":
+        this.calls.push("push_branch:ran");
+        return Promise.resolve("");
       case "read_commit_files":
         return Promise.resolve(this.files);
       default:
@@ -166,6 +172,22 @@ test("the graph svg spans every row, not just the first screen", async () => {
   // The graph column clips overflow; if the svg only covered the viewport height, every node
   // below the fold would vanish on scroll.
   assert.equal(svg?.getAttribute("height"), String(3 * ROW_HEIGHT));
+});
+
+test("the pull button runs the git pull and refreshes", async () => {
+  localStorage.setItem(STORAGE_KEYS.repos, JSON.stringify(["C:/repos/demo"]));
+  const { container } = render(<App />);
+
+  await waitFor(() => {
+    assert.equal(container.querySelectorAll("[data-commit-row]").length, 3);
+  });
+
+  fireEvent.click(within(container).getByRole("button", { name: "Pull main" }));
+
+  await waitFor(() => {
+    assert.ok(fake.calls.includes("pull_branch:ran"), "the git pull ran through the backend");
+    assert.ok(fake.calls.includes("read_status"), "a sync ends with a forced refresh");
+  });
 });
 
 test("right-clicking a row opens the context menu with copy and checkout", async () => {

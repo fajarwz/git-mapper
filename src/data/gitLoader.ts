@@ -528,6 +528,16 @@ export async function checkoutBranch(dir: string, branch: string): Promise<void>
   await call("checkout_branch", { dir, branch }, (raw) => raw as void);
 }
 
+/** Pulls the current branch, fast-forward only; a merge-shaped pull comes back as an error. */
+export async function pullBranch(dir: string): Promise<string> {
+  return call("pull_branch", { dir }, (raw) => raw as string);
+}
+
+/** Pushes the current branch to origin with `-u`, so the first push sets the upstream. */
+export async function pushBranch(dir: string): Promise<string> {
+  return call("push_branch", { dir }, (raw) => raw as string);
+}
+
 export async function loadCommitFiles(repoPath: string, hash: string): Promise<ChangedFile[]> {
   const payload = await call<RawFilePayload>(
     "read_commit_files",

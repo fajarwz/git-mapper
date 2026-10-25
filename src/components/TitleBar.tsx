@@ -97,6 +97,12 @@ interface TitleBarProps {
   onOpenSettings: () => void;
   /** True when an update is downloaded and waiting: the settings gear shows a dot. */
   updateReady?: boolean;
+  /** Pull/push the checked-out branch; `syncing` while either is in flight. */
+  onPull: () => void;
+  onPush: () => void;
+  syncing: boolean;
+  /** The failed op and git's message, shown on the button that failed until the timeout. */
+  syncError: { op: "pull" | "push"; message: string } | null;
 }
 
 interface SortableTabProps {
@@ -186,6 +192,10 @@ export function TitleBar({
   onRefresh,
   onOpenSettings,
   updateReady = false,
+  onPull,
+  onPush,
+  syncing,
+  syncError,
 }: TitleBarProps) {
   const [maximized, setMaximized] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -388,10 +398,43 @@ export function TitleBar({
           </span>
         )}
         {repo && repo.ahead > 0 && (
-          <span className="font-mono text-[11px] font-semibold text-success-ink">↑{repo.ahead}</span>
+          <span className="font-mono text-[11px] font-semibold text-success-ink" aria-hidden="true">
+            ↑{repo.ahead}
+          </span>
         )}
         {repo && repo.behind > 0 && (
-          <span className="font-mono text-[11px] font-semibold text-warning-ink">↓{repo.behind}</span>
+          <span className="font-mono text-[11px] font-semibold text-warning-ink" aria-hidden="true">
+            ↓{repo.behind}
+          </span>
+        )}
+
+        {repo && repo.branch !== "HEAD detached" && (
+          <>
+            <button
+              type="button"
+              onClick={onPull}
+              disabled={syncing}
+              aria-label={`Pull ${repo.branch}`}
+              title={`Pull ${repo.branch} (fast-forward only)${syncError?.op === "pull" ? ` — ${syncError.message}` : ""}`}
+              className={`${GLASS_CONTROL} h-7 min-w-7 px-1.5 font-mono text-[11px] font-semibold ${
+                syncError?.op === "pull" ? "text-danger" : "text-ink-dim hover:bg-sheet-strong hover:text-ink"
+              } focus-visible:ring-2 focus-visible:ring-primary/70 disabled:opacity-50`}
+            >
+              ↓{repo.behind > 0 ? repo.behind : ""}
+            </button>
+            <button
+              type="button"
+              onClick={onPush}
+              disabled={syncing}
+              aria-label={`Push ${repo.branch}`}
+              title={`Push ${repo.branch} to origin${syncError?.op === "push" ? ` — ${syncError.message}` : ""}`}
+              className={`${GLASS_CONTROL} h-7 min-w-7 px-1.5 font-mono text-[11px] font-semibold ${
+                syncError?.op === "push" ? "text-danger" : "text-ink-dim hover:bg-sheet-strong hover:text-ink"
+              } focus-visible:ring-2 focus-visible:ring-primary/70 disabled:opacity-50`}
+            >
+              ↑{repo.ahead > 0 ? repo.ahead : ""}
+            </button>
+          </>
         )}
 
         <button
