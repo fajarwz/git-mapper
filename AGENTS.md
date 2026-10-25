@@ -15,15 +15,19 @@ pill); there is no staging or committing.
 npm run build        # gate for frontend work: tsc && vite build (run this before claiming done)
 npm run lint         # tailwind hygiene autofix over src (eslint-plugin-tailwindcss); run after CSS-class changes
 npm run lint:check   # same rules without fixing (CI-style check)
-npm test             # commit graph regression checks (lane geometry + line colours)
+npm test             # vitest: graph regression, parsers, gitLoader (mocked invoke), components, App
 npm run dev          # vite dev server on http://localhost:1420
 npm run tauri dev    # desktop window
 cargo check          # in src-tauri/; gate for Rust work
+cargo test           # in src-tauri/; git.rs against real throwaway repos (runs git CLI)
 ```
 
-`npm test` runs the graph regression checks (Node's test runner, TS loaded through Vite's SSR
-loader). `npm run lint` is a Tailwind class checker, not a code linter. `npm run build` +
-`npm test` + `npm run lint:check` + `cargo check` pass = verifiable state.
+`npm test` is Vitest; unit and component tests sit next to their source (`src/**/<file>.test.ts(x)`), the App integration slice lives in `tests/`. Component and App tests need jsdom
+(`// @vitest-environment jsdom` on the file) and stub `window.__TAURI_INTERNALS__` +
+`ResizeObserver`; `@tauri-apps/api/core` is mocked with `vi.mock(..., () => ({ invoke: vi.fn() }))`.
+`cargo test` builds throwaway git repos under the OS temp dir — keep them self-contained
+(no remote network, cheap fixtures). `npm run lint` is a Tailwind class checker, not a code
+linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass = verifiable state.
 
 ## Architecture
 
