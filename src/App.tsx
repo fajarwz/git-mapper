@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { getVersion } from "@tauri-apps/api/app";
 import type { ChangedFile } from "./types";
 import { CommitList } from "./components/CommitList";
 import { ContextMenu, type ContextMenuTarget } from "./components/ContextMenu";
@@ -10,6 +11,15 @@ import { SettingsModal } from "./components/SettingsModal";
 import { STORAGE_KEYS, usePersistedState } from "./lib/persisted";
 import { filterCommits } from "./lib/commitFilter";
 import type { SyntaxScheme } from "./lib/highlight";
+import {
+  checkForUpdates,
+  downloadUpdate,
+  onUpdateStatus,
+  restartToUpdate,
+  updateStatusSnapshot,
+  type UpdateMode,
+  type UpdateStatus,
+} from "./lib/updater";
 import { applyTheme, initialTheme, storeTheme } from "./lib/theme";
 import type { Theme } from "./lib/theme";
 import {
@@ -68,6 +78,11 @@ function App() {
     "app",
   );
 
+  // Updates: auto (background download on launch) by default, manual as the opt-out.
+  const [updateMode, setUpdateMode] = usePersistedState<UpdateMode>(STORAGE_KEYS.updateMode, "auto");
+  const [updateStatus, setUpdateStatus] = useState<UpdateStatus>(updateStatusSnapshot());
+  const [appVersion, setAppVersion] = useState("");
+
   // Rows a refresh just added or re-pilled, highlighted for a moment then forgotten.
   const [flashHashes, setFlashHashes] = useState<string[]>([]);
   // Right-click menu: what was clicked (position, commit, ref). null = closed.
@@ -81,6 +96,32 @@ function App() {
   useEffect(() => {
     applyTheme(theme);
   }, [theme]);
+
+  // The updater store lives module-level; App just mirrors its status into state.
+  useEffect(() => onUpdateStatus(setUpdateStatus), []);
+
+  // The release version, for the settings about line.
+  useEffect(() => {
+    getVersion()
+      .then(setAppVersion)
+      .catch(() => setAppVersion("dev"));
+  }, []);
+
+  // Auto mode checks on launch (and when the mode is switched back to auto). Dev builds skip:
+  // they are unsigned, so a real check would only ever error.
+  useEffect(() => {
+    if (updateMode === "auto" && !import.meta.env.DEV) void checkForUpdates("auto");
+  }, [updateMode]);
+
+  const handleCheckForUpdates = useCallback(() => {
+    void checkForUpdates("manual");
+  }, []);
+  const handleDownloadUpdate = useCallback(() => {
+    void downloadUpdate();
+  }, []);
+  const handleRestartToUpdate = useCallback(() => {
+    void restartToUpdate();
+  }, []);
 
   const hydratedPaths = useRef(false);
 
@@ -391,6 +432,7 @@ function App() {
         onReorder={handleReorderRepos}
         onRefresh={() => void handleRefresh()}
         onOpenSettings={() => setSettingsOpen(true)}
+        updateReady={updateStatus.phase === "ready"}
       />
 
       <div className="flex min-h-0 flex-1 flex-col px-2.5 pb-2.5 pt-1">
@@ -432,6 +474,13 @@ function App() {
           onThemeChange={handleThemeChange}
           syntaxScheme={syntaxScheme}
           onSyntaxSchemeChange={setSyntaxScheme}
+          appVersion={appVersion}
+          updateMode={updateMode}
+          onUpdateModeChange={setUpdateMode}
+          updateStatus={updateStatus}
+          onCheckForUpdates={handleCheckForUpdates}
+          onDownloadUpdate={handleDownloadUpdate}
+          onRestartToUpdate={handleRestartToUpdate}
           onClose={() => setSettingsOpen(false)}
         />
       )}

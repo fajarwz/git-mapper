@@ -95,6 +95,8 @@ interface TitleBarProps {
   onReorder: (from: number, to: number) => void;
   onRefresh: () => void;
   onOpenSettings: () => void;
+  /** True when an update is downloaded and waiting: the settings gear shows a dot. */
+  updateReady?: boolean;
 }
 
 interface SortableTabProps {
@@ -183,6 +185,7 @@ export function TitleBar({
   onReorder,
   onRefresh,
   onOpenSettings,
+  updateReady = false,
 }: TitleBarProps) {
   const [maximized, setMaximized] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -406,9 +409,13 @@ export function TitleBar({
           onClick={onOpenSettings}
           aria-label="Open settings"
           title="Settings"
-          className={`${GLASS_CONTROL} grid cursor-default place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-7`}
+          className={`${GLASS_CONTROL} relative grid cursor-default place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-7`}
         >
           <SettingsIcon size={13} />
+          {updateReady && (
+            // An update is downloaded and waiting: a nudge toward the "restart to apply" button.
+            <span aria-hidden="true" className="absolute right-1 top-1 size-1.5 rounded-full bg-success" />
+          )}
         </button>
       </div>
 
