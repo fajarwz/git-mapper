@@ -121,10 +121,11 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
   same commit as several parallel lines that fanned into one dot rows later (that was the
   `jersium-marketplace` breakage). `laneX` is not clamped: lanes past the palette still get their
   own x, and the graph width comes from `layout.laneCount`. The gutter column follows that width
-  in fit mode, but a splitter drag pins an ABSOLUTE width (never an offset from the natural
-  width — re-laid lanes, e.g. a search filter, would turn a stored offset negative, zero the
-  column out, vanish the graph and slam the header left). A pinned column clips overflowing
-  lanes on the right (`overflow-hidden`).
+  in fit mode but CAPPED at `DEFAULT_GRAPH_LANES` (six) — a lane-heavy history gets a compact
+  default and the splitter widens it; a splitter drag pins an ABSOLUTE width (never an offset
+  from the natural width — re-laid lanes, e.g. a search filter, would turn a stored offset
+  negative, zero the column out, vanish the graph and slam the header left). A pinned column
+  clips overflowing lanes on the right (`overflow-hidden`).
   **The layout records the pieces.** `layoutGraph` returns, per row, `transitions` (kind
   `continue` / `shift` / `fork` / `join`, source lane, destination lane, colour, target hash) and
   `gaps` (a parent outside the loaded window, or one already drawn because the input was not
@@ -140,15 +141,19 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
   newest entry, so `for-each-ref` and `log --all` can never see the older ones: `read_stashes`
   reads the reflog (`git stash list`), and every log read passes `--exclude=refs/stash` so the
   stash commit and its `index on …` snapshot stop masquerading as commits. `stashRows` builds one
-  row per entry with a `stash@{n}` pill and `stashIndex` set, from the stash commit's FIRST parent
-  only (the commit it was taken on) — its other parents are plumbing. Those rows are NOT pinned
-  above history: `mergeStashes` files each one by the date the stash was taken (only the
-  uncommitted row is pinned on top), which keeps the list in `--date-order` so the stash's base
-  commit stays below its row and the lane layout holds. They are rebuilt on every refresh
-  (`stashDigest` notices a take or a drop, and a drop renumbers the survivors so the moved pill
-  flashes), and are excluded from the log-order splice and the paging count. The details panel
+  row per entry with a `stash@{n}` pill and `stashIndex` set. Those rows are NOT pinned above
+  history: `mergeStashes` files each one by the date the stash was taken (only the uncommitted
+  row is pinned on top), which keeps the list in `--date-order`. They FLOAT in the layout —
+  `withLanes` strips their parents, so each is a one-row tip with no connector to its base: a
+  stash on a months-old commit held a lane open for hundreds of rows, and one whose base sat
+  outside the window traced a line to the very bottom (jersium-marketplace: 8 lanes became 31).
+  The pill and the details panel carry the "taken on" story instead. They are rebuilt on every
+  refresh (`stashDigest` notices a take or a drop, and a drop renumbers the survivors so the
+  moved pill flashes), and are excluded from the log-order splice. The details panel
   diffs a stash against `^1`; a `stash -u` entry also needs its third parent, a parentless commit
   holding only the untracked files (`git show <hash>^3`), which `read_commit_files` appends.
+  **Paging counts history rows only**: `loadMoreCommits`'s `--skip` excludes stash rows — git's
+  log never contains them, so counting them skipped that many real commits per page.
 - **verifying without the desktop window:** `npm run dev` exposes the same git commands as
   `POST /api/git` (`{op, args}`), so a headless Chrome probe of `http://127.0.0.1:1420` exercises the
   real TS path (refresh, wip payloads, flash classes) without rebuilding Rust. Rust-side changes
