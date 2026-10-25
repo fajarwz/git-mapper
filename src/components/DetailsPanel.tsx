@@ -96,8 +96,12 @@ export function DetailsPanel({
               <ChevronDownIcon className={summaryCollapsed ? "-rotate-90" : ""} />
             </button>
             {/* The subject IS the panel title, so it survives a collapse (the hash lives in the
-                meta block below); merge/stash stay as pills because they change the row's kind. */}
-            <span className="min-w-0 flex-1 truncate text-[12.5px] font-bold text-ink">
+                meta block below). Expanded it wraps fully; collapsed it stays a one-line row. */}
+            <span
+              className={`min-w-0 flex-1 text-[12.5px] font-bold text-ink ${
+                summaryCollapsed ? "truncate" : "wrap-break-word leading-snug"
+              }`}
+            >
               {commit.subject}
             </span>
             {commit.parents.length > 1 && (
