@@ -397,17 +397,6 @@ export function TitleBar({
             <span className="truncate">{repo.branch}</span>
           </span>
         )}
-        {repo && repo.ahead > 0 && (
-          <span className="font-mono text-[11px] font-semibold text-success-ink" aria-hidden="true">
-            ↑{repo.ahead}
-          </span>
-        )}
-        {repo && repo.behind > 0 && (
-          <span className="font-mono text-[11px] font-semibold text-warning-ink" aria-hidden="true">
-            ↓{repo.behind}
-          </span>
-        )}
-
         {repo && repo.branch !== "HEAD detached" && (
           <>
             <button
@@ -417,7 +406,11 @@ export function TitleBar({
               aria-label={`Pull ${repo.branch}`}
               title={`Pull ${repo.branch} (fast-forward only)${syncError?.op === "pull" ? ` — ${syncError.message}` : ""}`}
               className={`${GLASS_CONTROL} h-7 min-w-7 px-1.5 font-mono text-[11px] font-semibold ${
-                syncError?.op === "pull" ? "text-danger" : "text-ink-dim hover:bg-sheet-strong hover:text-ink"
+                syncError?.op === "pull"
+                  ? "text-danger"
+                  : repo.behind > 0
+                    ? "text-warning-ink hover:bg-sheet-strong"
+                    : "text-ink-dim hover:bg-sheet-strong hover:text-ink"
               } focus-visible:ring-2 focus-visible:ring-primary/70 disabled:opacity-50`}
             >
               ↓{repo.behind > 0 ? repo.behind : ""}
@@ -429,7 +422,11 @@ export function TitleBar({
               aria-label={`Push ${repo.branch}`}
               title={`Push ${repo.branch} to origin${syncError?.op === "push" ? ` — ${syncError.message}` : ""}`}
               className={`${GLASS_CONTROL} h-7 min-w-7 px-1.5 font-mono text-[11px] font-semibold ${
-                syncError?.op === "push" ? "text-danger" : "text-ink-dim hover:bg-sheet-strong hover:text-ink"
+                syncError?.op === "push"
+                  ? "text-danger"
+                  : repo.ahead > 0
+                    ? "text-success-ink hover:bg-sheet-strong"
+                    : "text-ink-dim hover:bg-sheet-strong hover:text-ink"
               } focus-visible:ring-2 focus-visible:ring-primary/70 disabled:opacity-50`}
             >
               ↑{repo.ahead > 0 ? repo.ahead : ""}
