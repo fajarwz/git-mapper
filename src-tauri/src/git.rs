@@ -2,7 +2,7 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-#[derive(Serialize)]
+#[derive(Serialize, Debug)]
 pub struct RepoInfo {
     pub path: String,
     pub name: String,
@@ -364,4 +364,257 @@ pub fn read_commit_files(dir: &str, hash: &str) -> Result<FilePayload, String> {
 
 fn args(v: &[String]) -> Vec<&str> {
     v.iter().map(String::as_str).collect()
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    /// A throw-away repository on disk, real `git` CLI driving every command below it.
+    struct TempRepo(PathBuf);
+
+    fn git(dir: &Path, args: &[&str]) {
+        let out = Command::new("git").args(args).current_dir(dir).output().expect("git ran");
+        assert!(
+            out.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+    }
+
+    impl TempRepo {
+        fn new(label: &str) -> Self {
+            let dir = std::env::temp_dir()
+                .join(format!("git-mapper-test-{}-{label}", std::process::id()));
+            let _ = std::fs::remove_dir_all(&dir);
+            std::fs::create_dir_all(&dir).expect("temp repo created");
+            git(&dir, &["init", "-q"]);
+            git(&dir, &["config", "user.name", "Test User"]);
+            git(&dir, &["config", "user.email", "test@example.com"]);
+            git(&dir, &["config", "core.autocrlf", "false"]);
+            TempRepo(dir)
+        }
+
+        fn path(&self) -> &str {
+            self.0.to_string_lossy().replace('\\', "/").leak()
+        }
+
+        fn commit(&self, file: &str, body: &str, message: &str) {
+            std::fs::write(self.0.join(file), body).expect("file written");
+            git(&self.0, &["add", file]);
+            git(&self.0, &["commit", "-q", "-m", message]);
+        }
+    }
+
+    impl Drop for TempRepo {
+        fn drop(&mut self) {
+            let _ = std::fs::remove_dir_all(&self.0);
+        }
+    }
+
+    fn records_of(raw: &str) -> Vec<Vec<String>> {
+        raw.split('\u{1e}')
+            .filter(|r| !r.trim().is_empty())
+            .map(|r| r.trim_matches('\n').split('\0').map(String::from).collect())
+            .collect()
+    }
+
+    #[test]
+    fn open_repository_names_the_toplevel() {
+        let repo = TempRepo::new("open");
+        let info = open_repository(repo.path()).expect("the repo opens");
+        assert_eq!(info.path, repo.path());
+        assert_eq!(info.name, PathBuf::from(repo.path()).file_name().unwrap().to_string_lossy());
+    }
+
+    #[test]
+    fn open_repository_rejects_a_worktreeless_directory() {
+        // A bare repo has no work tree, which is exactly the check open_repository guards.
+        let dir = std::env::temp_dir().join(format!("git-mapper-test-{}-bare", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("temp dir created");
+        let bare = Command::new("git")
+            .arg("init")
+            .arg("--bare")
+            .arg("-q")
+            .current_dir(&dir)
+            .output()
+            .expect("git ran");
+        assert!(bare.status.success());
+        let target = dir.to_string_lossy().replace('\\', "/");
+        let err = open_repository(&target).unwrap_err();
+        assert!(err.contains("is not a Git repository"), "got: {err}");
+        let _ = std::fs::remove_dir_all(&dir);
+    }
+
+    #[test]
+    fn read_status_counts_modified_plus_untracked_and_sees_ahead() {
+        let repo = TempRepo::new("status");
+        repo.commit("tracked.txt", "one\n", "c1");
+        repo.0.join("untracked.txt");
+
+        let clean = read_status(repo.path()).expect("status read");
+        assert_eq!((clean.dirty, clean.changed), (false, 0), "a committed tree is clean");
+        assert!(!clean.head.is_empty(), "HEAD is present");
+        assert_eq!((clean.ahead, clean.behind), (0, 0));
+
+        // One modified tracked path + one untracked path, each counted individually.
+        std::fs::write(repo.0.join("tracked.txt"), "one\ntwo\n").expect("edit");
+        std::fs::write(repo.0.join("untracked.txt"), "new\n").expect("untracked");
+        let dirty = read_status(repo.path()).expect("status read");
+        assert_eq!((dirty.dirty, dirty.changed), (true, 2));
+
+        // A commit after a push lands the branch ahead by exactly one.
+        git(&repo.0, &["stash", "-q"]);
+        git(&repo.0, &["remote", "add", "origin", repo.path()]);
+        git(&repo.0, &["fetch", "-q", "origin", "main"]);
+        git(&repo.0, &["branch", "--set-upstream-to=origin/main", "main"]);
+        repo.commit("tracked.txt", "pushed\n", "c2");
+        let ahead = read_status(repo.path()).expect("status read");
+        assert_eq!(ahead.ahead, 1);
+        assert_eq!((dirty.behind, dirty.ahead), (0, 0), "the pre-push read stays at zero");
+    }
+
+    #[test]
+    fn read_status_survives_an_unborn_branch() {
+        let repo = TempRepo::new("unborn");
+        let info = read_status(repo.path()).expect("a repo without commits still reads");
+        // git status prints "## No commits yet on main"; the loader shows the branch hint as-is.
+        assert_eq!(info.branch, "No commits yet on main");
+        assert_eq!(info.head, "");
+        assert_eq!(info.dirty, false);
+    }
+
+    #[test]
+    fn the_worktree_digest_notices_an_edit_the_count_misses() {
+        let repo = TempRepo::new("digest");
+        repo.commit("tracked.txt", "one\n", "c1");
+
+        let first = read_status(repo.path()).expect("first read");
+        let again = read_status(repo.path()).expect("second read");
+        assert_eq!(first.worktree, again.worktree, "an untouched tree stamps identically");
+
+        // Same path count (one modified file), different content: only the patch moves the stamp.
+        std::fs::write(repo.0.join("tracked.txt"), "one\n").expect("touch");
+        let pre_edit = read_status(repo.path()).expect("read with one change");
+        std::fs::write(repo.0.join("tracked.txt"), "two\n").expect("edit");
+        let post_edit = read_status(repo.path()).expect("read with same count");
+        assert_ne!(pre_edit.worktree, post_edit.worktree, "an edit inside one file moves the stamp");
+    }
+
+    #[test]
+    fn read_log_records_keep_field_and_record_separators() {
+        let repo = TempRepo::new("log");
+        repo.commit("one.txt", "one\n", "first: one");
+        repo.commit("two.txt", "two\n", "second: two");
+
+        let raw = read_log(repo.path(), 10, 0).expect("log read");
+        let records = records_of(&raw);
+        assert_eq!(records.len(), 2, "one record per commit, newest first");
+        let head = run_git(repo.path(), &["rev-parse", "--verify", "HEAD"]).expect("rev-parse");
+        assert_eq!(
+            records[0][1].trim_start_matches('\n'),
+            head.trim(),
+            "the hash field is the commit sha"
+        );
+        assert!(records[0][6].contains("second: two"), "%B lands in the last field");
+    }
+
+    #[test]
+    fn read_log_order_matches_read_log_shape_and_delta_excludes_the_since_base() {
+        let repo = TempRepo::new("delta");
+        repo.commit("one.txt", "one\n", "first");
+        let old_head = read_log_order(repo.path(), 10).expect("ordering read");
+        repo.commit("two.txt", "two\n", "second");
+
+        let order = read_log_order(repo.path(), 10).expect("ordering read");
+        let lines: Vec<&str> = order.lines().collect();
+        assert_eq!(lines.len(), 2, "one line per commit, nothing else");
+        let raw = read_log(repo.path(), 10, 0).expect("log read");
+        let hashes: Vec<String> = records_of(&raw)
+            .iter()
+            .map(|r| r[1].trim_start_matches('\n').to_string())
+            .collect();
+        assert_eq!(hashes, lines, "read_log and read_log_order describe the same window");
+
+        let delta = read_log_delta(repo.path(), old_head.trim(), 500).expect("delta read");
+        let delta_hashes: Vec<String> = records_of(&delta)
+            .iter()
+            .map(|r| r[1].trim_start_matches('\n').to_string())
+            .collect();
+        assert_eq!(delta_hashes, vec![lines[0]], "only the commit newer than `since` comes back");
+    }
+
+    #[test]
+    fn read_log_excludes_the_stash_stack() {
+        let repo = TempRepo::new("stash");
+        repo.commit("one.txt", "one\n", "first");
+        std::fs::write(repo.0.join("one.txt"), "two\n").expect("edit");
+        git(&repo.0, &["stash", "-q"]);
+        let stash_hash = run_git(repo.path(), &["rev-parse", "refs/stash"]).expect("stash ref");
+        repo.commit("two.txt", "two\n", "second");
+
+        for raw in [
+            read_log(repo.path(), 10, 0).expect("log read"),
+            read_log_order(repo.path(), 10).expect("order read"),
+        ] {
+            assert!(
+                !raw.contains(&stash_hash),
+                "the stash commit must stay out of history: {raw}"
+            );
+        }
+
+        let stashes = read_stashes(repo.path()).expect("stash read");
+        let records = records_of(&stashes);
+        assert_eq!(records.len(), 1, "the reflog is the only view over every entry");
+        assert!(records[0][0].trim_start_matches('\n').starts_with("stash@{"));
+        assert_eq!(records[0][1], stash_hash.trim());
+    }
+
+    #[test]
+    fn wip_files_list_untracked_paths_and_the_binary_hunk() {
+        let repo = TempRepo::new("wip");
+        repo.commit("tracked.txt", "one\n", "first");
+
+        std::fs::write(repo.0.join("tracked.txt"), "one\ntwo\n").expect("edit");
+        std::fs::write(repo.0.join("new.txt"), "l1\nl2\n").expect("untracked text");
+        std::fs::write(repo.0.join("blob.bin"), [0u8, 1, 255, 9, 0]).expect("untracked binary");
+
+        let payload = read_commit_files(repo.path(), "wip").expect("wip payload");
+        assert!(payload.name_status.contains("M\ttracked.txt"));
+        assert!(payload.numstat.contains("2\t0\tnew.txt"));
+        assert!(payload.name_status.contains("A\tnew.txt"), "`git diff` alone never lists untracked paths");
+        assert!(payload.diff.contains("+++ b/new.txt"));
+        assert!(payload.numstat.contains("-\t-\tblob.bin"));
+        assert!(payload.diff.contains("@@ Binary file, not shown @@"), "the panel needs a reason for an empty patch");
+    }
+
+    #[test]
+    fn commit_files_diff_against_the_first_parent_and_handle_roots_and_renames() {
+        let repo = TempRepo::new("files");
+        repo.commit("root.txt", "root\n", "root commit");
+        let root_hash = run_git(repo.path(), &["rev-parse", "--verify", "HEAD"]).expect("rev-parse");
+        let root_hash = root_hash.trim().to_string();
+
+        std::fs::write(repo.0.join("other.txt"), "o\n").expect("file");
+        git(&repo.0, &["add", "."]);
+        git(&repo.0, &["commit", "-q", "-m", "second"]);
+        let second_hash = run_git(repo.path(), &["rev-parse", "HEAD"]).expect("rev-parse");
+        let second_hash = second_hash.trim().to_string();
+
+        // Root commits diff against the empty tree; the `^1` of a root resolves to nothing.
+        let root_files = read_commit_files(repo.path(), &root_hash).expect("root files");
+        assert!(root_files.numstat.contains("1\t0\troot.txt"), "got: {}", root_files.numstat);
+
+        let files = read_commit_files(repo.path(), &second_hash).expect("parent diff");
+        assert!(files.name_status.contains("A\tother.txt"));
+
+        // git mv keeps the rename visible.
+        git(&repo.0, &["mv", "root.txt", "renamed.txt"]);
+        git(&repo.0, &["commit", "-q", "-m", "renamed"]);
+        let renamed_hash = run_git(repo.path(), &["rev-parse", "HEAD"]).expect("rev-parse");
+        let renamed_hash = renamed_hash.trim().to_string();
+        let renamed = read_commit_files(repo.path(), &renamed_hash).expect("renamed files");
+        assert!(renamed.name_status.contains("R100\troot.txt\trenamed.txt"), "got: {}", renamed.name_status);
+    }
 }
