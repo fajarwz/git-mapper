@@ -127,3 +127,27 @@ test("a stored path hydrates rows on launch, loads wip files and shows pills", a
   assert.ok(within(container).getByText("demo"), "the repo tab carries the folder name");
   assert.ok(within(container).getAllByText(/Uncommitted/).length > 0, "the uncommitted row is visible");
 });
+
+test("the search box filters the loaded rows and clears back to full history", async () => {
+  localStorage.setItem(STORAGE_KEYS.repos, JSON.stringify(["C:/repos/demo"]));
+  const { container } = render(<App />);
+
+  await waitFor(() => {
+    assert.equal(container.querySelectorAll("[data-commit-row]").length, 3);
+  });
+
+  const search = within(container).getByRole("textbox", { name: /search history/i });
+  fireEvent.change(search, { target: { value: "two" } });
+
+  await waitFor(() => {
+    assert.equal(container.querySelectorAll("[data-commit-row]").length, 1,
+      "only the matching row stays; the wip row does not match 'two'");
+  });
+  assert.ok(container.querySelector("[data-commit-row]")?.textContent?.includes("feat: two"));
+
+  fireEvent.change(search, { target: { value: "" } });
+  await waitFor(() => {
+    assert.equal(container.querySelectorAll("[data-commit-row]").length, 3,
+      "clearing the query restores every row, wip included");
+  });
+});

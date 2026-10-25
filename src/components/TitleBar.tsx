@@ -23,6 +23,7 @@ import {
   PlusIcon,
   RefreshIcon,
   RepoIcon,
+  SearchIcon,
   SettingsIcon,
   WindowCloseIcon,
   WindowMaximizeIcon,
@@ -84,6 +85,9 @@ interface TitleBarProps {
   adding: boolean;
   /** True while a manual reload is in flight; the refresh button spins with it. */
   refreshing: boolean;
+  /** Free-text filter over the active repo's loaded commits; empty means unfiltered. */
+  query: string;
+  onQueryChange: (query: string) => void;
   onSelect: (id: string) => void;
   onAdd: () => void;
   onClose: (id: string) => void;
@@ -171,6 +175,8 @@ export function TitleBar({
   repo,
   adding,
   refreshing,
+  query,
+  onQueryChange,
   onSelect,
   onAdd,
   onClose,
@@ -182,6 +188,20 @@ export function TitleBar({
   const [draggedId, setDraggedId] = useState<string | null>(null);
   // The click that ends a drag must not also select the tab that was dropped.
   const suppressClick = useRef(false);
+
+  // Ctrl+F focuses (and selects) the search box; the browser's page-find is not the tool here.
+  const searchRef = useRef<HTMLInputElement>(null);
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.ctrlKey && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        searchRef.current?.focus();
+        searchRef.current?.select();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, []);
 
   // Pointer only on purpose: the keyboard sensor claims Space and Enter on the focused tab, and a
   // tab has to stay activatable from the keyboard. Keyboard reordering would need a grip handle.
@@ -316,6 +336,31 @@ export function TitleBar({
       </DndContext>
 
       <div className="flex shrink-0 items-center gap-1.5">
+        {repo && (
+          // The search box sits straight on the aurora, so it gets the glass backing like
+          // every other control in the bar. Esc clears the query first, then blurs.
+          <div className="relative flex items-center">
+            <span aria-hidden="true" className="pointer-events-none absolute left-2 text-ink-dim">
+              <SearchIcon size={12} />
+            </span>
+            <input
+              ref={searchRef}
+              type="text"
+              value={query}
+              onChange={(event) => onQueryChange(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Escape") {
+                  if (query) onQueryChange("");
+                  else event.currentTarget.blur();
+                }
+              }}
+              aria-label="Search history"
+              placeholder="Search history"
+              title="Search hashes, messages, authors and refs (Ctrl+F)"
+              className="h-7 w-36 rounded-lg border border-hairline bg-glass-soft pl-7 pr-2 text-[12.5px] text-ink outline-none backdrop-blur-md transition-all placeholder:text-ink-dim focus:w-52 focus:border-primary-ink/50 focus:bg-glass-strong"
+            />
+          </div>
+        )}
         {repo && (
           // The edge takes primary-ink, not primary: primary-ink is re-pointed in .dark
           // (violet -> lavender), so the hairline stays visible on the dark glass too.

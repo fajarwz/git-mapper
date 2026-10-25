@@ -15,6 +15,7 @@ import RawChevronDownIcon from "../assets/chevron-down.svg?react";
 import RawCloseIcon from "../assets/close.svg?react";
 import RawSettingsIcon from "../assets/settings.svg?react";
 import RawCheckIcon from "../assets/check.svg?react";
+import RawSearchIcon from "../assets/search.svg?react";
 
 interface IconProps {
   size?: number;
@@ -70,6 +71,10 @@ export function SettingsIcon({ size = 14, className = "" }: GlyphProps) {
 
 export function CheckIcon({ size = 12, className = "" }: GlyphProps) {
   return <SizedIcon glyph={RawCheckIcon} size={size} className={className} />;
+}
+
+export function SearchIcon({ size = 13, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawSearchIcon} size={size} className={className} />;
 }
 
 /* Fixed-size glyphs re-exported as-is; their dimensions live in the SVG files. */

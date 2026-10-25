@@ -7,6 +7,7 @@ import { EmptyState } from "./components/EmptyState";
 import { TitleBar } from "./components/TitleBar";
 import { SettingsModal } from "./components/SettingsModal";
 import { STORAGE_KEYS, usePersistedState } from "./lib/persisted";
+import { filterCommits } from "./lib/commitFilter";
 import { applyTheme, initialTheme, storeTheme } from "./lib/theme";
 import type { Theme } from "./lib/theme";
 import {
@@ -62,6 +63,9 @@ function App() {
 
   // Rows a refresh just added or re-pilled, highlighted for a moment then forgotten.
   const [flashHashes, setFlashHashes] = useState<string[]>([]);
+  // Search over the loaded window: hashes, subjects, authors, ref pills. Not synced per tab —
+  // switching repos clears it, because a filter carried into another tab would look like a bug.
+  const [query, setQuery] = useState("");
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -152,6 +156,7 @@ function App() {
 
   const handleSelectRepo = useCallback((id: string) => {
     setActiveRepoId(id);
+    setQuery("");
   }, [setActiveRepoId]);
 
   // Tab order is the order of this array, so a drag is just a splice; the persist effect
@@ -224,7 +229,9 @@ function App() {
   }, [activeRepoPath, opening]);
 
   async function handleNearBottom() {
-    if (!repo || loadingMoreByRepo[repo.id] || allLoadedByRepo[repo.id]) return;
+    // While a search filters the list the scrolled window no longer maps to pages: the
+    // "load more" trigger stays off until the query is cleared.
+    if (!repo || query || loadingMoreByRepo[repo.id] || allLoadedByRepo[repo.id]) return;
     setLoadingMoreByRepo((previous) => ({ ...previous, [repo.id]: true }));
     try {
       const result = await loadMoreCommits(repo);
@@ -328,6 +335,13 @@ function App() {
 
   const flashSet = useMemo(() => new Set(flashHashes), [flashHashes]);
 
+  // The search filters the loaded window only — the visible rows AND the lanes/graph re-layout
+  // over the subset. Searching unpaginated history stays out until the deep-search slice.
+  const visibleCommits = useMemo(
+    () => filterCommits(repo?.commits ?? [], query),
+    [repo, query],
+  );
+
   function handleThemeChange(nextTheme: Theme) {
     setTheme(nextTheme);
     storeTheme(nextTheme);
@@ -350,6 +364,8 @@ function App() {
         repo={repo}
         adding={opening}
         refreshing={refreshing}
+        query={query}
+        onQueryChange={setQuery}
         onSelect={handleSelectRepo}
         onAdd={handleAdd}
         onClose={handleCloseRepo}
@@ -365,6 +381,8 @@ function App() {
           <div className="relative grid min-h-0 flex-1 gap-2.5" style={workspaceStyle}>
             <CommitList
               repo={repo}
+              commits={visibleCommits}
+              query={query}
               selectedHash={selectedCommit?.hash ?? ""}
               onSelect={handleSelectCommit}
               flashHashes={flashSet}

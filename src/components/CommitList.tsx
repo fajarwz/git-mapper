@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import type { Repository } from "../types";
+import type { Commit, Repository } from "../types";
 import { layoutGraph } from "../lib/graphLanes";
 import { graphWidth } from "../lib/graphGeometry";
 import {
@@ -23,6 +23,13 @@ import { ResizeHandle } from "./ResizeHandle";
 
 interface CommitListProps {
   repo: Repository;
+  /**
+   * The commits to render: repo.commits when no search query is active, the filtered subset
+   * otherwise. The graph layout and the rows both work off this list, and the "no matches"
+   * notice keys off the query.
+   */
+  commits: Commit[];
+  query: string;
   selectedHash: string;
   /** Commits a refresh just added or re-pilled; they flash once. */
   flashHashes: Set<string>;
@@ -38,12 +45,12 @@ function widthOf(element: HTMLElement | null, fallback: number): number {
 
 const HEADER_CELL = "relative flex h-full min-w-0 items-center";
 
-export function CommitList({ repo, selectedHash, flashHashes, onSelect, loadingMore, onNearBottom, onCheckoutBranch }: CommitListProps) {
+export function CommitList({ repo, commits, query, selectedHash, flashHashes, onSelect, loadingMore, onNearBottom, onCheckoutBranch }: CommitListProps) {
   // One layout for the graph column and the SVG. Sizing the column from the dot lanes alone used to
   // clip the graph whenever a line ran right of every dot.
   const layout = useMemo(
-    () => layoutGraph(repo.commits.map((commit) => ({ hash: commit.hash, parents: commit.parents }))),
-    [repo.commits],
+    () => layoutGraph(commits.map((commit) => ({ hash: commit.hash, parents: commit.parents }))),
+    [commits],
   );
   const baseGraphWidth = graphWidth(layout.laneCount);
 
@@ -64,7 +71,7 @@ export function CommitList({ repo, selectedHash, flashHashes, onSelect, loadingM
   useEffect(() => {
     const el = scrollRef.current;
     if (el && lastScrollTop.current > 0) el.scrollTop = lastScrollTop.current;
-  }, [repo.commits]);
+  }, [commits]);
 
   const graphColumnWidth = baseGraphWidth + graphExtra;
 
@@ -185,10 +192,10 @@ export function CommitList({ repo, selectedHash, flashHashes, onSelect, loadingM
         }}
       >
         <div ref={graphColumnRef} className="w-(--graph-width) shrink-0">
-          <CommitGraph commits={repo.commits} layout={layout} selectedHash={selectedHash} />
+          <CommitGraph commits={commits} layout={layout} selectedHash={selectedHash} />
         </div>
         <div className="min-w-0 flex-1 pl-2 pr-3">
-          {repo.commits.map((commit) => (
+          {commits.map((commit) => (
             <CommitRow
               key={commit.hash}
               commit={commit}
@@ -198,6 +205,11 @@ export function CommitList({ repo, selectedHash, flashHashes, onSelect, loadingM
               onCheckoutBranch={onCheckoutBranch}
             />
           ))}
+          {commits.length === 0 && query !== "" && (
+            <p className="m-0 py-2 text-center text-[12px] text-ink-dim">
+              No commits in the loaded history match this search.
+            </p>
+          )}
           {loadingMore && (
             <p className="m-0 py-2 text-center text-[12px] text-ink-dim">Loading more history…</p>
           )}
