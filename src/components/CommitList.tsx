@@ -202,9 +202,6 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
           if (el.scrollTop + el.clientHeight >= el.scrollHeight - 320) onNearBottom();
         }}
       >
-        // self-start: the column must size to the SVG's full height. Left stretching (the flex
-        // default) clipped overflow-hidden to the viewport height, so every node below the
-        // first screen vanished on scroll.
         <div ref={graphColumnRef} className="w-(--graph-width) shrink-0 self-start overflow-hidden">
           <CommitGraph commits={commits} layout={layout} selectedHash={selectedHash} />
         </div>
