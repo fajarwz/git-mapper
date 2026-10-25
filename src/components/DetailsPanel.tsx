@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { ChangedFile, Commit } from "../types";
+import { copyText } from "../lib/clipboard";
 import { formatAbsoluteDate } from "../lib/format";
 import {
   DEFAULT_DETAILS_HEIGHT,
@@ -42,6 +43,17 @@ export function DetailsPanel({
 
   const [summaryCollapsed, setSummaryCollapsed] = useState(false);
   const [filesCollapsed, setFilesCollapsed] = useState(false);
+  // Click-to-copy on the hash line: the marker resets itself, and a switch of commits clears it.
+  const [hashCopied, setHashCopied] = useState(false);
+  const hashTimer = useRef(0);
+
+  function copyHash() {
+    void copyText(commit.hash).then(() => {
+      setHashCopied(true);
+      window.clearTimeout(hashTimer.current);
+      hashTimer.current = window.setTimeout(() => setHashCopied(false), 900);
+    });
+  }
   // null = follow the content, capped so the file list always keeps most of the sidebar.
   const [summaryHeight, setSummaryHeight] = useState<number | null>(null);
   const pinned = summaryHeight !== null && !summaryCollapsed && !filesCollapsed;
@@ -83,8 +95,10 @@ export function DetailsPanel({
             >
               <ChevronDownIcon className={summaryCollapsed ? "-rotate-90" : ""} />
             </button>
-            <span className="shrink-0 rounded-full bg-primary/10 px-2.5 py-1 font-mono text-[11.5px] font-semibold text-primary-ink">
-              {commit.hash}
+            {/* The subject IS the panel title, so it survives a collapse (the hash lives in the
+                meta block below); merge/stash stay as pills because they change the row's kind. */}
+            <span className="min-w-0 flex-1 truncate text-[12.5px] font-bold text-ink">
+              {commit.subject}
             </span>
             {commit.parents.length > 1 && (
               <span className="shrink-0 rounded-full bg-warning/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-warning-ink">
@@ -109,11 +123,15 @@ export function DetailsPanel({
 
           {!summaryCollapsed && (
             <>
-              <h2 className="m-0 wrap-break-word text-[15px] font-bold leading-snug text-ink">
-                {commit.subject}
-              </h2>
-
               <div className="flex min-w-0 flex-col gap-0.5 text-[12px] text-ink-dim">
+                <button
+                  type="button"
+                  onClick={copyHash}
+                  title="Copy commit hash"
+                  className="-mx-1 flex w-fit cursor-default items-center rounded px-1 font-mono text-[10.5px] text-ink-soft hover:bg-hover-glass"
+                >
+                  {hashCopied ? "Copied!" : commit.hash}
+                </button>
                 <span className="text-[12.5px] font-semibold text-ink-soft">{commit.author}</span>
                 <span className="truncate">{commit.authorEmail}</span>
                 <span>{formatAbsoluteDate(commit.date)}</span>
