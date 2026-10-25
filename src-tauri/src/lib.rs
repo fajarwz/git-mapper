@@ -4,6 +4,11 @@ mod git;
 pub fn run() {
     tauri::Builder::default()
         .plugin(tauri_plugin_dialog::init())
+        .plugin(tauri_plugin_updater::Builder::new().build())
+        // Relaunch after an update has been downloaded and installed.
+        .plugin(tauri_plugin_process::init())
+        // The About links (GitHub) open in the system browser.
+        .plugin(tauri_plugin_opener::init())
         // Remembers window size, position and maximized state between runs.
         .plugin(tauri_plugin_window_state::Builder::default().build())
         .invoke_handler(tauri::generate_handler![

@@ -30,6 +30,7 @@
   "bundle": {
     "active": true,
     "targets": "all",
+    "createUpdaterArtifacts": true,
     "icon": [
       "icons/32x32.png",
       "icons/128x128.png",
@@ -37,5 +38,13 @@
       "icons/icon.icns",
       "icons/icon.ico"
     ]
+  },
+  "plugins": {
+    "updater": {
+      "pubkey": "dW50cnVzdGVkIGNvbW1lbnQ6IG1pbmlzaWduIHB1YmxpYyBrZXk6IERDM0NGNzE3OUI5MTEwMDcKUldRSEVKR2JGL2M4M0s4dzhxejI3aUVtU2c4bk8rZVp6d2JjeVI0OEtVWDlmN2VmWGUrc0Nlc0kK",
+      "endpoints": [
+        "https://github.com/fajarwz/git-mapper/releases/latest/download/latest.json"
+      ]
+    }
   }
 }
