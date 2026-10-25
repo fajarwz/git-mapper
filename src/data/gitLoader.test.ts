@@ -34,6 +34,8 @@ function logRecord(deco: string, hash: string, parents: string, subject: string)
 /** A tiny fake backend: git commands answered from in-memory state, calls recorded. */
 class FakeGit {
   calls: string[] = [];
+  /** Every read_log --skip, in call order: the paging window must never drift. */
+  logSkips: number[] = [];
   openPath = "C:/repos/demo";
   name = "demo";
   branch = "main";
@@ -70,6 +72,7 @@ class FakeGit {
         });
       case "read_log": {
         const page = this.commits.slice(Number(args.skip), Number(args.skip) + Number(args.limit));
+        this.logSkips.push(Number(args.skip));
         return Promise.resolve(page.map((c) => logRecord(c.deco, c.hash, c.parents, c.subject)).join(""));
       }
       case "read_log_delta":
@@ -95,6 +98,7 @@ async function bootstrap(fake: FakeGit): Promise<Repository> {
   );
   const repo = await loadRepository("C:/repos/demo");
   fake.calls.length = 0;
+  fake.logSkips.length = 0;
   return repo;
 }
 
@@ -272,6 +276,41 @@ test("rewritten history (moved head over an empty delta) falls back to a full re
   assert.equal(refreshed.head, "NX1");
   assert.deepEqual(hashesOf(refreshed).slice(0, 3), ["wip", "NX1", "NX2"]);
   assert.equal(refreshed.defaultCommitHash, "NX1");
+});
+
+test("paging counts history rows only: stash rows never drift the skip", async () => {
+  const fake = new FakeGit();
+  fake.dirty = false;
+  fake.changed = 0;
+  // Newest first, a linear chain: c1000 -> c999 -> ... -> c0 (root, no parent).
+  fake.commits = Array.from({ length: 1001 }, (_, i) => {
+    const n = 1000 - i;
+    return {
+      deco: n === 1000 ? "(HEAD -> main)" : "",
+      hash: `c${n}`,
+      parents: n === 0 ? "" : `c${n - 1}`,
+      subject: `commit ${n}`,
+    };
+  });
+  // Two stash entries in the first window: they must not push the page-2 skip past 500.
+  fake.stashes =
+    ["stash@{0}", "sss000", "c1000 idx1", "Fajar", "fajar@example.com", "2026-10-25T11:00:00+07:00", "WIP on main: c1000"].join(NUL) +
+    RS + "\n" +
+    ["stash@{1}", "sss111", "c999 idx1", "Fajar", "fajar@example.com", "2026-10-25T10:30:00+07:00", "WIP on main: c999"].join(NUL) +
+    RS + "\n";
+
+  const repo = await bootstrap(fake);
+  assert.equal(repo.commits.length, 502, "wip excluded, stashes merged in, 500 history rows");
+
+  const page2 = await loadMoreCommits(repo);
+  assert.equal(page2.done, false);
+  assert.deepEqual(fake.logSkips, [500],
+    "page 2 skips 500 history rows — the two stash rows must not push the window past them");
+  assert.equal(page2.repo.commits[0].hash, "sss000");
+  assert.equal(page2.repo.commits[2].hash, "c1000",
+    "the stashes (taken later than any commit) sit above the head, history follows");
+  assert.equal(page2.repo.commits[502].hash, "c500",
+    "page 2 continues the chain at c500 — the stash count must not eat rows");
 });
 
 test("paging appends the next page below the window and reports when history runs out", async () => {

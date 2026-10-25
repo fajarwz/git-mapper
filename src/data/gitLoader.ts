@@ -235,7 +235,15 @@ function uncommittedCommit(commits: Commit[], changed: number): Commit {
 /** Places lanes over the real commits plus, when present, the uncommitted row on top. */
 function withLanes(commits: Commit[]): Commit[] {
   const layout = layoutGraph(
-    commits.map((c) => ({ hash: c.hash, parents: c.parents, uncommitted: c.hash === UNCOMMITTED_HASH })),
+    commits.map((c) => ({
+      hash: c.hash,
+      // Stash rows float: they are snapshots, not history, so they draw no line to the commit
+      // they were taken on. A stash on a months-old commit used to hold its lane open for
+      // hundreds of rows, and one whose base sat outside the window traced a line to the very
+      // bottom — the graph blew up to twice the lanes and the dots clipped out of the column.
+      parents: isStashRow(c) ? [] : c.parents,
+      uncommitted: c.hash === UNCOMMITTED_HASH,
+    })),
   );
   // Reuse the commit object when its lane and colour are unchanged: rows are memoized, so
   // identical objects mean identical renders and no DOM work for history that did not move.
@@ -477,11 +485,13 @@ async function fullReload(repo: Repository): Promise<RefreshedRepository> {
 export async function loadMoreCommits(
   repo: Repository,
 ): Promise<{ repo: Repository; done: boolean } | null> {
-  const loaded = repo.commits.filter(
+  // The skip counts HISTORY rows only: read_log's --skip applies to git's log, which never
+  // contains stash rows — counting them made every page skip that many real commits.
+  const historyCount = repo.commits.filter(
     (commit) => commit.hash !== UNCOMMITTED_HASH && !isStashRow(commit),
-  );
+  ).length;
   const [parsed, refsRaw] = await Promise.all([
-    parseLog(await readLog(repo.path, LOG_LIMIT, loaded.length)),
+    parseLog(await readLog(repo.path, LOG_LIMIT, historyCount)),
     readRefs(repo.path),
   ]);
   if (parsed.length === 0) return { repo, done: true };
@@ -492,6 +502,7 @@ export async function loadMoreCommits(
   }));
   // The uncommitted row is kept as it is and stays on top; stash rows keep their spot inside
   // history — they are not pages of history, but they are not pinned either.
+  const loaded = repo.commits.filter((commit) => commit.hash !== UNCOMMITTED_HASH);
   const above = repo.commits.filter((commit) => commit.hash === UNCOMMITTED_HASH);
   const list = [...above, ...loaded, ...fresh];
   const done = parsed.length < LOG_LIMIT;
