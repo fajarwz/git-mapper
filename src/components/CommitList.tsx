@@ -16,6 +16,7 @@ import {
   MIN_DATE_WIDTH,
   MIN_GRAPH_WIDTH,
   MIN_MESSAGE_WIDTH,
+  DEFAULT_GRAPH_LANES,
 } from "../lib/tableLayout";
 import { PANEL } from "../lib/ui";
 import { CommitGraph } from "./CommitGraph";
@@ -82,10 +83,12 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
 
   // A pinned width outlives lane re-counts unchanged (no header jump on search), but is
   // clamped to the current layout's legal range: never under one lane, never past the
-  // natural width plus the extra the splitter allows. Fit mode just follows the layout.
+  // natural width plus the extra the splitter allows. Fit mode is capped at
+  // DEFAULT_GRAPH_LANES: a lane-heavy history gets a compact default, and the splitter
+  // widens it (the clipped lanes come back) instead of the column starting enormous.
   const graphColumnWidth =
     pinnedGraphWidth === null
-      ? baseGraphWidth
+      ? Math.min(baseGraphWidth, graphWidth(DEFAULT_GRAPH_LANES))
       : Math.max(MIN_GRAPH_WIDTH, Math.min(pinnedGraphWidth, baseGraphWidth + MAX_GRAPH_EXTRA));
 
   const columns = {
