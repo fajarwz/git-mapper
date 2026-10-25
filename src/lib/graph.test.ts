@@ -222,28 +222,42 @@ test("empty and single-commit histories are handled", () => {
   assert.equal(buildEdges(single).length, 0, "a lone root has no lines");
 });
 
-test("stash rows interleaved into history hang off the commit they were taken on", () => {
-  // The shape gitLoader builds once stashes file by date: the uncommitted row, then stash rows
-  // slotted between history rows (here both were taken on c1, so their rows join that one line).
+test("stash rows float: one-row tips with no connector into history", () => {
+  // Stash rows enter the layout as parentless one-row tips: they are snapshots, not history.
+  // A stash on a months-old commit used to hold a lane open for hundreds of rows, and one
+  // whose base sat outside the window traced a line to the very bottom — the graph blew up
+  // its lanes and the stash dots clipped out of the column.
   const rows = [
     ["wip", "c3"],
-    ["stash0", "c1"],
-    ["stash1", "c1"],
+    ["stash0"],
+    ["stash1"],
     ["c3", "c2"],
     ["c2", "c1"],
     ["c1"],
   ];
   const layout = checkInvariants(rows, "stashes");
   assert.ok(layout.ordered, "synthetic rows are laid out newest-first like history");
-  assert.notEqual(layout.lanes[1], layout.lanes[2], "each stash entry needs its own lane");
-  assert.notEqual(
-    branchColor(layout.branchColors[1]),
-    branchColor(layout.branchColors[2]),
-    "two stashes must not share a pill colour",
-  );
-  // Two children of c1 already exist below (c2) plus the two stashes: the graph stays readable,
-  // and every line still ends on the commit it comes from.
-  assert.equal(layout.lanes[5], 0, "the shared base keeps the leftmost lane");
+  const floats = layout.branches.filter((branch) => branch.lines.length === 0);
+  assert.equal(floats.length, 2, "each stash row is a standalone one-row tip");
+  assert.ok(layout.laneCount <= 3, "floating stashes must not explode the lane count");
+  assert.equal(layout.lanes[5], 0, "the base chain keeps the leftmost lane");
+});
+
+test("a parentless tip mid-list owns one lane and draws nothing", () => {
+  // A floating stash row (no parents in the window) used to TRACE from its row to the bottom
+  // of the list, holding a lane over hundreds of rows. It must be a one-row standalone tip.
+  const rows = [
+    ["float"],
+    ["c2", "c1"],
+    ["c1"],
+  ];
+  const layout = checkInvariants(rows, "float tip");
+  assert.ok(layout.ordered);
+  const floatBranch = layout.branches.find((branch) => branch.lines.length === 0);
+  assert.ok(floatBranch, "the parentless tip draws no lines");
+  assert.equal(floatBranch.end, 0, "the float's branch ends at its own row");
+  assert.equal(layout.laneCount, 1, "the float shares the column temporally, no extra lanes");
+  assert.equal(buildEdges(layout).length, 1, "only the c2->c1 line is drawn");
 });
 
 test("out-of-order input is reported", () => {

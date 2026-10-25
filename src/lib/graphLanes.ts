@@ -167,6 +167,22 @@ export function layoutGraph(
     let i = startAt;
     let vertex = vertices[i];
     let parentVertex = vertex.nextParent();
+
+    if (parentVertex === null) {
+      // A tip with no parents in the window (a floating stash row, or a root at the end of the
+      // list) owns a lane for its one row and draws nothing. Tracing from here would walk to
+      // the bottom of the list and hold the lane the whole way down.
+      const branch = new Branch(getAvailableColour(startAt));
+      const point = vertex.nextPoint();
+      vertex.addToBranch(branch, point.x);
+      vertex.registerUnavailablePoint(point.x);
+      laneCount = Math.max(laneCount, point.x + 1);
+      branch.end = startAt;
+      branches.push(branch);
+      availableColours[branch.color] = startAt;
+      return;
+    }
+
     let lastPoint = vertex.branch === null ? vertex.nextPoint() : vertex.point();
 
     laneCount = Math.max(laneCount, lastPoint.x + 1);
