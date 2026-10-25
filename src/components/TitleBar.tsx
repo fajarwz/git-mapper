@@ -405,7 +405,7 @@ export function TitleBar({
               disabled={syncing}
               aria-label={`Pull ${repo.branch}`}
               title={`Pull ${repo.branch} (fast-forward only)${syncError?.op === "pull" ? ` — ${syncError.message}` : ""}`}
-              className={`${GLASS_CONTROL} h-7 min-w-7 px-1.5 font-mono text-[11px] font-semibold ${
+              className={`${GLASS_CONTROL} grid h-7 min-w-7 place-items-center px-1.5 font-mono text-[11px] font-semibold leading-none ${
                 syncError?.op === "pull"
                   ? "text-danger"
                   : repo.behind > 0
@@ -421,7 +421,7 @@ export function TitleBar({
               disabled={syncing}
               aria-label={`Push ${repo.branch}`}
               title={`Push ${repo.branch} to origin${syncError?.op === "push" ? ` — ${syncError.message}` : ""}`}
-              className={`${GLASS_CONTROL} h-7 min-w-7 px-1.5 font-mono text-[11px] font-semibold ${
+              className={`${GLASS_CONTROL} grid h-7 min-w-7 place-items-center px-1.5 font-mono text-[11px] font-semibold leading-none ${
                 syncError?.op === "push"
                   ? "text-danger"
                   : repo.ahead > 0
