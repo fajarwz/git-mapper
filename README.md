@@ -19,6 +19,8 @@ reading real repositories through the `git` CLI.
 - Light and dark glass themes, remembered across restarts together with the window size and
   position.
 - Resizable graph gutter, commit / author / date columns and details panel height.
+- Search over the loaded history: hashes, commit messages, authors and ref pills. Ctrl+F focuses
+  the title-bar box, Esc clears.
 
 Built for Windows; the git layer itself is platform-neutral.
 
@@ -49,6 +51,6 @@ The only thing the app changes in a repository is a branch checkout.
 
 ## Not there yet
 
-- Search or filtering over history.
+- Searching history beyond the loaded 500-commit window.
 - Staging, committing, merging, rebasing.
 - Side-by-side diff view.
