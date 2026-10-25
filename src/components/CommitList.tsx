@@ -104,6 +104,17 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
 
   const measureMessage = () => widthOf(messageCellRef.current, 300);
 
+  // While the message column is flexible (1fr, the first-load state) it absorbs every track
+  // change on its right — an author/date drag then looked inverted: the dragged edge stayed
+  // pinned against the hash column while the column grew from its far side. Pinning the
+  // message to its live width hands the leftover to the spacer, and the dragged edge follows
+  // the pointer like any desktop table.
+  function pinMessageWidth(): number {
+    const measured = measureMessage();
+    setMessageWidth(clampMessageWidth(measured, graphColumnWidth, authorWidth, dateWidth));
+    return measured;
+  }
+
   // Keep the pinned message column inside the window: the header and rows use the same 52px of gaps/padding.
   function clampMessageWidth(width: number, graph: number, author: number, date: number): number {
     const sectionWidth = sectionRef.current?.getBoundingClientRect().width ?? 0;
@@ -115,6 +126,7 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
   }
 
   function handleAuthorResize(width: number) {
+    if (messageWidth === null) pinMessageWidth();
     setAuthorWidth(width);
     setMessageWidth((current) =>
       current === null ? current : clampMessageWidth(current, graphColumnWidth, width, dateWidth),
@@ -122,6 +134,7 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
   }
 
   function handleDateResize(width: number) {
+    if (messageWidth === null) pinMessageWidth();
     setDateWidth(width);
     setMessageWidth((current) =>
       current === null ? current : clampMessageWidth(current, graphColumnWidth, authorWidth, width),
@@ -129,6 +142,7 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
   }
 
   function handleGraphResize(width: number) {
+    if (messageWidth === null) pinMessageWidth();
     setPinnedGraphWidth(Math.max(MIN_GRAPH_WIDTH, width));
     setMessageWidth((current) =>
       current === null
