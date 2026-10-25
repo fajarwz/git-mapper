@@ -95,6 +95,10 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
   `src/lib/webview.ts` blocks both paths at startup; dev keeps the context menu for Inspect,
   Ctrl+Shift+I still opens devtools. Refresh data by focusing the window (see App.tsx) or by
   reopening the tab, not by reloading the page.
+- **The app icon regenerates from `src-tauri/icons/app-icon.svg`** (brand glyph on the violet
+  tile — keep it in sync with TitleBar's BrandMark): `npx tauri icon src-tauri/icons/app-icon.svg`
+  rewrites every format. `tauri dev` does NOT rebuild on an icon change — the exe keeps the old
+  embedded `icon.ico` — so `touch src-tauri/build.rs` and restart the app to see it.
 
 - **design references:** target look is a frosted-glass commit feed (Dribbble-style, violet/rose/warm palette). The user judges ugliness by: row density, font-scale hierarchy, background saturation. "Ours should be close to the reference" means those three.
 - **Graph geometry:** lines are drawn row to row, never across rows. `layoutGraph` returns, per row,
