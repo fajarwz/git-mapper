@@ -222,9 +222,9 @@ test("empty and single-commit histories are handled", () => {
   assert.equal(buildEdges(single).length, 0, "a lone root has no lines");
 });
 
-test("stash rows above history hang off the commit they were taken on", () => {
-  // Exactly the shape gitLoader builds: the uncommitted row, then one row per stash, then the
-  // log. Both stashes were taken on the same commit, so their rows join that one line.
+test("stash rows interleaved into history hang off the commit they were taken on", () => {
+  // The shape gitLoader builds once stashes file by date: the uncommitted row, then stash rows
+  // slotted between history rows (here both were taken on c1, so their rows join that one line).
   const rows = [
     ["wip", "c3"],
     ["stash0", "c1"],

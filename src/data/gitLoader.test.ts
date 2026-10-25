@@ -130,7 +130,7 @@ test("parseForEachRef types refs by namespace and marks the checked-out branch",
   );
 });
 
-test("loading a repository stacks wip, stashes, then history and pairs the remote", async () => {
+test("loading a repository files stashes by date under the wip row and pairs the remote", async () => {
   const fake = new FakeGit();
   fake.stashes =
     ["stash@{0}", "sss000", "H1 index1", "Fajar", "fajar@example.com", "2026-10-25T09:00:00+07:00", "WIP on main: H1 feat: one"].join(NUL) +
@@ -144,18 +144,30 @@ test("loading a repository stacks wip, stashes, then history and pairs the remot
   assert.equal(repo.worktree, "wt-initial");
   assert.equal(repo.defaultCommitHash, "H1");
 
-  assert.deepEqual(hashesOf(repo).slice(0, 4), ["wip", "sss000", "H1", "H2"],
-    "wip row on top, then stash rows, then history");
+  assert.deepEqual(hashesOf(repo).slice(0, 4), ["wip", "H1", "H2", "sss000"],
+    "wip row on top, then history; the stash files by its date, not pinned above");
   assert.equal(repo.commits[0].subject, "Uncommitted changes (2)");
   assert.deepEqual(repo.commits[0].parents, ["H1"]);
-  assert.deepEqual(repo.commits[1].refs.map((r) => r.name), ["stash@{0}"]);
-  assert.deepEqual(repo.commits[1].parents, ["H1"], "stash rows hang off their base commit only");
+  assert.deepEqual(repo.commits[3].refs.map((r) => r.name), ["stash@{0}"]);
+  assert.deepEqual(repo.commits[3].parents, ["H1"], "stash rows hang off their base commit only");
 
-  const headPills = repo.commits[2].refs;
+  const headPills = repo.commits[1].refs;
   assert.ok(headPills.some((r) => r.type === "branch" && r.name === "main" && r.isCurrent),
     "the checked-out branch is a current pill");
   assert.ok(headPills.some((r) => r.type === "branch" && r.withRemote === "origin"),
     "the local branch knows its remote");
+});
+
+test("a stash newer than the head lands between the wip row and history", async () => {
+  const fake = new FakeGit();
+  fake.stashes =
+    ["stash@{0}", "sss000", "H1 index1", "Fajar", "fajar@example.com", "2026-10-25T11:00:00+07:00", "WIP on main: H1 feat: one"].join(NUL) +
+    RS +
+    "\n";
+  const repo = await bootstrap(fake);
+
+  assert.deepEqual(hashesOf(repo).slice(0, 3), ["wip", "sss000", "H1"],
+    "a stash taken after the head commit sits directly under the wip row");
 });
 
 test("a refresh where nothing moved returns null and costs three reads", async () => {

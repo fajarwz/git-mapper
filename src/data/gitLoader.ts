@@ -116,6 +116,28 @@ function stashRows(stashes: LogStash[]): Commit[] {
   }));
 }
 
+/** Millisecond stamp of an ISO date; unparseable strings sort oldest so they never land on top. */
+function stamp(date: string): number {
+  const time = Date.parse(date);
+  return Number.isNaN(time) ? 0 : time;
+}
+
+/**
+ * Stashes are not pinned above history: a stash row files by the date the stash was taken, like
+ * any other commit. Each row goes before the first history commit older than it, which keeps the
+ * list in git's `--date-order` — the stash's base commit is always below its row, so the lane
+ * layout still holds. Equal dates keep the stash list's own order (stash@{0} above stash@{1}).
+ */
+function mergeStashes(history: Commit[], stashes: Commit[]): Commit[] {
+  const rows = [...history];
+  for (const stash of stashes) {
+    const at = rows.findIndex((commit) => stamp(commit.date) < stamp(stash.date));
+    if (at === -1) rows.push(stash);
+    else rows.splice(at, 0, stash);
+  }
+  return rows;
+}
+
 /** `hash\tfullref` lines → refs grouped by hash, typed by the ref namespace. */
 export function parseForEachRef(
   raw: string,
@@ -253,9 +275,9 @@ export async function loadRepository(dir: string): Promise<Repository> {
     ...commit,
     refs: mergeRefs(commit.refs, tipRefs.get(commit.hash) ?? []),
   }));
-  // Stashes sit above history, the uncommitted row above them: the working tree is what moves
-  // next, then what is parked, then what is committed.
-  const rows = [...stashRows(parseStashes(stashesRaw)), ...history];
+  // Stashes file into history by the date they were taken; the uncommitted row stays on top:
+  // the working tree is what moves next, then everything else in git's own order.
+  const rows = mergeStashes(history, stashRows(parseStashes(stashesRaw)));
   const finalCommits = withLanes(
     status.dirty && history.length > 0
       ? [uncommittedCommit(history, status.changed), ...rows]
@@ -417,8 +439,7 @@ export async function refreshRepository(
 
   const commits = [
     ...(status.dirty && history.length > 0 ? [uncommittedCommit(history, status.changed)] : []),
-    ...stashes,
-    ...history,
+    ...mergeStashes(history, stashes),
   ];
 
   return {
@@ -469,10 +490,9 @@ export async function loadMoreCommits(
     ...commit,
     refs: mergeRefs(commit.refs, tipRefs.get(commit.hash) ?? []),
   }));
-  // The synthetic rows are kept as they are: they are not pages of history, they sit on top.
-  const above = repo.commits.filter(
-    (commit) => commit.hash === UNCOMMITTED_HASH || isStashRow(commit),
-  );
+  // The uncommitted row is kept as it is and stays on top; stash rows keep their spot inside
+  // history — they are not pages of history, but they are not pinned either.
+  const above = repo.commits.filter((commit) => commit.hash === UNCOMMITTED_HASH);
   const list = [...above, ...loaded, ...fresh];
   const done = parsed.length < LOG_LIMIT;
   return { repo: { ...repo, refsDigest: hashText(refsRaw), commits: withLanes(list) }, done };
