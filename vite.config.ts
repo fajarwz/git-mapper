@@ -126,14 +126,14 @@ function gitDevApi(): Plugin {
     read_log: ({ dir, limit, skip }) => ({
       text: run(
         String(dir),
-        ["log", "--all", "--date-order", `--max-count=${Number(limit) || 500}`, `--skip=${Number(skip) || 0}`, "--date=iso-strict",
+        ["log", "--exclude=refs/stash", "--all", "--date-order", `--max-count=${Number(limit) || 500}`, `--skip=${Number(skip) || 0}`, "--date=iso-strict",
           "--pretty=tformat:%d%x00%H%x00%an%x00%ae%x00%aI%x00%P%x00%B%x1e"],
       ),
     }),
     read_log_order: ({ dir, limit }) => ({
       text: run(String(dir), [
         "log",
-        "--all", "--date-order",
+        "--exclude=refs/stash", "--all", "--date-order",
         `--max-count=${Number(limit) || 500}`,
         "--date=iso-strict",
         "--pretty=tformat:%H",
@@ -141,7 +141,11 @@ function gitDevApi(): Plugin {
     }),
     read_log_delta: ({ dir, since, limit }) => {
       const rev = String(since ?? "").trim();
-      const base = ["log", "--all", "--date-order", `--max-count=${Number(limit) || 500}`];
+      const base = [
+        "log",
+        "--exclude=refs/stash", "--all", "--date-order",
+        `--max-count=${Number(limit) || 500}`,
+      ];
       if (rev !== "") base.push(`^${rev}`);
       base.push("--date=iso-strict", "--pretty=tformat:%d%x00%H%x00%an%x00%ae%x00%aI%x00%P%x00%B%x1e");
       return { text: run(String(dir), base) };
@@ -153,6 +157,13 @@ function gitDevApi(): Plugin {
         "refs/heads",
         "refs/remotes",
         "refs/tags",
+      ]),
+    }),
+    read_stashes: ({ dir }) => ({
+      text: run(String(dir), [
+        "stash",
+        "list",
+        "--pretty=tformat:%gd%x00%H%x00%P%x00%an%x00%ae%x00%cI%x00%gs%x1e",
       ]),
     }),
     checkout_branch: ({ dir, branch }) => {
@@ -194,11 +205,33 @@ function gitDevApi(): Plugin {
       const runVariant = (flag: string) =>
         // Flag position matters: `--numstat` must come after the sub-command (show/diff).
         run(String(dir), flag ? [base[0], flag, ...base.slice(1)] : base);
-      return {
+      const payload = {
         numstat: runVariant("--numstat"),
         name_status: runVariant("--name-status"),
         diff: runVariant(""),
       };
+      // `git stash -u` parks untracked files in a third parent: a parentless commit holding
+      // only those files, so `git show` prints them as additions. Mirrors the `^3` branch in
+      // src-tauri/src/git.rs.
+      let hasThird = false;
+      try {
+        execFileSync("git", ["rev-parse", "--verify", `${h}^3`], { cwd: String(dir), encoding: "utf8" });
+        hasThird = true;
+      } catch {
+        // No untracked part.
+      }
+      if (hasThird) {
+        const extra = (flag: string) => {
+          const args = ["show"];
+          if (flag) args.push(flag);
+          args.push("--no-color", "--format=", `${h}^3`);
+          return run(String(dir), args);
+        };
+        payload.numstat += extra("--numstat");
+        payload.name_status += extra("--name-status");
+        payload.diff += extra("");
+      }
+      return payload;
     },
   };
 

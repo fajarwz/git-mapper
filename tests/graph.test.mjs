@@ -238,6 +238,30 @@ test("empty and single-commit histories are handled", () => {
   assert.equal(buildEdges(single).length, 0, "a lone root has no lines");
 });
 
+test("stash rows above history hang off the commit they were taken on", () => {
+  // Exactly the shape gitLoader builds: the uncommitted row, then one row per stash, then the
+  // log. Both stashes were taken on the same commit, so their rows join that one line.
+  const rows = [
+    ["wip", "c3"],
+    ["stash0", "c1"],
+    ["stash1", "c1"],
+    ["c3", "c2"],
+    ["c2", "c1"],
+    ["c1"],
+  ];
+  const layout = checkInvariants(rows, "stashes");
+  assert.ok(layout.ordered, "synthetic rows are laid out newest-first like history");
+  assert.notEqual(layout.lanes[1], layout.lanes[2], "each stash entry needs its own lane");
+  assert.notEqual(
+    branchColor(layout.branchColors[1]),
+    branchColor(layout.branchColors[2]),
+    "two stashes must not share a pill colour",
+  );
+  // Two children of c1 already exist below (c2) plus the two stashes: the graph stays readable,
+  // and every line still ends on the commit it comes from.
+  assert.equal(layout.lanes[5], 0, "the shared base keeps the leftmost lane");
+});
+
 test("out-of-order input is reported", () => {
   const rows = [["parent", "base"], ["child", "parent"]];
   const layout = layoutGraph(commits(rows));

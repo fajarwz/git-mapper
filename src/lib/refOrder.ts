@@ -1,6 +1,6 @@
 import type { CommitRef, RefType } from "../types";
 
-const PRIORITY: RefType[] = ["branch", "tag", "remote"];
+const PRIORITY: RefType[] = ["stash", "branch", "tag", "remote"];
 
 /**
  * Clean ref lists for the pills: `origin/HEAD` is noise; a local branch paired
@@ -14,7 +14,19 @@ export function orderRefs(refs: CommitRef[]): CommitRef[] {
   // Locals and tags first, so remote pairing finds its branch either way.
   for (const ref of refs.filter((item) => item.type !== "remote")) {
     const existing = byKey.get(key(ref));
-    if (!existing || (!existing.isCurrent && ref.isCurrent)) byKey.set(key(ref), ref);
+    if (!existing) {
+      byKey.set(key(ref), ref);
+      continue;
+    }
+    // The same ref arrives from more than one place (log decorations, for-each-ref tips), and
+    // each copy knows something the other may not: the checked-out flag, the remote pairing
+    // computed below. Keep both instead of letting the first one win and losing the pair.
+    byKey.set(key(ref), {
+      ...existing,
+      ...ref,
+      isCurrent: existing.isCurrent || ref.isCurrent || undefined,
+      withRemote: existing.withRemote ?? ref.withRemote,
+    });
   }
   for (const remote of refs.filter((item) => item.type === "remote")) {
     if (remote.name === "origin/HEAD") continue;

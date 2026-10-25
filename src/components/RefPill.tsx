@@ -1,6 +1,6 @@
 import type { CommitRef } from "../types";
 import { branchColor } from "../lib/graphGeometry";
-import { BranchIcon, RemoteIcon, TagIcon } from "./icons";
+import { BranchIcon, RemoteIcon, StashIcon, TagIcon } from "./icons";
 
 interface RefPillProps {
   ref: CommitRef;
@@ -14,9 +14,10 @@ const ICONS = {
   branch: BranchIcon,
   remote: RemoteIcon,
   tag: TagIcon,
+  stash: StashIcon,
 };
 
-/** Branch / remote / tag label shown inline after a commit subject. */
+/** Branch / remote / tag / stash label shown inline after a commit subject. */
 export function RefPill({ ref, color, onCheckout }: RefPillProps) {
   const Icon = ICONS[ref.type];
   const checkoutable = ref.type === "branch" && !ref.isCurrent && onCheckout !== undefined;

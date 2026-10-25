@@ -13,6 +13,7 @@ pub fn run() {
             git::read_log_delta,
             git::read_log_order,
             git::read_refs,
+            git::read_stashes,
             git::read_commit_files,
             git::checkout_branch
         ])

@@ -1,6 +1,6 @@
-export type RefType = "branch" | "remote" | "tag";
+export type RefType = "branch" | "remote" | "tag" | "stash";
 
-/** A label rendered beside the commit subject: local branch, remote branch or tag. */
+/** A label rendered beside the commit subject: local branch, remote branch, tag or stash. */
 export interface CommitRef {
   type: RefType;
   name: string;
@@ -43,6 +43,11 @@ export interface Commit {
   /** Hashes of the parent commits, in order. Empty for the root commit. */
   parents: string[];
   refs: CommitRef[];
+  /**
+   * Set on the row built for a stash entry: `stash@{stashIndex}`. Synthetic rows like this (and
+   * the uncommitted one) are not part of the log, so refresh/load-more keep them apart.
+   */
+  stashIndex?: number;
   /** Files+diff load lazily per selected commit (see gitLoader.loadCommitFiles). */
 }
 
@@ -61,6 +66,8 @@ export interface Repository {
   worktree: string;
   /** Digest of all branch/remote/tag refs at load time; a fetch changes it. */
   refsDigest: string;
+  /** Digest of the stash list: taking or dropping a stash changes it, not the refs above. */
+  stashDigest: string;
   commits: Commit[];
   /** Commit pre-selected when the tab is first shown. */
   defaultCommitHash: string;

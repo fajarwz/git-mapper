@@ -183,6 +183,11 @@ pub fn read_status(dir: &str) -> Result<StatusInfo, String> {
     }
 }
 
+/// `--all` includes refs/stash, which drags in the stash commit and the index snapshot it
+/// points at as if they were history. Stashes get their own rows (read_stashes), so they are
+/// excluded here — and from the delta/order reads, which have to describe the same set.
+const EXCLUDE_STASH: &str = "--exclude=refs/stash";
+
 /// Raw log for TS-side parsing: fields split on \x00, records on \x1e.
 /// Decorations (%d) lead each record; %B is last so multi-line bodies survive the split.
 #[tauri::command]
@@ -191,6 +196,7 @@ pub fn read_log(dir: &str, limit: u32, skip: u32) -> Result<String, String> {
         dir,
         &[
             "log",
+            EXCLUDE_STASH,
             "--all", "--date-order",
             &format!("--max-count={limit}"),
             &format!("--skip={skip}"),
@@ -212,6 +218,7 @@ pub fn read_log_delta(dir: &str, since: &str, limit: u32) -> Result<String, Stri
         dir,
         &[
             "log",
+            EXCLUDE_STASH,
             "--all", "--date-order",
             &format!("--max-count={limit}"),
             &exclude,
@@ -230,6 +237,7 @@ pub fn read_log_order(dir: &str, limit: u32) -> Result<String, String> {
         dir,
         &[
             "log",
+            EXCLUDE_STASH,
             "--all", "--date-order",
             &format!("--max-count={limit}"),
             "--date=iso-strict",
@@ -250,6 +258,21 @@ pub fn read_refs(dir: &str) -> Result<String, String> {
             "refs/heads",
             "refs/remotes",
             "refs/tags",
+        ],
+    )
+}
+
+/// Stash entries, newest first. Only `refs/stash` is a real ref and it points at the newest
+/// entry, so for-each-ref and `log --all` can never see the older ones: the reflog is the only
+/// place the full list exists. Same record/field separators as read_log.
+#[tauri::command]
+pub fn read_stashes(dir: &str) -> Result<String, String> {
+    run_git(
+        dir,
+        &[
+            "stash",
+            "list",
+            "--pretty=tformat:%gd%x00%H%x00%P%x00%an%x00%ae%x00%cI%x00%gs%x1e",
         ],
     )
 }
@@ -310,11 +333,33 @@ pub fn read_commit_files(dir: &str, hash: &str) -> Result<FilePayload, String> {
     };
     let numstat_args = insert("--numstat");
     let name_status_args = insert("--name-status");
-    Ok(FilePayload {
+    let mut payload = FilePayload {
         numstat: run_git(dir, &args(&numstat_args))?,
         name_status: run_git(dir, &args(&name_status_args))?,
         diff: run_git(dir, &args(&base))?,
-    })
+    };
+
+    // `git stash -u` keeps the untracked-but-stashed files in a third parent: a parentless
+    // commit whose tree holds nothing but those files, so `git show` on it prints them as the
+    // additions they were, and `diff ^1 ^3` (a full tree against that fragment) prints every
+    // other file as deleted.
+    let third = format!("{hash}^3");
+    if run_git(dir, &["rev-parse", "--verify", &third]).is_ok() {
+        let stash_extra = |flag: Option<&str>| -> Result<String, String> {
+            let mut v: Vec<String> = vec!["show".into()];
+            if let Some(flag) = flag {
+                v.push(flag.into());
+            }
+            v.push("--no-color".into());
+            v.push("--format=".into());
+            v.push(third.clone());
+            run_git(dir, &args(&v))
+        };
+        payload.numstat.push_str(&stash_extra(Some("--numstat"))?);
+        payload.name_status.push_str(&stash_extra(Some("--name-status"))?);
+        payload.diff.push_str(&stash_extra(None)?);
+    }
+    Ok(payload)
 }
 
 fn args(v: &[String]) -> Vec<&str> {

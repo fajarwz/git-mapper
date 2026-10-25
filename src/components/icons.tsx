@@ -8,6 +8,7 @@ import type { ComponentType } from "react";
 import RawBranchIcon from "../assets/branch.svg?react";
 import RawTagIcon from "../assets/tag.svg?react";
 import RawRemoteIcon from "../assets/remote.svg?react";
+import RawStashIcon from "../assets/stash.svg?react";
 import RawRepoIcon from "../assets/repo.svg?react";
 import RawPlusIcon from "../assets/plus.svg?react";
 import RawChevronDownIcon from "../assets/chevron-down.svg?react";
@@ -41,6 +42,10 @@ export function TagIcon({ size = 12 }: IconProps) {
 
 export function RemoteIcon({ size = 12 }: IconProps) {
   return <SizedIcon glyph={RawRemoteIcon} size={size} />;
+}
+
+export function StashIcon({ size = 12 }: IconProps) {
+  return <SizedIcon glyph={RawStashIcon} size={size} />;
 }
 
 export function RepoIcon({ size = 14 }: IconProps) {

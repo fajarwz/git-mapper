@@ -91,6 +91,11 @@ export function DetailsPanel({
                 merge
               </span>
             )}
+            {commit.stashIndex !== undefined && (
+              <span className="shrink-0 rounded-full bg-secondary/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-secondary">
+                stash
+              </span>
+            )}
             <button
               type="button"
               onClick={onClose}

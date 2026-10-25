@@ -5,7 +5,8 @@ import { STORAGE_KEYS } from "../lib/persisted";
 import { orderRefs } from "../lib/refOrder";
 import { layoutGraph } from "../lib/graphLanes";
 import { parseCommitFiles } from "../lib/gitDiffParser";
-import { parseLog } from "../lib/gitLogParser";
+import { parseLog, parseStashes } from "../lib/gitLogParser";
+import type { LogStash } from "../lib/gitLogParser";
 
 const LOG_LIMIT = 500;
 
@@ -66,29 +67,52 @@ function hashText(text: string): string {
   return `${text.length}:${(hash >>> 0).toString(16)}`;
 }
 
-/** Decoration refs first, then for-each-ref tips not already present (dedupe by type+name). */
+/**
+ * Decoration refs first, then the for-each-ref tips. Both describe the same refs, so the
+ * dedupe is left to orderRefs: filtering tips out here threw away the copy that knew the
+ * branch's remote, which is why a refreshed pill read `main` instead of `main | origin`.
+ */
 function mergeRefs(decorations: CommitRef[], tips: CommitRef[]): CommitRef[] {
-  return orderRefs([
-    ...decorations,
-    ...tips.filter(
-      (tip) => !decorations.some((d) => d.type === tip.type && d.name === tip.name),
-    ),
-  ]);
+  return orderRefs([...decorations, ...tips]);
 }
 
 function toCommits(parsed: ReturnType<typeof parseLog>): Commit[] {
-  const layout = layoutGraph(parsed.map((c) => ({ hash: c.hash, parents: c.parents })));
-  return parsed.map((commit, index) => ({
+  return parsed.map((commit) => ({
     hash: commit.hash,
     subject: commit.subject,
     body: commit.body,
     author: commit.author,
     authorEmail: commit.authorEmail,
     date: commit.date,
-    lane: layout.lanes[index] ?? 0,
-    branchColor: layout.branchColors[index] ?? 0,
+    lane: 0,
+    branchColor: 0,
     parents: commit.parents,
     refs: commit.refs,
+  }));
+}
+
+/** True for the rows the app builds itself: the uncommitted row and one per stash entry. */
+export function isStashRow(commit: Commit): boolean {
+  return commit.stashIndex !== undefined;
+}
+
+/**
+ * One row per stash entry, newest first. Only the stash commit's first parent is used: that is
+ * the commit it was taken on, so the graph hangs the row off the branch it came from. Its other
+ * parents (git's index snapshot, the `-u` tree) are plumbing, not history.
+ */
+function stashRows(stashes: LogStash[]): Commit[] {
+  return stashes.map((stash, index) => ({
+    hash: stash.hash,
+    subject: stash.message,
+    author: stash.author,
+    authorEmail: stash.authorEmail,
+    date: stash.date,
+    lane: 0,
+    branchColor: 0,
+    parents: stash.parents.slice(0, 1),
+    refs: [{ type: "stash", name: stash.selector }],
+    stashIndex: index,
   }));
 }
 
@@ -123,7 +147,11 @@ export function parseForEachRef(
       byHash.set(hash, list);
     }
   }
-  return byHash;
+  // Order now, not just at load time: a refresh replaces a row's refs with this map, and
+  // `orderRefs` is what pairs a local branch with its remote (main | origin). Comparing the raw
+  // list against the shaped one failed every time, so those rows dropped their remote suffix and
+  // flashed on every refresh.
+  return new Map([...byHash].map(([hash, refs]) => [hash, orderRefs(refs)]));
 }
 
 function readLog(dir: string, limit: number, skip: number): Promise<string> {
@@ -158,6 +186,13 @@ async function readRefs(dir: string): Promise<string> {
   return isTauri()
     ? invoke<string>("read_refs", { dir })
     : ((await devApi("read_refs", { dir })) as { text: string }).text;
+}
+
+/** Raw `git stash list` records. Only the newest entry is a ref, so this is the only full list. */
+async function readStashes(dir: string): Promise<string> {
+  return isTauri()
+    ? invoke<string>("read_stashes", { dir })
+    : ((await devApi("read_stashes", { dir })) as { text: string }).text;
 }
 
 function uncommittedCommit(commits: Commit[], changed: number): Commit {
@@ -207,20 +242,25 @@ function sameRefs(a: CommitRef[], b: CommitRef[]): boolean {
 
 export async function loadRepository(dir: string): Promise<Repository> {
   const info = await call<RepoInfo>("open_repository", { dir }, (raw) => raw as RepoInfo);
-  const [status, log, refsRaw] = await Promise.all([
+  const [status, log, refsRaw, stashesRaw] = await Promise.all([
     call<StatusInfo>("read_status", { dir: info.path }, (raw) => raw as StatusInfo),
     readLog(info.path, LOG_LIMIT, 0),
     readRefs(info.path),
+    readStashes(info.path),
   ]);
   const tipRefs = parseForEachRef(refsRaw, status.branch || "");
-  const commits = toCommits(parseLog(log)).map((commit) => ({
+  const history = toCommits(parseLog(log)).map((commit) => ({
     ...commit,
     refs: mergeRefs(commit.refs, tipRefs.get(commit.hash) ?? []),
   }));
-  const finalCommits =
-    status.dirty && commits.length > 0
-      ? withLanes([uncommittedCommit(commits, status.changed), ...commits])
-      : commits;
+  // Stashes sit above history, the uncommitted row above them: the working tree is what moves
+  // next, then what is parked, then what is committed.
+  const rows = [...stashRows(parseStashes(stashesRaw)), ...history];
+  const finalCommits = withLanes(
+    status.dirty && history.length > 0
+      ? [uncommittedCommit(history, status.changed), ...rows]
+      : rows,
+  );
   return {
     id: info.path,
     name: info.name,
@@ -232,8 +272,9 @@ export async function loadRepository(dir: string): Promise<Repository> {
     changed: status.changed,
     worktree: status.worktree,
     refsDigest: hashText(refsRaw),
+    stashDigest: hashText(stashesRaw),
     commits: finalCommits,
-    defaultCommitHash: commits[0]?.hash ?? "",
+    defaultCommitHash: history[0]?.hash ?? "",
   };
 }
 
@@ -261,9 +302,15 @@ export async function refreshRepository(
   repo: Repository,
   force = false,
 ): Promise<RefreshedRepository | null> {
-  const [status, refsRaw] = await Promise.all([readStatus(repo.path), readRefs(repo.path)]);
+  const [status, refsRaw, stashesRaw] = await Promise.all([
+    readStatus(repo.path),
+    readRefs(repo.path),
+    readStashes(repo.path),
+  ]);
   const branch = status.branch || "HEAD detached";
   const refsDigest = hashText(refsRaw);
+  const stashDigest = hashText(stashesRaw);
+  const stashes = stashRows(parseStashes(stashesRaw));
   const hadWip = repo.commits.some((commit) => commit.hash === UNCOMMITTED_HASH);
   const dirtyCount = status.dirty ? status.changed : 0;
   const knownDirtyCount = hadWip ? repo.changed : 0;
@@ -275,6 +322,7 @@ export async function refreshRepository(
     branch === repo.branch &&
     status.head === repo.head &&
     refsDigest === repo.refsDigest &&
+    stashDigest === repo.stashDigest &&
     dirtyCount === knownDirtyCount &&
     !worktreeMoved
   ) {
@@ -317,9 +365,20 @@ export async function refreshRepository(
   if (status.dirty && (worktreeMoved || dirtyCount !== knownDirtyCount)) {
     touched.push(UNCOMMITTED_HASH);
   }
+  // A stash taken (or dropped) while the window was open: dropping renumbers the entries below
+  // it, so the pill moving counts as a change too, not just a new hash.
+  const previousStashes = new Map(
+    repo.commits.filter(isStashRow).map((commit) => [commit.hash, commit.refs[0]?.name]),
+  );
+  for (const stash of stashes) {
+    if (previousStashes.get(stash.hash) !== stash.refs[0]?.name) touched.push(stash.hash);
+  }
   const freshHashes = new Set(touched);
   const existing = repo.commits
-    .filter((commit) => commit.hash !== UNCOMMITTED_HASH && !freshHashes.has(commit.hash))
+    .filter(
+      (commit) =>
+        commit.hash !== UNCOMMITTED_HASH && !isStashRow(commit) && !freshHashes.has(commit.hash),
+    )
     .map((commit) => {
       const refs = tipRefs.get(commit.hash) ?? [];
       if (sameRefs(commit.refs, refs)) return commit;
@@ -356,9 +415,11 @@ export async function refreshRepository(
     }
   }
 
-  const commits = status.dirty
-    ? [uncommittedCommit(history, status.changed), ...history]
-    : history;
+  const commits = [
+    ...(status.dirty && history.length > 0 ? [uncommittedCommit(history, status.changed)] : []),
+    ...stashes,
+    ...history,
+  ];
 
   return {
     repo: {
@@ -370,6 +431,7 @@ export async function refreshRepository(
       changed: status.changed,
       worktree: status.worktree,
       refsDigest,
+      stashDigest,
       commits: withLanes(commits),
       defaultCommitHash:
         history.find((commit) => commit.hash === status.head)?.hash ?? repo.defaultCommitHash,
@@ -394,7 +456,9 @@ async function fullReload(repo: Repository): Promise<RefreshedRepository> {
 export async function loadMoreCommits(
   repo: Repository,
 ): Promise<{ repo: Repository; done: boolean } | null> {
-  const loaded = repo.commits.filter((commit) => commit.hash !== UNCOMMITTED_HASH);
+  const loaded = repo.commits.filter(
+    (commit) => commit.hash !== UNCOMMITTED_HASH && !isStashRow(commit),
+  );
   const [parsed, refsRaw] = await Promise.all([
     parseLog(await readLog(repo.path, LOG_LIMIT, loaded.length)),
     readRefs(repo.path),
@@ -405,8 +469,11 @@ export async function loadMoreCommits(
     ...commit,
     refs: mergeRefs(commit.refs, tipRefs.get(commit.hash) ?? []),
   }));
-  const wip = repo.commits.find((commit) => commit.hash === UNCOMMITTED_HASH) ?? null;
-  const list = (wip ? [wip, ...loaded, ...fresh] : [...loaded, ...fresh]);
+  // The synthetic rows are kept as they are: they are not pages of history, they sit on top.
+  const above = repo.commits.filter(
+    (commit) => commit.hash === UNCOMMITTED_HASH || isStashRow(commit),
+  );
+  const list = [...above, ...loaded, ...fresh];
   const done = parsed.length < LOG_LIMIT;
   return { repo: { ...repo, refsDigest: hashText(refsRaw), commits: withLanes(list) }, done };
 }
