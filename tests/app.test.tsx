@@ -145,9 +145,10 @@ test("the search box filters the loaded rows and clears back to full history", a
   });
   assert.ok(container.querySelector("[data-commit-row]")?.textContent?.includes("feat: two"));
 
-  fireEvent.change(search, { target: { value: "" } });
+  // The visible X affordance clears the field back to the full list.
+  fireEvent.click(within(container).getByRole("button", { name: /clear search/i }));
   await waitFor(() => {
     assert.equal(container.querySelectorAll("[data-commit-row]").length, 3,
-      "clearing the query restores every row, wip included");
+      "clearing through the X restores every row, wip included");
   });
 });

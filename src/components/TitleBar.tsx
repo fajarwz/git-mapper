@@ -357,8 +357,23 @@ export function TitleBar({
               aria-label="Search history"
               placeholder="Search history"
               title="Search hashes, messages, authors and refs (Ctrl+F)"
-              className="h-7 w-36 rounded-lg border border-hairline bg-glass-soft pl-7 pr-2 text-[12.5px] text-ink outline-none backdrop-blur-md transition-all placeholder:text-ink-dim focus:w-52 focus:border-primary-ink/50 focus:bg-glass-strong"
+              className={`h-7 w-36 rounded-lg border border-hairline bg-glass-soft pl-7 text-[12.5px] text-ink outline-none backdrop-blur-md transition-all placeholder:text-ink-dim focus:w-52 focus:border-primary-ink/50 focus:bg-glass-strong ${query ? "pr-7" : "pr-2"}`}
             />
+            {query !== "" && (
+              // A visible affordance, not a hover-only one: while there is a value there is an X.
+              <button
+                type="button"
+                onClick={() => {
+                  onQueryChange("");
+                  searchRef.current?.focus();
+                }}
+                aria-label="Clear search"
+                title="Clear search"
+                className="absolute right-1 grid cursor-default place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink size-5"
+              >
+                <CloseIcon size={9} />
+              </button>
+            )}
           </div>
         )}
         {repo && (
