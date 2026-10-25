@@ -9,6 +9,7 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
 import App from "../src/App";
 import { STORAGE_KEYS } from "../src/lib/persisted";
+import { ROW_HEIGHT } from "../src/lib/graphGeometry";
 import type { Repository } from "../src/types";
 
 const NUL = String.fromCharCode(0);
@@ -145,10 +146,24 @@ test("the search box filters the loaded rows and clears back to full history", a
   });
   assert.ok(container.querySelector("[data-commit-row]")?.textContent?.includes("feat: two"));
 
-  // The visible X affordance clears the field back to the full list.
+  // Clearing through the X restores every row, wip included.
   fireEvent.click(within(container).getByRole("button", { name: /clear search/i }));
   await waitFor(() => {
     assert.equal(container.querySelectorAll("[data-commit-row]").length, 3,
       "clearing through the X restores every row, wip included");
   });
+});
+
+test("the graph svg spans every row, not just the first screen", async () => {
+  localStorage.setItem(STORAGE_KEYS.repos, JSON.stringify(["C:/repos/demo"]));
+  const { container } = render(<App />);
+
+  await waitFor(() => {
+    assert.equal(container.querySelectorAll("[data-commit-row]").length, 3);
+  });
+  const svg = container.querySelector("svg[data-commit-graph]");
+  assert.ok(svg, "the graph renders");
+  // The graph column clips overflow; if the svg only covered the viewport height, every node
+  // below the fold would vanish on scroll.
+  assert.equal(svg?.getAttribute("height"), String(3 * ROW_HEIGHT));
 });
