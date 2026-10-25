@@ -167,3 +167,28 @@ test("the graph svg spans every row, not just the first screen", async () => {
   // below the fold would vanish on scroll.
   assert.equal(svg?.getAttribute("height"), String(3 * ROW_HEIGHT));
 });
+
+test("right-clicking a row opens the context menu with copy and checkout", async () => {
+  localStorage.setItem(STORAGE_KEYS.repos, JSON.stringify(["C:/repos/demo"]));
+  const { container } = render(<App />);
+
+  await waitFor(() => {
+    assert.equal(container.querySelectorAll("[data-commit-row]").length, 3);
+  });
+  const writeText = vi.fn().mockResolvedValue(undefined);
+  (navigator as unknown as { clipboard: unknown }).clipboard = { writeText };
+
+  // Right-click the HEAD row: it carries the checked-out main branch, so no checkout entry.
+  fireEvent.contextMenu(container.querySelectorAll("[data-commit-row]")[1], {
+    clientX: 30,
+    clientY: 30,
+  });
+  const menu = within(container).getByRole("menu");
+  assert.ok(within(menu).getByText("Copy commit hash"));
+  assert.equal(within(menu).queryByText(/Check out/i), null,
+    "the current branch is already checked out, so no checkout entry");
+
+  fireEvent.click(within(menu).getByText("Copy commit hash"));
+  assert.deepEqual(writeText.mock.calls[0], ["H1"]);
+});
+

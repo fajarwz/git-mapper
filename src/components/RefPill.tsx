@@ -8,6 +8,8 @@ interface RefPillProps {
   color: number;
   /** Only local branches are checkout-able; double-clicking the pill switches to it. */
   onCheckout?: (branch: string) => void;
+  /** Right-clicking the pill opens the context menu for this exact ref. */
+  onContextMenu?: (ref: CommitRef, x: number, y: number) => void;
 }
 
 const ICONS = {
@@ -18,7 +20,7 @@ const ICONS = {
 };
 
 /** Branch / remote / tag / stash label shown inline after a commit subject. */
-export function RefPill({ ref, color, onCheckout }: RefPillProps) {
+export function RefPill({ ref, color, onCheckout, onContextMenu }: RefPillProps) {
   const Icon = ICONS[ref.type];
   const checkoutable = ref.type === "branch" && !ref.isCurrent && onCheckout !== undefined;
   const colorValue = branchColor(color);
@@ -26,6 +28,16 @@ export function RefPill({ ref, color, onCheckout }: RefPillProps) {
   return (
     <span
       onDoubleClick={checkoutable ? () => onCheckout?.(ref.name) : undefined}
+      onContextMenu={
+        onContextMenu
+          ? (event) => {
+              // The pill menu targets THIS ref, not the row's default one.
+              event.preventDefault();
+              event.stopPropagation();
+              onContextMenu(ref, event.clientX, event.clientY);
+            }
+          : undefined
+      }
       className={`inline-flex h-5 shrink-0 items-center gap-1 whitespace-nowrap rounded-full px-2 text-[10.5px] leading-none ${
         ref.isCurrent ? "font-bold text-surface" : "border-[1.5px] bg-transparent"
       } ${checkoutable ? "cursor-pointer" : ""}`}

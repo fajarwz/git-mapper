@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import type { Commit, Repository } from "../types";
+import type { Commit, CommitRef, Repository } from "../types";
 import { layoutGraph } from "../lib/graphLanes";
 import { graphWidth } from "../lib/graphGeometry";
 import {
@@ -38,6 +38,8 @@ interface CommitListProps {
   loadingMore: boolean;
   onNearBottom: () => void;
   onCheckoutBranch: (branch: string) => void;
+  /** Right-click on a row (or one of its pills): opens the commit context menu. */
+  onContextMenu?: (commit: Commit, ref: CommitRef | undefined, x: number, y: number) => void;
 }
 
 function widthOf(element: HTMLElement | null, fallback: number): number {
@@ -46,7 +48,7 @@ function widthOf(element: HTMLElement | null, fallback: number): number {
 
 const HEADER_CELL = "relative flex h-full min-w-0 items-center";
 
-export function CommitList({ repo, commits, query, selectedHash, flashHashes, onSelect, loadingMore, onNearBottom, onCheckoutBranch }: CommitListProps) {
+export function CommitList({ repo, commits, query, selectedHash, flashHashes, onSelect, loadingMore, onNearBottom, onCheckoutBranch, onContextMenu }: CommitListProps) {
   // One layout for the graph column and the SVG. Sizing the column from the dot lanes alone used to
   // clip the graph whenever a line ran right of every dot.
   const layout = useMemo(
@@ -214,6 +216,12 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
               fresh={flashHashes.has(commit.hash)}
               onSelect={onSelect}
               onCheckoutBranch={onCheckoutBranch}
+              onContextMenu={onContextMenu ? (row, x, y) => {
+                // The row's most relevant ref: its branch, falling back to the first pill.
+                const ref = row.refs.find((item) => item.type === "branch") ?? row.refs[0];
+                onContextMenu(row, ref, x, y);
+              } : undefined}
+              onRefContextMenu={onContextMenu ? (row, ref, x, y) => onContextMenu(row, ref, x, y) : undefined}
             />
           ))}
           {commits.length === 0 && query !== "" && (

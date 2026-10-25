@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { ChangedFile } from "./types";
 import { CommitList } from "./components/CommitList";
+import { ContextMenu, type ContextMenuTarget } from "./components/ContextMenu";
 import { DetailsPanel } from "./components/DetailsPanel";
 import { EmptyState } from "./components/EmptyState";
 import { TitleBar } from "./components/TitleBar";
@@ -63,6 +64,8 @@ function App() {
 
   // Rows a refresh just added or re-pilled, highlighted for a moment then forgotten.
   const [flashHashes, setFlashHashes] = useState<string[]>([]);
+  // Right-click menu: what was clicked (position, commit, ref). null = closed.
+  const [contextMenu, setContextMenu] = useState<ContextMenuTarget | null>(null);
   // Search over the loaded window: hashes, subjects, authors, ref pills. Not synced per tab —
   // switching repos clears it, because a filter carried into another tab would look like a bug.
   const [query, setQuery] = useState("");
@@ -335,6 +338,16 @@ function App() {
 
   const flashSet = useMemo(() => new Set(flashHashes), [flashHashes]);
 
+  // The right-click menu's checkout reuses the branch checkout path; the menu closes itself.
+  const closeContextMenu = useCallback(() => setContextMenu(null), []);
+  const handleMenuCheckout = useCallback(
+    (branch: string) => {
+      closeContextMenu();
+      void handleCheckoutBranch(branch);
+    },
+    [closeContextMenu, handleCheckoutBranch],
+  );
+
   // The search filters the loaded window only — the visible rows AND the lanes/graph re-layout
   // over the subset. Searching unpaginated history stays out until the deep-search slice.
   const visibleCommits = useMemo(
@@ -389,6 +402,7 @@ function App() {
             loadingMore={loadingMoreByRepo[repo.id] ?? false}
               onNearBottom={handleNearBottom}
               onCheckoutBranch={handleCheckoutBranch}
+              onContextMenu={(commit, ref, x, y) => setContextMenu({ commit, ref, x, y })}
             />
             {detailsOpen && selectedCommit !== null && (
               <DetailsPanel
@@ -410,6 +424,14 @@ function App() {
           theme={theme}
           onThemeChange={handleThemeChange}
           onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {contextMenu && (
+        <ContextMenu
+          target={contextMenu}
+          onCheckout={handleMenuCheckout}
+          onClose={closeContextMenu}
         />
       )}
     </div>

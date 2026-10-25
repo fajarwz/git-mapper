@@ -1,5 +1,5 @@
 import { memo } from "react";
-import type { Commit } from "../types";
+import type { Commit, CommitRef } from "../types";
 import { formatAbsoluteDate } from "../lib/format";
 import { branchColor } from "../lib/graphGeometry";
 import { COMMIT_ROW_GRID } from "../lib/tableLayout";
@@ -12,6 +12,10 @@ interface CommitRowProps {
   fresh?: boolean;
   onSelect: (hash: string) => void;
   onCheckoutBranch?: (branch: string) => void;
+  /** Right-click on the row body: the menu targets the commit and its most relevant ref. */
+  onContextMenu?: (commit: Commit, x: number, y: number) => void;
+  /** Right-click on a pill: the menu targets that exact ref. */
+  onRefContextMenu?: (commit: Commit, ref: CommitRef, x: number, y: number) => void;
 }
 
 export const CommitRow = memo(function CommitRow({
@@ -20,6 +24,8 @@ export const CommitRow = memo(function CommitRow({
   fresh = false,
   onSelect,
   onCheckoutBranch,
+  onContextMenu,
+  onRefContextMenu,
 }: CommitRowProps) {
   // The checked-out branch's tip commit reads bold across the whole row.
   const onHead = commit.refs.some((ref) => ref.isCurrent);
@@ -34,6 +40,14 @@ export const CommitRow = memo(function CommitRow({
       data-selected={selected}
       aria-pressed={selected}
       onClick={() => onSelect(commit.hash)}
+      onContextMenu={
+        onContextMenu
+          ? (event) => {
+              event.preventDefault();
+              onContextMenu(commit, event.clientX, event.clientY);
+            }
+          : undefined
+      }
     >
       <span className="flex min-w-0 items-center gap-2 overflow-hidden">
         {/* Branch-coloured segment: ties this message to its graph node. */}
@@ -46,7 +60,13 @@ export const CommitRow = memo(function CommitRow({
           {commit.subject}
         </span>
         {commit.refs.map((ref) => (
-          <RefPill key={`${ref.type}:${ref.name}`} ref={ref} color={commit.branchColor} onCheckout={onCheckoutBranch} />
+          <RefPill
+            key={`${ref.type}:${ref.name}`}
+            ref={ref}
+            color={commit.branchColor}
+            onCheckout={onCheckoutBranch}
+            onContextMenu={onRefContextMenu ? (pill, x, y) => onRefContextMenu(commit, pill, x, y) : undefined}
+          />
         ))}
       </span>
 
