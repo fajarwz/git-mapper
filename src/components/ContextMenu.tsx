@@ -111,11 +111,6 @@ export function ContextMenu({ target, onCheckout, onClose }: ContextMenuProps) {
           {copiedKey === "ref" ? "Copied!" : COPY_LABELS[activeRef.type]}
         </button>
       )}
-      <button type="button" role="menuitem" className={ITEM}
-        onClick={() => copy("message", target.commit.subject)}
-      >
-        {copiedKey === "message" ? "Copied!" : "Copy commit message"}
-      </button>
     </div>
   );
 }
