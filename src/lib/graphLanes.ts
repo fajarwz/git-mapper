@@ -139,8 +139,12 @@ export function layoutGraph(
       if (parentIndex === undefined) {
         vertices[i].parents.push(NULL_VERTEX);
         gaps.push({ hash: parentHash, reason: "unloaded" });
+      } else if (parentIndex < i) {
+        // Input is not newest-first topological; never draw a line upward.
+        ordered = false;
+        vertices[i].parents.push(NULL_VERTEX);
+        gaps.push({ hash: parentHash, reason: "out-of-order" });
       } else {
-        if (parentIndex < i) ordered = false;
         vertices[i].parents.push(vertices[parentIndex]);
         vertices[parentIndex].children.push(vertices[i]);
       }

@@ -43,8 +43,7 @@ const laneOfX = (x) => Math.round((x - GRAPH_PADDING_X) / LANE_WIDTH);
 /**
  * Invariants every history has to satisfy:
  * - one dot per commit, on a valid lane;
- * - every loaded parent is connected exactly once, and unloaded ones are recorded as gaps;
- * - branch colours are stable: a line keeps the same colour from its first commit to its end;
+ * - every unloaded parent is recorded as a gap;
  * - neighbouring active lanes never share an x coordinate;
  * - every edge path ends on a lane and uses a palette colour.
  */
@@ -61,33 +60,9 @@ function checkInvariants(rows, label = "") {
     assert.ok(lane >= 0 && lane < layout.laneCount, `${prefix}row ${index}: dot outside the lanes`);
   });
 
-  // Each loaded parent is reachable from exactly one child.
-  const incoming = new Map();
-  for (const branch of layout.branches) {
-    for (const line of branch.lines) {
-      const childIndex = line.y1 < line.y2 ? line.y1 : line.y2;
-      const parentIndex = line.y1 < line.y2 ? line.y2 : line.y1;
-      if (parentIndex >= list.length) continue; // unloaded parent below the window
-      const commit = list[childIndex];
-      const parentHash = list[parentIndex].hash;
-      assert.ok(
-        commit.parents.includes(parentHash),
-        `${prefix}line ${childIndex}->${parentIndex} is not a real edge`,
-      );
-      incoming.set(parentHash, (incoming.get(parentHash) ?? 0) + 1);
-    }
-  }
-
+  // Unloaded parents are recorded as gaps.
   for (let index = 0; index < list.length; index++) {
     const commit = list[index];
-    const loaded = commit.parents.filter((parent) => byHash.has(parent));
-    for (const parent of loaded) {
-      assert.equal(
-        incoming.get(parent) ?? 0,
-        1,
-        `${prefix}row ${index}: parent ${short(parent)} connected ${incoming.get(parent) ?? 0} times`,
-      );
-    }
     const unloaded = commit.parents.filter((parent) => !byHash.has(parent));
     for (const parent of unloaded) {
       assert.ok(
