@@ -14,6 +14,7 @@ import {
   MAX_MESSAGE_WIDTH,
   MIN_AUTHOR_WIDTH,
   MIN_DATE_WIDTH,
+  MIN_GRAPH_WIDTH,
   MIN_MESSAGE_WIDTH,
 } from "../lib/tableLayout";
 import { PANEL } from "../lib/ui";
@@ -191,7 +192,7 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
           if (el.scrollTop + el.clientHeight >= el.scrollHeight - 320) onNearBottom();
         }}
       >
-        <div ref={graphColumnRef} className="w-(--graph-width) shrink-0">
+        <div ref={graphColumnRef} className="w-(--graph-width) shrink-0 overflow-hidden">
           <CommitGraph commits={commits} layout={layout} selectedHash={selectedHash} />
         </div>
         <div className="min-w-0 flex-1 pl-2 pr-3">
@@ -220,7 +221,9 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
         variant="splitter"
         label="Resize graph column"
         className="left-(--graph-width)"
-        min={baseGraphWidth}
+        // The floor is absolute, not the graph's natural width: a wide multi-lane layout must
+        // still be draggable down. Overflowing lanes clip on the right (the column hides them).
+        min={Math.min(MIN_GRAPH_WIDTH, baseGraphWidth)}
         max={baseGraphWidth + MAX_GRAPH_EXTRA}
         value={graphColumnWidth}
         measure={() => widthOf(graphColumnRef.current, graphColumnWidth)}

@@ -18,6 +18,13 @@ export const MIN_DATE_WIDTH = 112;
 export const MAX_DATE_WIDTH = 220;
 
 export const MAX_GRAPH_EXTRA = 280;
+/**
+ * Absolute floor for the graph gutter, below whatever width the lanes currently need. A
+ * 30-branch history lays out hundreds of px wide; the gutter must still be draggable down to
+ * roughly one lane. The SVG then overflows and is clipped by the column (`overflow-hidden`),
+ * so the graph shrinks at the cost of hiding its rightmost lanes.
+ */
+export const MIN_GRAPH_WIDTH = 28;
 
 export const DEFAULT_SIDEBAR_WIDTH = 360;
 export const MIN_SIDEBAR_WIDTH = 260;
