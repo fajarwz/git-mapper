@@ -284,6 +284,20 @@ pub fn checkout_branch(dir: &str, branch: &str) -> Result<(), String> {
     run_git(dir, &["checkout", branch]).map(|_| ())
 }
 
+/// Pulls the current branch from its upstream. Fast-forward only: a pull that would need a
+/// merge is refused with git's own message instead of half-merging inside a history viewer.
+#[tauri::command]
+pub fn pull_branch(dir: &str) -> Result<String, String> {
+    run_git(dir, &["pull", "--ff-only", "--no-edit"])
+}
+
+/// Pushes the current branch to origin. `-u` sets the upstream on the first push and is
+/// harmless on every later one; a rejected push comes back as git's own error text.
+#[tauri::command]
+pub fn push_branch(dir: &str) -> Result<String, String> {
+    run_git(dir, &["push", "-u", "origin", "HEAD"])
+}
+
 /// Files of one commit. "wip" means the uncommitted working tree vs HEAD.
 /// Otherwise: diff against the first parent; root commits use the --root forms.
 #[tauri::command]
@@ -616,5 +630,77 @@ mod tests {
         let renamed_hash = renamed_hash.trim().to_string();
         let renamed = read_commit_files(repo.path(), &renamed_hash).expect("renamed files");
         assert!(renamed.name_status.contains("R100\troot.txt\trenamed.txt"), "got: {}", renamed.name_status);
+    }
+
+    /// A bare repository to push/pull against: a local-path remote, no network.
+    fn bare_repo(label: &str) -> PathBuf {
+        let dir = std::env::temp_dir().join(format!("git-mapper-test-{}-{label}", std::process::id()));
+        let _ = std::fs::remove_dir_all(&dir);
+        std::fs::create_dir_all(&dir).expect("bare repo created");
+        Command::new("git")
+            .args(["init", "--bare", "-q"])
+            .current_dir(&dir)
+            .output()
+            .expect("git ran");
+        dir
+    }
+
+    #[test]
+    fn push_publishes_the_branch_and_sets_the_upstream() {
+        let origin = bare_repo("push-origin");
+        let repo = TempRepo::new("push-work");
+        repo.commit("base.txt", "base\n", "base");
+        git(&repo.0, &["remote", "add", "origin", origin.to_str().expect("origin path")]);
+
+        push_branch(repo.path()).expect("the first push publishes and sets the upstream");
+        repo.commit("more.txt", "more\n", "second");
+        push_branch(repo.path()).expect("a later push is a plain update");
+
+        let pushed = run_git(origin.to_str().expect("origin path"), &["rev-parse", "HEAD"])
+            .expect("origin read");
+        let local = run_git(repo.path(), &["rev-parse", "HEAD"]).expect("local read");
+        assert_eq!(pushed.trim(), local.trim(), "origin carries the pushed commit");
+        let upstream = run_git(repo.path(), &["rev-parse", "--abbrev-ref", "@{u}"])
+            .expect("upstream read");
+        assert!(upstream.trim().starts_with("origin/"), "`-u` set the upstream");
+        let _ = std::fs::remove_dir_all(&origin);
+    }
+
+    #[test]
+    fn pull_fast_forwards_and_refuses_a_diverged_branch() {
+        let origin = bare_repo("pull-origin");
+        let work = TempRepo::new("pull-work");
+        work.commit("base.txt", "base\n", "base");
+        git(&work.0, &["remote", "add", "origin", origin.to_str().expect("origin path")]);
+        push_branch(work.path()).expect("the seed push");
+
+        // A second clone plays the other machine: it commits and pushes.
+        let other = work.0.parent().unwrap().join("pull-other");
+        git(
+            &work.0.parent().unwrap().to_path_buf(),
+            &["clone", "-q", origin.to_str().unwrap(), other.to_str().unwrap()],
+        );
+        std::fs::write(other.join("theirs.txt"), "theirs\n").expect("file written");
+        git(&other, &["add", "theirs.txt"]);
+        git(&other, &["commit", "-q", "-m", "theirs"]);
+
+        pull_branch(work.path()).expect("the fast-forward pull");
+        let head = run_git(work.path(), &["rev-parse", "HEAD"]).expect("head read");
+        let upstream = run_git(work.path(), &["rev-parse", "@{u}"]).expect("upstream read");
+        assert_eq!(head.trim(), upstream.trim(), "the pull caught the other machine's commit");
+
+        // Diverged: both sides commit; ff-only refuses instead of merging in a viewer.
+        work.commit("ours.txt", "ours\n", "ours");
+        std::fs::write(other.join("theirs2.txt"), "t\n").expect("file written");
+        git(&other, &["add", "theirs2.txt"]);
+        git(&other, &["commit", "-q", "-m", "theirs 2"]);
+        git(&other, &["push", "-q"]);
+        assert!(
+            pull_branch(work.path()).is_err(),
+            "a diverged pull must be refused, not merged"
+        );
+
+        let _ = std::fs::remove_dir_all(&other);
+        let _ = std::fs::remove_dir_all(&origin);
     }
 }
