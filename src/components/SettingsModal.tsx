@@ -15,9 +15,12 @@ const THEMES: { value: Theme; label: string; hint: string }[] = [
 ];
 
 function ThemePreview({ theme }: { theme: Theme }) {
+  // The previews mock a FIXED theme, so they use literal colours, not tokens: a token like
+  // `ink` re-points with the app theme, which made the light preview's bar go white-on-white
+  // (invisible) whenever the app itself sat in dark mode.
   const frame =
-    theme === "dark" ? "border-white/15 bg-[#0b1018]" : "border-ink/10 bg-white";
-  const bar = theme === "dark" ? "bg-white/25" : "bg-ink/15";
+    theme === "dark" ? "border-white/15 bg-[#0b1018]" : "border-black/10 bg-white";
+  const bar = theme === "dark" ? "bg-white/25" : "bg-black/15";
 
   return (
     <span className={`flex h-12 w-full items-end gap-1 rounded-lg border p-1.5 ${frame}`}>
