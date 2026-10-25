@@ -286,16 +286,51 @@ pub fn checkout_branch(dir: &str, branch: &str) -> Result<(), String> {
 
 /// Pulls the current branch from its upstream. Fast-forward only: a pull that would need a
 /// merge is refused with git's own message instead of half-merging inside a history viewer.
+/// Runs on a blocking thread (network IO — a sync command would freeze the window) and
+/// refuses terminal prompts, so a credential-hungry remote errors instead of hanging.
 #[tauri::command]
-pub fn pull_branch(dir: &str) -> Result<String, String> {
-    run_git(dir, &["pull", "--ff-only", "--no-edit"])
+pub async fn pull_branch(dir: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        Command::new("git")
+            .args(["pull", "--ff-only", "--no-edit"])
+            .current_dir(&dir)
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .output()
+            .map_err(|e| format!("failed to run git: {e}"))
+            .and_then(|out| {
+                if out.status.success() {
+                    Ok(String::from_utf8_lossy(&out.stdout).to_string())
+                } else {
+                    Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+                }
+            })
+    })
+    .await
+    .map_err(|e| format!("the pull task failed: {e}"))?
 }
 
 /// Pushes the current branch to origin. `-u` sets the upstream on the first push and is
-/// harmless on every later one; a rejected push comes back as git's own error text.
+/// harmless on every later one; a rejected push comes back as git's own error text. Blocking
+/// thread for the same reason as the pull.
 #[tauri::command]
-pub fn push_branch(dir: &str) -> Result<String, String> {
-    run_git(dir, &["push", "-u", "origin", "HEAD"])
+pub async fn push_branch(dir: String) -> Result<String, String> {
+    tauri::async_runtime::spawn_blocking(move || {
+        Command::new("git")
+            .args(["push", "-u", "origin", "HEAD"])
+            .current_dir(&dir)
+            .env("GIT_TERMINAL_PROMPT", "0")
+            .output()
+            .map_err(|e| format!("failed to run git: {e}"))
+            .and_then(|out| {
+                if out.status.success() {
+                    Ok(String::from_utf8_lossy(&out.stdout).to_string())
+                } else {
+                    Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+                }
+            })
+    })
+    .await
+    .map_err(|e| format!("the push task failed: {e}"))?
 }
 
 /// Files of one commit. "wip" means the uncommitted working tree vs HEAD.
@@ -652,9 +687,11 @@ mod tests {
         repo.commit("base.txt", "base\n", "base");
         git(&repo.0, &["remote", "add", "origin", origin.to_str().expect("origin path")]);
 
-        push_branch(repo.path()).expect("the first push publishes and sets the upstream");
+        tauri::async_runtime::block_on(push_branch(repo.path().to_string()))
+            .expect("the first push publishes and sets the upstream");
         repo.commit("more.txt", "more\n", "second");
-        push_branch(repo.path()).expect("a later push is a plain update");
+        tauri::async_runtime::block_on(push_branch(repo.path().to_string()))
+            .expect("a later push is a plain update");
 
         let pushed = run_git(origin.to_str().expect("origin path"), &["rev-parse", "HEAD"])
             .expect("origin read");
@@ -672,7 +709,8 @@ mod tests {
         let work = TempRepo::new("pull-work");
         work.commit("base.txt", "base\n", "base");
         git(&work.0, &["remote", "add", "origin", origin.to_str().expect("origin path")]);
-        push_branch(work.path()).expect("the seed push");
+        tauri::async_runtime::block_on(push_branch(work.path().to_string()))
+            .expect("the seed push");
 
         // A second clone plays the other machine: it commits and pushes.
         let other = work.0.parent().unwrap().join("pull-other");
@@ -684,7 +722,8 @@ mod tests {
         git(&other, &["add", "theirs.txt"]);
         git(&other, &["commit", "-q", "-m", "theirs"]);
 
-        pull_branch(work.path()).expect("the fast-forward pull");
+        tauri::async_runtime::block_on(pull_branch(work.path().to_string()))
+            .expect("the fast-forward pull");
         let head = run_git(work.path(), &["rev-parse", "HEAD"]).expect("head read");
         let upstream = run_git(work.path(), &["rev-parse", "@{u}"]).expect("upstream read");
         assert_eq!(head.trim(), upstream.trim(), "the pull caught the other machine's commit");
@@ -696,7 +735,7 @@ mod tests {
         git(&other, &["commit", "-q", "-m", "theirs 2"]);
         git(&other, &["push", "-q"]);
         assert!(
-            pull_branch(work.path()).is_err(),
+            tauri::async_runtime::block_on(pull_branch(work.path().to_string())).is_err(),
             "a diverged pull must be refused, not merged"
         );
 
