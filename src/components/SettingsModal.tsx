@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import type { SyntaxScheme } from "../lib/highlight";
 import type { Theme } from "../lib/theme";
 import { PANEL } from "../lib/ui";
 import { CheckIcon, CloseIcon } from "./icons";
@@ -6,12 +7,20 @@ import { CheckIcon, CloseIcon } from "./icons";
 interface SettingsModalProps {
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
+  syntaxScheme: SyntaxScheme;
+  onSyntaxSchemeChange: (scheme: SyntaxScheme) => void;
   onClose: () => void;
 }
 
 const THEMES: { value: Theme; label: string; hint: string }[] = [
   { value: "light", label: "Light", hint: "Frosted white glass" },
   { value: "dark", label: "Dark", hint: "Smoked glass, low glare" },
+];
+
+const SYNTAX_SCHEMES: { value: SyntaxScheme; label: string; hint: string }[] = [
+  { value: "app", label: "App", hint: "Tokens; follows the theme" },
+  { value: "github", label: "GitHub", hint: "The github.com look" },
+  { value: "neon", label: "Neon", hint: "One-Dark punch" },
 ];
 
 function ThemePreview({ theme }: { theme: Theme }) {
@@ -31,7 +40,13 @@ function ThemePreview({ theme }: { theme: Theme }) {
   );
 }
 
-export function SettingsModal({ theme, onThemeChange, onClose }: SettingsModalProps) {
+export function SettingsModal({
+  theme,
+  onThemeChange,
+  syntaxScheme,
+  onSyntaxSchemeChange,
+  onClose,
+}: SettingsModalProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
@@ -133,7 +148,33 @@ export function SettingsModal({ theme, onThemeChange, onClose }: SettingsModalPr
           })}
         </div>
 
-        <p className="m-0 mt-3 text-[10.5px] text-ink-dim">Theme is saved on this device.</p>
+        <div className="mt-3 flex gap-2" role="group" aria-label="Syntax colours">
+          {SYNTAX_SCHEMES.map(({ value, label, hint }) => {
+            const active = syntaxScheme === value;
+
+            return (
+              <button
+                key={value}
+                type="button"
+                aria-pressed={active}
+                onClick={() => onSyntaxSchemeChange(value)}
+                className={`flex flex-1 flex-col gap-1 rounded-xl border p-2.5 text-left transition-colors focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2 focus-visible:ring-offset-transparent ${
+                  active
+                    ? "border-primary bg-primary/10 soft-shadow"
+                    : "border-rule bg-sheet hover:bg-hover-glass"
+                }`}
+              >
+                <span className="flex items-center justify-between gap-2">
+                  <span className="text-[12px] font-semibold text-ink">{label}</span>
+                  {active && <CheckIcon className="text-primary" />}
+                </span>
+                <span className="text-[11px] leading-snug text-ink-dim">{hint}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        <p className="m-0 mt-3 text-[10.5px] text-ink-dim">Settings are saved on this device.</p>
       </div>
     </div>
   );

@@ -36,4 +36,5 @@ export const STORAGE_KEYS = {
   selectedFiles: "git-mapper:selected-files",
   detailsOpen: "git-mapper:details-open",
   detailsHeight: "git-mapper:details-height",
+  syntaxScheme: "git-mapper:syntax-scheme",
 } as const;

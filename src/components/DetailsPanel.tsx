@@ -3,6 +3,7 @@ import type { CSSProperties } from "react";
 import type { ChangedFile, Commit } from "../types";
 import { copyText } from "../lib/clipboard";
 import { formatAbsoluteDate } from "../lib/format";
+import type { SyntaxScheme } from "../lib/highlight";
 import {
   DEFAULT_DETAILS_HEIGHT,
   DEFAULT_SIDEBAR_WIDTH,
@@ -23,6 +24,8 @@ interface DetailsPanelProps {
   filesLoading: boolean;
   selectedFile: ChangedFile | null;
   onSelectFile: (path: string) => void;
+  /** Diff token palette, chosen in settings and passed straight to the DiffViewer. */
+  syntaxScheme: SyntaxScheme;
   onClose: () => void;
   onHeightChange: (height: number) => void;
 }
@@ -33,6 +36,7 @@ export function DetailsPanel({
   filesLoading,
   selectedFile,
   onSelectFile,
+  syntaxScheme,
   onClose,
   onHeightChange,
 }: DetailsPanelProps) {
@@ -182,7 +186,7 @@ export function DetailsPanel({
         />
       </div>
 
-      <DiffViewer file={selectedFile} />
+      <DiffViewer file={selectedFile} scheme={syntaxScheme} />
 
       <ResizeHandle
         orientation="horizontal"

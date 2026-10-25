@@ -9,6 +9,7 @@ import { TitleBar } from "./components/TitleBar";
 import { SettingsModal } from "./components/SettingsModal";
 import { STORAGE_KEYS, usePersistedState } from "./lib/persisted";
 import { filterCommits } from "./lib/commitFilter";
+import type { SyntaxScheme } from "./lib/highlight";
 import { applyTheme, initialTheme, storeTheme } from "./lib/theme";
 import type { Theme } from "./lib/theme";
 import {
@@ -60,6 +61,11 @@ function App() {
   const [detailsHeight, setDetailsHeight] = usePersistedState<number | null>(
     STORAGE_KEYS.detailsHeight,
     null,
+  );
+  // Diff token palette: app tokens, GitHub's look, or One-Dark neon. Colours are the default.
+  const [syntaxScheme, setSyntaxScheme] = usePersistedState<SyntaxScheme>(
+    STORAGE_KEYS.syntaxScheme,
+    "app",
   );
 
   // Rows a refresh just added or re-pilled, highlighted for a moment then forgotten.
@@ -411,6 +417,7 @@ function App() {
                 filesLoading={filesLoading}
                 selectedFile={selectedFile}
                 onSelectFile={handleSelectFile}
+                syntaxScheme={syntaxScheme}
                 onClose={() => setDetailsOpen(false)}
                 onHeightChange={setDetailsHeight}
               />
@@ -423,6 +430,8 @@ function App() {
         <SettingsModal
           theme={theme}
           onThemeChange={handleThemeChange}
+          syntaxScheme={syntaxScheme}
+          onSyntaxSchemeChange={setSyntaxScheme}
           onClose={() => setSettingsOpen(false)}
         />
       )}
