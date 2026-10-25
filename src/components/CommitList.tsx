@@ -56,7 +56,11 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
   const baseGraphWidth = graphWidth(layout.laneCount);
 
   // null keeps the message column flexible; dragging pins it to a pixel width.
-  const [graphExtra, setGraphExtra] = useState(0);
+  // The graph gutter is the same idea: null = fit mode, the column hugs the lanes the layout
+  // needs; a drag pins an ABSOLUTE width. Pinning an offset instead (old behaviour) went
+  // negative when a search or refresh re-laid the lanes narrower — width zeroed out, the
+  // graph vanished and the header slammed left.
+  const [pinnedGraphWidth, setPinnedGraphWidth] = useState<number | null>(null);
   const [messageWidth, setMessageWidth] = useState<number | null>(null);
   const [authorWidth, setAuthorWidth] = useState(DEFAULT_AUTHOR_WIDTH);
   const [dateWidth, setDateWidth] = useState(DEFAULT_DATE_WIDTH);
@@ -74,7 +78,13 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
     if (el && lastScrollTop.current > 0) el.scrollTop = lastScrollTop.current;
   }, [commits]);
 
-  const graphColumnWidth = baseGraphWidth + graphExtra;
+  // A pinned width outlives lane re-counts unchanged (no header jump on search), but is
+  // clamped to the current layout's legal range: never under one lane, never past the
+  // natural width plus the extra the splitter allows. Fit mode just follows the layout.
+  const graphColumnWidth =
+    pinnedGraphWidth === null
+      ? baseGraphWidth
+      : Math.max(MIN_GRAPH_WIDTH, Math.min(pinnedGraphWidth, baseGraphWidth + MAX_GRAPH_EXTRA));
 
   const columns = {
     "--graph-width": `${graphColumnWidth}px`,
@@ -114,7 +124,7 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
   }
 
   function handleGraphResize(width: number) {
-    setGraphExtra(width - baseGraphWidth);
+    setPinnedGraphWidth(Math.max(MIN_GRAPH_WIDTH, width));
     setMessageWidth((current) =>
       current === null
         ? current
@@ -223,12 +233,12 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
         className="left-(--graph-width)"
         // The floor is absolute, not the graph's natural width: a wide multi-lane layout must
         // still be draggable down. Overflowing lanes clip on the right (the column hides them).
-        min={Math.min(MIN_GRAPH_WIDTH, baseGraphWidth)}
+        min={MIN_GRAPH_WIDTH}
         max={baseGraphWidth + MAX_GRAPH_EXTRA}
         value={graphColumnWidth}
         measure={() => widthOf(graphColumnRef.current, graphColumnWidth)}
         onResize={handleGraphResize}
-        onReset={() => setGraphExtra(0)}
+        onReset={() => setPinnedGraphWidth(null)}
       />
     </section>
   );
