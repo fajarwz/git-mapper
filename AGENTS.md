@@ -100,6 +100,14 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
   tile — keep it in sync with TitleBar's BrandMark): `npx tauri icon src-tauri/icons/app-icon.svg`
   rewrites every format. `tauri dev` does NOT rebuild on an icon change — the exe keeps the old
   embedded `icon.ico` — so `touch src-tauri/build.rs` and restart the app to see it.
+- **Releases feed the updater.** `tauri.conf.json` points at
+  `github.com/fajarwz/git-mapper/releases/latest/download/latest.json`. To ship one: bump
+  `version` in `tauri.conf.json` (keep `package.json` and `Cargo.toml` in step), then
+  `TAURI_SIGNING_PRIVATE_KEY=C:/Users/fajar/.tauri/git-mapper.key TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" npx tauri build`
+  — the private key lives OUTSIDE the repo and never gets committed. Attach `latest.json` plus
+  the signed artifacts to a GitHub release; the app checks that feed at launch when "Update
+  automatically" is on (the default), downloads in the background, and the settings modal offers
+  "Restart to apply update" (`tauri-plugin-updater` + `tauri-plugin-process` + the gear dot).
 
 - **design references:** target look is a frosted-glass commit feed (Dribbble-style, violet/rose/warm palette). The user judges ugliness by: row density, font-scale hierarchy, background saturation. "Ours should be close to the reference" means those three.
 - **Graph geometry:** lines are drawn row to row, never across rows. `layoutGraph` returns, per row,
