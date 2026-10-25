@@ -115,7 +115,11 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
   child records `join` and bends into that line at its own row. Reserving a lane per child drew the
   same commit as several parallel lines that fanned into one dot rows later (that was the
   `jersium-marketplace` breakage). `laneX` is not clamped: lanes past the palette still get their
-  own x, and the graph width comes from `layout.laneCount`.
+  own x, and the graph width comes from `layout.laneCount`. The gutter column follows that width
+  in fit mode, but a splitter drag pins an ABSOLUTE width (never an offset from the natural
+  width — re-laid lanes, e.g. a search filter, would turn a stored offset negative, zero the
+  column out, vanish the graph and slam the header left). A pinned column clips overflowing
+  lanes on the right (`overflow-hidden`).
   **The layout records the pieces.** `layoutGraph` returns, per row, `transitions` (kind
   `continue` / `shift` / `fork` / `join`, source lane, destination lane, colour, target hash) and
   `gaps` (a parent outside the loaded window, or one already drawn because the input was not
