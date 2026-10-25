@@ -1,8 +1,12 @@
+import { useEffect, useMemo, useState } from "react";
 import type { ChangedFile } from "../types";
 import { STATUS_LABELS, numberDiffLines } from "../lib/format";
+import { highlightSync, languageForPath, loadHighlighter, type SyntaxScheme } from "../lib/highlight";
 
 interface DiffViewerProps {
   file: ChangedFile | null;
+  /** Which syntax palette the tokens use (see index.css `data-syntax` blocks). Default: app. */
+  scheme?: SyntaxScheme;
 }
 
 const PREFIX = {
@@ -17,7 +21,33 @@ const LINE_TONES = {
   context: { row: "", text: "text-ink-soft" },
 } as const;
 
-export function DiffViewer({ file }: DiffViewerProps) {
+export function DiffViewer({ file, scheme = "app" }: DiffViewerProps) {
+  const lines = useMemo(() => (file ? numberDiffLines(file.diff) : []), [file]);
+
+  // Highlighted HTML per line, filled once the file's grammar has loaded. Rows render plain
+  // until then, and a file whose language we do not know just stays plain forever.
+  const [highlighted, setHighlighted] = useState<string[] | null>(null);
+  useEffect(() => {
+    const language = file ? languageForPath(file.path) : null;
+    if (!language || lines.length === 0) {
+      setHighlighted(null);
+      return;
+    }
+    let cancelled = false;
+    void (async () => {
+      const ready = await loadHighlighter(language);
+      if (cancelled) return;
+      if (!ready) {
+        setHighlighted(null);
+        return;
+      }
+      setHighlighted(lines.map((line) => highlightSync(line.text, language) ?? ""));
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [file, lines]);
+
   if (!file) {
     return (
       <div data-diff className="flex min-h-0 min-w-0 flex-col bg-sheet">
@@ -29,10 +59,8 @@ export function DiffViewer({ file }: DiffViewerProps) {
     );
   }
 
-  const lines = numberDiffLines(file.diff);
-
   return (
-    <div data-diff className="flex min-h-0 min-w-0 flex-col bg-sheet">
+    <div data-diff data-syntax={scheme} className="flex min-h-0 min-w-0 flex-col bg-sheet">
       <div className="flex shrink-0 items-center gap-2.5 border-b border-rule px-3.5 py-2">
         <span className="min-w-0 truncate font-mono text-[11.5px] font-medium text-ink" title={file.path}>
           {file.path}
@@ -61,6 +89,10 @@ export function DiffViewer({ file }: DiffViewerProps) {
           }
 
           const tone = LINE_TONES[line.type];
+          const html = highlighted?.[index];
+          // With tokens on, the content span drops the line tone colour: token spans carry the
+          // palette, and only untokenized text keeps the soft base. The row tint stays.
+          const contentClass = `whitespace-pre pr-[18px] ${html === undefined ? tone.text : "text-ink-soft"}`;
 
           return (
             <div
@@ -75,7 +107,11 @@ export function DiffViewer({ file }: DiffViewerProps) {
                 {line.newNumber ?? ""}
               </span>
               <span className={`select-none text-center ${tone.text}`}>{PREFIX[line.type]}</span>
-              <span className={`whitespace-pre pr-[18px] ${tone.text}`}>{line.text || " "}</span>
+              {html !== undefined ? (
+                <span className={contentClass} dangerouslySetInnerHTML={{ __html: html }} />
+              ) : (
+                <span className={contentClass}>{line.text || " "}</span>
+              )}
             </div>
           );
         })}

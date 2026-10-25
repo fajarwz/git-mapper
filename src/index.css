@@ -253,4 +253,181 @@
     cursor: col-resize;
     user-select: none;
   }
+
+  /* ---- Diff syntax colours (highlight.js token classes, scoped per scheme). ---- */
+
+  /* App: the design tokens themselves, so light and dark follow the canvas for free. */
+  [data-syntax="app"] .hljs-comment,
+  [data-syntax="app"] .hljs-quote {
+    color: var(--color-ink-dim);
+    font-style: italic;
+  }
+  [data-syntax="app"] .hljs-keyword,
+  [data-syntax="app"] .hljs-built_in,
+  [data-syntax="app"] .hljs-selector-tag,
+  [data-syntax="app"] .hljs-meta,
+  [data-syntax="app"] .hljs-doctag {
+    color: var(--color-primary-ink);
+  }
+  [data-syntax="app"] .hljs-string,
+  [data-syntax="app"] .hljs-regexp {
+    color: var(--color-success-ink);
+  }
+  [data-syntax="app"] .hljs-number,
+  [data-syntax="app"] .hljs-literal,
+  [data-syntax="app"] .hljs-attr,
+  [data-syntax="app"] .hljs-attribute,
+  [data-syntax="app"] .hljs-variable,
+  [data-syntax="app"] .hljs-template-variable,
+  [data-syntax="app"] .hljs-property {
+    color: var(--color-warning-ink);
+  }
+  [data-syntax="app"] .hljs-title,
+  [data-syntax="app"] .hljs-name,
+  [data-syntax="app"] .hljs-type,
+  [data-syntax="app"] .hljs-symbol {
+    color: var(--color-secondary);
+    font-weight: 600;
+  }
+  [data-syntax="app"] .hljs-tag {
+    color: var(--color-danger-ink);
+  }
+
+  /* GitHub: the github.com palette, light values and dark values side by side. */
+  [data-syntax="github"] .hljs-comment,
+  [data-syntax="github"] .hljs-quote {
+    color: #6e7781;
+    font-style: italic;
+  }
+  [data-syntax="github"] .hljs-keyword,
+  [data-syntax="github"] .hljs-built_in,
+  [data-syntax="github"] .hljs-meta,
+  [data-syntax="github"] .hljs-doctag {
+    color: #cf222e;
+  }
+  [data-syntax="github"] .hljs-string,
+  [data-syntax="github"] .hljs-regexp {
+    color: #0a3069;
+  }
+  [data-syntax="github"] .hljs-number,
+  [data-syntax="github"] .hljs-literal,
+  [data-syntax="github"] .hljs-attr,
+  [data-syntax="github"] .hljs-attribute,
+  [data-syntax="github"] .hljs-variable,
+  [data-syntax="github"] .hljs-template-variable,
+  [data-syntax="github"] .hljs-property {
+    color: #0550ae;
+  }
+  [data-syntax="github"] .hljs-title,
+  [data-syntax="github"] .hljs-name,
+  [data-syntax="github"] .hljs-type,
+  [data-syntax="github"] .hljs-symbol {
+    color: #8250df;
+    font-weight: 600;
+  }
+  [data-syntax="github"] .hljs-tag {
+    color: #116329;
+  }
+
+  .dark [data-syntax="github"] .hljs-comment,
+  .dark [data-syntax="github"] .hljs-quote {
+    color: #8b949e;
+  }
+  .dark [data-syntax="github"] .hljs-keyword,
+  .dark [data-syntax="github"] .hljs-built_in,
+  .dark [data-syntax="github"] .hljs-meta,
+  .dark [data-syntax="github"] .hljs-doctag {
+    color: #ff7b72;
+  }
+  .dark [data-syntax="github"] .hljs-string,
+  .dark [data-syntax="github"] .hljs-regexp {
+    color: #a5d6ff;
+  }
+  .dark [data-syntax="github"] .hljs-number,
+  .dark [data-syntax="github"] .hljs-literal,
+  .dark [data-syntax="github"] .hljs-attr,
+  .dark [data-syntax="github"] .hljs-attribute,
+  .dark [data-syntax="github"] .hljs-variable,
+  .dark [data-syntax="github"] .hljs-template-variable,
+  .dark [data-syntax="github"] .hljs-property {
+    color: #79c0ff;
+  }
+  .dark [data-syntax="github"] .hljs-title,
+  .dark [data-syntax="github"] .hljs-name,
+  .dark [data-syntax="github"] .hljs-type,
+  .dark [data-syntax="github"] .hljs-symbol {
+    color: #d2a8ff;
+  }
+  .dark [data-syntax="github"] .hljs-tag {
+    color: #7ee787;
+  }
+
+  /* Neon: One-Light hues on the light canvas, One-Dark hues on the dark one. */
+  [data-syntax="neon"] .hljs-comment,
+  [data-syntax="neon"] .hljs-quote {
+    color: #7f848e;
+    font-style: italic;
+  }
+  [data-syntax="neon"] .hljs-keyword,
+  [data-syntax="neon"] .hljs-built_in,
+  [data-syntax="neon"] .hljs-meta,
+  [data-syntax="neon"] .hljs-doctag {
+    color: #a626a4;
+  }
+  [data-syntax="neon"] .hljs-string,
+  [data-syntax="neon"] .hljs-regexp {
+    color: #50a14f;
+  }
+  [data-syntax="neon"] .hljs-number,
+  [data-syntax="neon"] .hljs-literal,
+  [data-syntax="neon"] .hljs-attr,
+  [data-syntax="neon"] .hljs-attribute,
+  [data-syntax="neon"] .hljs-variable,
+  [data-syntax="neon"] .hljs-template-variable,
+  [data-syntax="neon"] .hljs-property {
+    color: #986801;
+  }
+  [data-syntax="neon"] .hljs-title,
+  [data-syntax="neon"] .hljs-name,
+  [data-syntax="neon"] .hljs-type,
+  [data-syntax="neon"] .hljs-symbol {
+    color: #4078f2;
+    font-weight: 600;
+  }
+  [data-syntax="neon"] .hljs-tag {
+    color: #e45649;
+  }
+
+  .dark [data-syntax="neon"] .hljs-comment,
+  .dark [data-syntax="neon"] .hljs-quote {
+    color: #5c6370;
+  }
+  .dark [data-syntax="neon"] .hljs-keyword,
+  .dark [data-syntax="neon"] .hljs-built_in,
+  .dark [data-syntax="neon"] .hljs-meta,
+  .dark [data-syntax="neon"] .hljs-doctag {
+    color: #c678dd;
+  }
+  .dark [data-syntax="neon"] .hljs-string,
+  .dark [data-syntax="neon"] .hljs-regexp {
+    color: #98c379;
+  }
+  .dark [data-syntax="neon"] .hljs-number,
+  .dark [data-syntax="neon"] .hljs-literal,
+  .dark [data-syntax="neon"] .hljs-attr,
+  .dark [data-syntax="neon"] .hljs-attribute,
+  .dark [data-syntax="neon"] .hljs-variable,
+  .dark [data-syntax="neon"] .hljs-template-variable,
+  .dark [data-syntax="neon"] .hljs-property {
+    color: #d19a66;
+  }
+  .dark [data-syntax="neon"] .hljs-title,
+  .dark [data-syntax="neon"] .hljs-name,
+  .dark [data-syntax="neon"] .hljs-type,
+  .dark [data-syntax="neon"] .hljs-symbol {
+    color: #61afef;
+  }
+  .dark [data-syntax="neon"] .hljs-tag {
+    color: #e06c75;
+  }
 }
