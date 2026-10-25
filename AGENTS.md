@@ -131,12 +131,14 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
   reads the reflog (`git stash list`), and every log read passes `--exclude=refs/stash` so the
   stash commit and its `index on …` snapshot stop masquerading as commits. `stashRows` builds one
   row per entry with a `stash@{n}` pill and `stashIndex` set, from the stash commit's FIRST parent
-  only (the commit it was taken on) — its other parents are plumbing. Those rows sit under the
-  uncommitted row and above history, are rebuilt on every refresh (`stashDigest` notices a take or
-  a drop, and a drop renumbers the survivors so the moved pill flashes), and are excluded from the
-  log-order splice and the paging count. The details panel diffs a stash against `^1`; a
-  `stash -u` entry also needs its third parent, a parentless commit holding only the untracked
-  files (`git show <hash>^3`), which `read_commit_files` appends.
+  only (the commit it was taken on) — its other parents are plumbing. Those rows are NOT pinned
+  above history: `mergeStashes` files each one by the date the stash was taken (only the
+  uncommitted row is pinned on top), which keeps the list in `--date-order` so the stash's base
+  commit stays below its row and the lane layout holds. They are rebuilt on every refresh
+  (`stashDigest` notices a take or a drop, and a drop renumbers the survivors so the moved pill
+  flashes), and are excluded from the log-order splice and the paging count. The details panel
+  diffs a stash against `^1`; a `stash -u` entry also needs its third parent, a parentless commit
+  holding only the untracked files (`git show <hash>^3`), which `read_commit_files` appends.
 - **verifying without the desktop window:** `npm run dev` exposes the same git commands as
   `POST /api/git` (`{op, args}`), so a headless Chrome probe of `http://127.0.0.1:1420` exercises the
   real TS path (refresh, wip payloads, flash classes) without rebuilding Rust. Rust-side changes
