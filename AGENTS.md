@@ -61,6 +61,13 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
   middleware in `vite.config.ts` mirrors this and the worktree digest — keep the two in sync.
 - `src/lib/` parsers — `gitLogParser`, `gitDiffParser` (DiffLine text carries NO +/- prefix; the renderer adds it), `graphLanes` (git-shaped layout: dense lanes, tips append on the right, merge parents fork just right of the commit, closed lanes shift the rest left, and a commit reserved by several children keeps the leftmost and joins the rest — `MAX_LANES` is a hard width cap). All pure, no React — verifiable with `npx vite-node <probe>` against real git output.
 - Changed files/diffs load lazily per selected commit (`App` keeps `filesByCommitHash`); the commit list never carries them.
+- `src/components/DiffViewer.tsx` — the diff pane has two scopes (`DiffScope`): `file` shows the
+  selected file alone (the default), `all` stacks **every** changed file into one scroll with a
+  sticky per-file header, so a whole commit can be read without a click per file. In `all` scope the
+  file list on the left becomes a jump list: selecting a file scrolls its section into view (guarded
+  `scrollIntoView`, jsdom has none). Each file keeps its own `DiffBody`, so highlighting follows that
+  file's grammar rather than the previously selected file's. The header totals every file in `all`
+  scope and the selected file in `file` scope. Scope is persisted (`git-mapper:diff-scope`).
 - Window focus re-checks the visible repo only (throttled to one probe per 1.5s, hidden windows skipped). Other tabs are not refreshed — they are off screen and each refresh costs git reads.
 - `src/lib/graphGeometry.ts` — `ROW_HEIGHT` is shared between `CommitRow` and the SVG graph. Change both together or dots misalign with rows.
 - `src/lib/commitFilter.ts` — `filterCommits(commits, query)`: space-separated tokens AND together, case-insensitive substring over hash, subject, body, author, email and ref-pill names (literal text — no fuzzy `_`/`-` folding). An empty query returns the input array itself so rows keep object identity. Search covers ONLY the loaded window; paging is suspended while a query is active, and deep search over unpaginated history is a planned separate slice.
@@ -70,7 +77,7 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
 - `src/lib/tableLayout.ts` — column widths, grid templates, resize min/max.
 - `src/lib/persisted.ts` — `usePersistedState` (localStorage-backed `useState`) and the `STORAGE_KEYS`
   registry every key goes through. Launch restores: open repo paths, the active tab, the selected
-  commit and file per repo, and the details panel open/height. Window bounds come from
+  commit and file per repo, the diff pane scope, and the details panel open/height. Window bounds come from
   `tauri-plugin-window-state` (Rust side, `window-state:default` capability), not from localStorage.
 - `src/lib/theme.ts` + inline script in `index.html` — theme resolution; storage key `git-mapper:theme`; the head script must stay in sync with that key.
 - `src/index.css` — all design tokens (`@theme` block + `.dark` overrides) and the background aurora (`body::before`).
