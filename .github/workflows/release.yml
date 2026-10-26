@@ -67,3 +67,26 @@ jobs:
           releaseDraft: true
           prerelease: false
           args: ${{ matrix.args }}
+
+      # The bundler names every asset productName_<version>_<arch>..., so
+      # releases/latest/download/<name> 404s the day the next version exists.
+      # Re-upload the human-downloadable installers without the version so the
+      # README links stay stable. Updater artifacts (.app.tar.gz, .sig,
+      # latest.json) keep their versioned names: latest.json embeds those exact
+      # paths, and a renamed copy would desync the updater feed.
+      - name: Upload versionless download links
+        if: startsWith(github.ref, 'refs/tags/')
+        env:
+          GH_TOKEN: ${{ github.token }}
+          VERSION: ${{ github.ref_name }}
+          GH_REPO: ${{ github.repository }}
+        run: |
+          version="${VERSION#v}"
+          mkdir aliases
+          find src-tauri/target -type f \( -name "*-setup.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) ! -name "*.sig" | while read -r file; do
+            base="$(basename "$file")"
+            stable="$(echo "$base" | sed "s/_$version//")"
+            cp "$file" "aliases/$stable"
+            echo "$base -> $stable"
+          done
+          gh release upload "$VERSION" aliases/* --clobber --repo "$GH_REPO"

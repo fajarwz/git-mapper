@@ -5,6 +5,7 @@
 # Git Mapper
 
 [![Release](https://img.shields.io/github/v/release/fajarwz/git-mapper?logo=github&labelColor=26233a&color=6e56cf)](https://github.com/fajarwz/git-mapper/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/fajarwz/git-mapper/total?labelColor=26233a&color=6e56cf&logo=github)](https://github.com/fajarwz/git-mapper/releases)
 [![Build release](https://github.com/fajarwz/git-mapper/actions/workflows/release.yml/badge.svg)](https://github.com/fajarwz/git-mapper/actions/workflows/release.yml)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue?labelColor=26233a)
 ![Built with](https://img.shields.io/badge/Tauri%202-React%2019-TypeScript-6e56cf?labelColor=26233a)
@@ -13,6 +14,20 @@ A standalone Git history viewer for the desktop. Tauri 2, React 19, TypeScript a
 reading real repositories through the `git` CLI.
 
 </div>
+
+## Download
+
+Grab the latest installer from [the releases page](https://github.com/fajarwz/git-mapper/releases/latest):
+
+| OS | Download |
+| --- | --- |
+| Windows | [`git-mapper_x64-setup.exe`](https://github.com/fajarwz/git-mapper/releases/latest/download/git-mapper_x64-setup.exe) (or the `.msi` if you prefer) |
+| macOS (Apple Silicon) | [`git-mapper_aarch64.dmg`](https://github.com/fajarwz/git-mapper/releases/latest/download/git-mapper_aarch64.dmg) |
+| macOS (Intel) | [`git-mapper_x64.dmg`](https://github.com/fajarwz/git-mapper/releases/latest/download/git-mapper_x64.dmg) |
+| Linux | [`git-mapper_amd64.AppImage`](https://github.com/fajarwz/git-mapper/releases/latest/download/git-mapper_amd64.AppImage) (or the `.deb` for Debian/Ubuntu) |
+
+The links above always resolve to the newest release. On macOS, the first launch gets a Gatekeeper
+warning because the app isn't notarized — right-click the app and pick **Open** to run it.
 
 <img src="docs/screenshots/main-light.png" alt="Commit list, light theme" width="49%"><img src="docs/screenshots/main-dark.png" alt="Commit list, dark theme" width="49%">
 
