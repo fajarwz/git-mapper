@@ -36,7 +36,7 @@ export const CommitRow = memo(function CommitRow({
     <button
       type="button"
       data-commit-row
-      className={`group grid h-8 w-full cursor-default items-center gap-2 border-b border-rule/70 bg-transparent p-0 text-left transition-colors hover:bg-hover-glass focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/60 data-[selected=true]:bg-selected-glass data-[selected=true]:shadow-[inset_3px_0_0_var(--color-primary)] data-[selected=true]:hover:bg-selected-glass ${COMMIT_ROW_GRID} ${fresh ? "row-flash" : ""}`}
+      className={`group grid h-8 w-full cursor-default items-center gap-2 border-b border-rule/70 bg-transparent p-0 text-left transition-colors hover:bg-hover-glass focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/60 data-[selected=true]:bg-selected-glass data-[selected=true]:hover:bg-selected-glass ${COMMIT_ROW_GRID} ${fresh ? "row-flash" : ""}`}
       data-selected={selected}
       aria-pressed={selected}
       onClick={() => onSelect(commit.hash)}
@@ -50,10 +50,10 @@ export const CommitRow = memo(function CommitRow({
       }
     >
       <span className="flex min-w-0 items-center gap-2 overflow-hidden">
-        {/* Branch-coloured segment: ties this message to its graph node. */}
+        {/* Branch-coloured segment: GitKraken's connector, tying this message to its graph node. */}
         <span
           aria-hidden="true"
-          className="h-3.75 w-0.5 shrink-0 rounded-full"
+          className="h-4 w-1 shrink-0 rounded-[2px]"
           style={{ backgroundColor: branchColor(commit.branchColor) }}
         />
         <span className={`truncate text-[13px] text-ink ${weight}`}>
