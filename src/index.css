@@ -160,6 +160,23 @@
   }
 }
 
+/* The launch dots on BootScreen: a slow breath, staggered per dot by an inline delay.
+   Reduced motion keeps the dots visible as a static row instead of dropping them. */
+@utility boot-dot {
+  animation: boot-dot 1.1s ease-in-out infinite;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+    opacity: 0.6;
+  }
+}
+
+@keyframes boot-dot {
+  50% {
+    opacity: 1;
+  }
+}
+
 @layer base {
   :root {
     color-scheme: light;

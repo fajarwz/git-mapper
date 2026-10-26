@@ -2,6 +2,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import type { ChangedFile } from "./types";
+import { BootScreen } from "./components/BootScreen";
 import { CommitList } from "./components/CommitList";
 import { ContextMenu, type ContextMenuTarget } from "./components/ContextMenu";
 import { DetailsPanel } from "./components/DetailsPanel";
@@ -49,6 +50,11 @@ function filesKey(repoPath: string, hash: string, worktree: string): string {
 
 function App() {
   const [repos, setRepos] = useState<Repository[]>([]);
+  // Launch with saved tabs means there is real work to wait for, and the read is synchronous so
+  // the decision exists before the first paint. Without this flag App has no repository yet and
+  // renders the open-folder card for the length of the first git read — which reads as "nothing
+  // is saved". A fresh install has nothing to hydrate, so it goes straight to that card.
+  const [booting, setBooting] = useState(() => readStoredPaths().length > 0);
   // Restored on launch: which tab was open, which commit/file was being read, panel state.
   const [activeRepoId, setActiveRepoId] = usePersistedState<string | null>(STORAGE_KEYS.activeRepo, null);
   const [selectedCommitByRepo, setSelectedCommitByRepo] = usePersistedState<Record<string, string>>(
@@ -128,10 +134,12 @@ function App() {
   const hydratedPaths = useRef(false);
 
   // First paint loads the persisted tabs; a fresh install starts on the empty state, so no
-  // machine-specific path is baked into the build.
+  // machine-specific path is baked into the build. `booting` holds the launch screen until the
+  // loop lands, and clears on every exit path — including "every stored path failed to open",
+  // which must fall through to the empty state rather than spin forever.
   useEffect(() => {
     let cancelled = false;
-    (async () => {
+    void (async () => {
       const stored = readStoredPaths();
       const loaded: Repository[] = [];
       for (const path of stored) {
@@ -146,7 +154,13 @@ function App() {
       setRepos(loaded);
       const restored = loaded.some((item) => item.id === activeRepoId) ? activeRepoId : null;
       setActiveRepoId(restored ?? loaded[0]?.id ?? null);
-    })();
+    })()
+      .catch((loadError) => {
+        console.error("Could not restore the open repositories", loadError);
+      })
+      .finally(() => {
+        if (!cancelled) setBooting(false);
+      });
     return () => {
       cancelled = true;
     };
@@ -480,7 +494,11 @@ function App() {
 
       <div className="flex min-h-0 flex-1 flex-col px-2.5 pb-2.5 pt-1">
         {noRepo || repo === null ? (
-          <EmptyState onOpen={handleAdd} error={error} loading={opening} repos={repos} />
+          booting ? (
+            <BootScreen />
+          ) : (
+            <EmptyState onOpen={handleAdd} error={error} loading={opening} repos={repos} />
+          )
         ) : (
           <div className="relative grid min-h-0 flex-1 gap-2.5" style={workspaceStyle}>
             <CommitList
