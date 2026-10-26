@@ -123,12 +123,12 @@ function DiffBody({ file, wrap }: { file: ChangedFile; wrap: boolean }) {
             className={`grid ${rowSpace} grid-cols-[44px_44px_14px_auto] ${tone.row}`}
           >
             <span
-              className={`select-none border-r border-rule pr-2 text-right ${GUTTER_TONE}`}
+              className={`select-none border-r border-rule pr-2 text-right ${line.type === "remove" ? tone.text : GUTTER_TONE}`}
             >
               {line.oldNumber ?? ""}
             </span>
             <span
-              className={`select-none border-r border-rule pr-2 text-right ${GUTTER_TONE}`}
+              className={`select-none border-r border-rule pr-2 text-right ${line.type === "add" ? tone.text : GUTTER_TONE}`}
             >
               {line.newNumber ?? ""}
             </span>
@@ -209,7 +209,11 @@ function SplitCells({
     <>
       <span
         data-diff-num={side}
-        className={`select-none border-r border-rule pr-2 text-right ${GUTTER_TONE} ${tone.row}`}
+        className={`select-none border-r border-rule pr-2 text-right ${GUTTER_TONE} ${tone.row} ${
+          (side === "old" && line.type === "remove") || (side === "new" && line.type === "add")
+            ? tone.text
+            : ""
+        }`}
       >
         {number ?? ""}
       </span>

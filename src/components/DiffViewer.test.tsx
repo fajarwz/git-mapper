@@ -91,6 +91,32 @@ test("DiffViewer renders bare text with the sign in its own cell", () => {
   );
 });
 
+test("add and remove line gutters use the line tone, context stays muted", () => {
+  const { container } = render(
+    <DiffViewer
+      files={[sampleFile]}
+      file={sampleFile}
+      scope="file"
+      onScopeChange={() => {}}
+      scheme="app"
+    />,
+  );
+  const rows = [...container.querySelectorAll("[data-diff-line]")];
+  const addRow = rows.find((row) => row.getAttribute("data-diff-line") === "add");
+  const removeRow = rows.find((row) => row.getAttribute("data-diff-line") === "remove");
+  const contextRow = rows.find((row) => row.getAttribute("data-diff-line") === "context");
+
+  const oldGutter = (row: Element) => row.children[0]?.className ?? "";
+  const newGutter = (row: Element) => row.children[1]?.className ?? "";
+
+  assert.ok(oldGutter(removeRow!).includes("text-danger-ink"), "remove line's old number is danger ink");
+  assert.ok(newGutter(addRow!).includes("text-success-ink"), "add line's new number is success ink");
+  assert.ok(oldGutter(addRow!).includes("text-ink/45"), "add line's empty old gutter stays muted");
+  assert.ok(newGutter(removeRow!).includes("text-ink/45"), "remove line's empty new gutter stays muted");
+  assert.ok(oldGutter(contextRow!).includes("text-ink/45"), "context old gutter stays muted");
+  assert.ok(newGutter(contextRow!).includes("text-ink/45"), "context new gutter stays muted");
+});
+
 test("DiffViewer tokenizes the content once the grammar loads", async () => {
   const tsFile: ChangedFile = {
     path: "src/index.ts",
