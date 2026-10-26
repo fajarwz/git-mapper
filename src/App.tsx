@@ -6,6 +6,7 @@ import { BootScreen } from "./components/BootScreen";
 import { CommitList } from "./components/CommitList";
 import { ContextMenu, type ContextMenuTarget } from "./components/ContextMenu";
 import { DetailsPanel } from "./components/DetailsPanel";
+import type { DiffScope } from "./components/DiffViewer";
 import { EmptyState } from "./components/EmptyState";
 import { TitleBar } from "./components/TitleBar";
 import { SettingsModal } from "./components/SettingsModal";
@@ -85,6 +86,9 @@ function App() {
     STORAGE_KEYS.syntaxScheme,
     "app",
   );
+  // Diff pane scope: one file at a time (the default) or every file in one scroll. Persisted,
+  // because a reader who prefers the stacked view wants it on every launch.
+  const [diffScope, setDiffScope] = usePersistedState<DiffScope>(STORAGE_KEYS.diffScope, "file");
 
   // Updates: auto (background download on launch) by default, manual as the opt-out.
   const [updateMode, setUpdateMode] = usePersistedState<UpdateMode>(STORAGE_KEYS.updateMode, "auto");
@@ -520,6 +524,8 @@ function App() {
                 filesLoading={filesLoading}
                 selectedFile={selectedFile}
                 onSelectFile={handleSelectFile}
+                diffScope={diffScope}
+                onDiffScopeChange={setDiffScope}
                 syntaxScheme={syntaxScheme}
                 onClose={() => setDetailsOpen(false)}
                 onHeightChange={setDetailsHeight}

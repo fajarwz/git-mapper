@@ -13,7 +13,7 @@ import {
   MIN_SIDEBAR_WIDTH,
 } from "../lib/tableLayout";
 import { PANEL } from "../lib/ui";
-import { DiffViewer } from "./DiffViewer";
+import { DiffViewer, type DiffScope } from "./DiffViewer";
 import { FileList } from "./FileList";
 import { ResizeHandle } from "./ResizeHandle";
 import { ChevronDownIcon, CloseIcon } from "./icons";
@@ -24,6 +24,9 @@ interface DetailsPanelProps {
   filesLoading: boolean;
   selectedFile: ChangedFile | null;
   onSelectFile: (path: string) => void;
+  /** One file at a time, or every file in a single scroll (the diff pane's toggle). */
+  diffScope: DiffScope;
+  onDiffScopeChange: (scope: DiffScope) => void;
   /** Diff token palette, chosen in settings and passed straight to the DiffViewer. */
   syntaxScheme: SyntaxScheme;
   onClose: () => void;
@@ -36,6 +39,8 @@ export function DetailsPanel({
   filesLoading,
   selectedFile,
   onSelectFile,
+  diffScope,
+  onDiffScopeChange,
   syntaxScheme,
   onClose,
   onHeightChange,
@@ -186,7 +191,13 @@ export function DetailsPanel({
         />
       </div>
 
-      <DiffViewer file={selectedFile} scheme={syntaxScheme} />
+      <DiffViewer
+        files={files}
+        file={selectedFile}
+        scope={diffScope}
+        onScopeChange={onDiffScopeChange}
+        scheme={syntaxScheme}
+      />
 
       <ResizeHandle
         orientation="horizontal"
