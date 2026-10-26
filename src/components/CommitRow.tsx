@@ -50,10 +50,9 @@ export const CommitRow = memo(function CommitRow({
       }
     >
       <span className="flex min-w-0 items-center gap-2 overflow-hidden">
-        {/* Branch-coloured segment: continues the graph's connector bar to the first character. */}
         <span
           aria-hidden="true"
-          className="h-1 w-2.5 shrink-0 rounded-r-full"
+          className="h-5 w-0.5 shrink-0"
           style={{ backgroundColor: branchColor(commit.branchColor) }}
         />
         <span className={`truncate text-[13px] text-ink ${weight}`}>

@@ -54,15 +54,6 @@ export function CommitGraph({ commits, layout, selectedHash }: CommitGraphProps)
 
         return (
           <g key={commit.hash}>
-            {/* GitKraken's connector: the lane colour runs from the node to the message column,
-                where the row's own chip picks it up and carries it to the title. */}
-            <rect
-              x={x + DOT_RADIUS + 3}
-              y={y - 2}
-              width={Math.max(0, width - x - DOT_RADIUS - 3)}
-              height={4}
-              fill={color}
-            />
             {selected && (
               <circle
                 cx={x}
