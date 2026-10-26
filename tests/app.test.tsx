@@ -153,6 +153,38 @@ test("a stored path hydrates rows on launch, loads wip files and shows pills", a
   assert.ok(within(container).getAllByText(/Uncommitted/).length > 0, "the uncommitted row is visible");
 });
 
+test("the diff scope toggle stacks every file and is remembered", async () => {
+  localStorage.setItem(STORAGE_KEYS.repos, JSON.stringify(["C:/repos/demo"]));
+  const { container } = render(<App />);
+  await waitFor(() => {
+    assert.equal(container.querySelectorAll("[data-commit-row]").length, 3);
+  });
+  await waitFor(() => {
+    assert.ok(container.querySelector("[data-diff-line]"), "the selected file's diff is up");
+  });
+
+  assert.equal(
+    container.querySelectorAll("[data-diff-file]").length,
+    0,
+    "the default scope shows one file at a time",
+  );
+
+  fireEvent.click(container.querySelector("[data-diff-scope='all']") as HTMLElement);
+
+  await waitFor(() => {
+    assert.equal(
+      container.querySelectorAll("[data-diff-file]").length,
+      1,
+      "the wip payload's one file is stacked in the single-scroll view",
+    );
+  });
+  assert.equal(
+    localStorage.getItem(STORAGE_KEYS.diffScope),
+    JSON.stringify("all"),
+    "the choice survives the next launch",
+  );
+});
+
 test("the search box filters the loaded rows and clears back to full history", async () => {
   localStorage.setItem(STORAGE_KEYS.repos, JSON.stringify(["C:/repos/demo"]));
   const { container } = render(<App />);
