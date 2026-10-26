@@ -1,3 +1,4 @@
+use base64::Engine as _;
 use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::process::Command;
@@ -44,6 +45,20 @@ fn run_git(dir: &str, args: &[&str]) -> Result<String, String> {
                 Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
             }
         })
+}
+
+/// Runs a blocking git body on a worker thread. A sync `#[tauri::command]` executes on the main
+/// thread, so one slow read (a 20-second `git status` over a `\\wsl.localhost` mount) greyed the
+/// whole window out with "Not responding". Every command below is a thin async wrapper around
+/// its sync `*_in` body; this is the one await they share.
+async fn run_blocking<T, F>(op: &str, work: F) -> Result<T, String>
+where
+    F: FnOnce() -> Result<T, String> + Send + 'static,
+    T: Send + 'static,
+{
+    tauri::async_runtime::spawn_blocking(work)
+        .await
+        .map_err(|e| format!("the {op} task failed: {e}"))?
 }
 
 /// Cheap FNV-1a digest: these stamps are only ever compared for equality between two reads,
@@ -122,7 +137,11 @@ fn untracked_entry(dir: &str, path: &str) -> (String, String, String) {
 }
 
 #[tauri::command]
-pub fn open_repository(dir: &str) -> Result<RepoInfo, String> {
+pub async fn open_repository(dir: String) -> Result<RepoInfo, String> {
+    run_blocking("open", move || open_repository_in(&dir)).await
+}
+
+fn open_repository_in(dir: &str) -> Result<RepoInfo, String> {
     let inside = run_git(dir, &["rev-parse", "--is-inside-work-tree"])?;
     if inside.trim() != "true" {
         return Err(format!("{} is not a Git repository", dir));
@@ -139,7 +158,11 @@ pub fn open_repository(dir: &str) -> Result<RepoInfo, String> {
 }
 
 #[tauri::command]
-pub fn read_status(dir: &str) -> Result<StatusInfo, String> {
+pub async fn read_status(dir: String) -> Result<StatusInfo, String> {
+    run_blocking("status read", move || read_status_in(&dir)).await
+}
+
+fn read_status_in(dir: &str) -> Result<StatusInfo, String> {
     // -uall so untracked files are counted one by one instead of per directory.
     let out = run_git(dir, &["status", "-sb", "--untracked-files=all"])?;
     let changed = out
@@ -191,7 +214,11 @@ const EXCLUDE_STASH: &str = "--exclude=refs/stash";
 /// Raw log for TS-side parsing: fields split on \x00, records on \x1e.
 /// Decorations (%d) lead each record; %B is last so multi-line bodies survive the split.
 #[tauri::command]
-pub fn read_log(dir: &str, limit: u32, skip: u32) -> Result<String, String> {
+pub async fn read_log(dir: String, limit: u32, skip: u32) -> Result<String, String> {
+    run_blocking("log read", move || read_log_in(&dir, limit, skip)).await
+}
+
+fn read_log_in(dir: &str, limit: u32, skip: u32) -> Result<String, String> {
     run_git(
         dir,
         &[
@@ -209,9 +236,13 @@ pub fn read_log(dir: &str, limit: u32, skip: u32) -> Result<String, String> {
 /// Commits reachable from any ref but not from `since`: the delta a focus refresh needs,
 /// so the UI never re-reads the whole history for one new commit.
 #[tauri::command]
-pub fn read_log_delta(dir: &str, since: &str, limit: u32) -> Result<String, String> {
+pub async fn read_log_delta(dir: String, since: String, limit: u32) -> Result<String, String> {
+    run_blocking("log delta", move || read_log_delta_in(&dir, &since, limit)).await
+}
+
+fn read_log_delta_in(dir: &str, since: &str, limit: u32) -> Result<String, String> {
     if since.trim().is_empty() {
-        return read_log(dir, limit, 0);
+        return read_log_in(dir, limit, 0);
     }
     let exclude = format!("^{since}");
     run_git(
@@ -232,7 +263,11 @@ pub fn read_log_delta(dir: &str, since: &str, limit: u32) -> Result<String, Stri
 /// commits, so it needs this cheap list to splice them in where git would put them: someone
 /// else's older commit can land below rows that are already on screen.
 #[tauri::command]
-pub fn read_log_order(dir: &str, limit: u32) -> Result<String, String> {
+pub async fn read_log_order(dir: String, limit: u32) -> Result<String, String> {
+    run_blocking("log order", move || read_log_order_in(&dir, limit)).await
+}
+
+fn read_log_order_in(dir: &str, limit: u32) -> Result<String, String> {
     run_git(
         dir,
         &[
@@ -249,7 +284,11 @@ pub fn read_log_order(dir: &str, limit: u32) -> Result<String, String> {
 /// All branch/remote/tag tips: raw `hash\tfullref` lines for TS-side parsing.
 /// Decorations on log rows miss tips that point outside the loaded window.
 #[tauri::command]
-pub fn read_refs(dir: &str) -> Result<String, String> {
+pub async fn read_refs(dir: String) -> Result<String, String> {
+    run_blocking("refs read", move || read_refs_in(&dir)).await
+}
+
+fn read_refs_in(dir: &str) -> Result<String, String> {
     run_git(
         dir,
         &[
@@ -266,7 +305,11 @@ pub fn read_refs(dir: &str) -> Result<String, String> {
 /// entry, so for-each-ref and `log --all` can never see the older ones: the reflog is the only
 /// place the full list exists. Same record/field separators as read_log.
 #[tauri::command]
-pub fn read_stashes(dir: &str) -> Result<String, String> {
+pub async fn read_stashes(dir: String) -> Result<String, String> {
+    run_blocking("stash read", move || read_stashes_in(&dir)).await
+}
+
+fn read_stashes_in(dir: &str) -> Result<String, String> {
     run_git(
         dir,
         &[
@@ -280,7 +323,11 @@ pub fn read_stashes(dir: &str) -> Result<String, String> {
 /// Checks out an existing branch by name; refuses with git's own error when the
 /// working tree would lose changes (dirty tree with conflicting paths).
 #[tauri::command]
-pub fn checkout_branch(dir: &str, branch: &str) -> Result<(), String> {
+pub async fn checkout_branch(dir: String, branch: String) -> Result<(), String> {
+    run_blocking("checkout", move || checkout_branch_in(&dir, &branch)).await
+}
+
+fn checkout_branch_in(dir: &str, branch: &str) -> Result<(), String> {
     run_git(dir, &["checkout", branch]).map(|_| ())
 }
 
@@ -336,7 +383,11 @@ pub async fn push_branch(dir: String) -> Result<String, String> {
 /// Files of one commit. "wip" means the uncommitted working tree vs HEAD.
 /// Otherwise: diff against the first parent; root commits use the --root forms.
 #[tauri::command]
-pub fn read_commit_files(dir: &str, hash: &str) -> Result<FilePayload, String> {
+pub async fn read_commit_files(dir: String, hash: String) -> Result<FilePayload, String> {
+    run_blocking("commit files read", move || read_commit_files_in(&dir, &hash)).await
+}
+
+fn read_commit_files_in(dir: &str, hash: &str) -> Result<FilePayload, String> {
     if hash == "wip" {
         // Unborn branch: `diff HEAD` has nothing to compare against, so start from empty.
         let diff = run_git(dir, &["diff", "--no-color", "HEAD"]).unwrap_or_default();
@@ -415,6 +466,154 @@ fn args(v: &[String]) -> Vec<&str> {
     v.iter().map(String::as_str).collect()
 }
 
+/// Git output that must stay bytes (a blob) instead of the lossy-text run_git.
+fn run_git_bytes(dir: &str, args: &[&str]) -> Result<Vec<u8>, String> {
+    Command::new("git")
+        .args(args)
+        .current_dir(dir)
+        .output()
+        .map_err(|e| format!("failed to run git: {e}"))
+        .and_then(|out| {
+            if out.status.success() {
+                Ok(out.stdout)
+            } else {
+                Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+            }
+        })
+}
+
+/// Above this a blob is no longer previewable — encoding it into a data URL would freeze the
+/// webview's IPC. The pane shows the size and a "too large" note instead of the picture.
+const MAX_IMAGE_BYTES: usize = 20 * 1024 * 1024;
+
+#[derive(Serialize, Debug)]
+pub struct ImageVersion {
+    /// Formed data URL; empty when the blob is over the cap.
+    pub url: String,
+    /// Byte size, shown even when too large to preview.
+    pub bytes: usize,
+    pub too_large: bool,
+}
+
+#[derive(Serialize, Default, Debug)]
+pub struct ImageVersions {
+    /// The parent's copy (empty for a root commit, and for a file HEAD cannot see).
+    pub old: Option<ImageVersion>,
+    /// The commit's copy (empty when the commit deleted the file).
+    pub new: Option<ImageVersion>,
+}
+
+const IMAGE_MIME_BY_EXT: &[(&str, &str)] = &[
+    ("png", "image/png"),
+    ("jpg", "image/jpeg"),
+    ("jpeg", "image/jpeg"),
+    ("gif", "image/gif"),
+    ("webp", "image/webp"),
+    ("bmp", "image/bmp"),
+    ("ico", "image/x-icon"),
+    ("avif", "image/avif"),
+    ("apng", "image/apng"),
+];
+
+fn image_mime(path: &str) -> &'static str {
+    let lower = path.to_ascii_lowercase();
+    let ext = lower.rsplit_once('.').map(|(_, ext)| ext).unwrap_or("");
+    IMAGE_MIME_BY_EXT
+        .iter()
+        .find(|(name, _)| *name == ext)
+        .map(|(_, mime)| *mime)
+        .unwrap_or("application/octet-stream")
+}
+
+/// The blob bytes at `<rev>:<path>`, or None when that path does not exist there (added/deleted).
+fn blob_bytes(dir: &str, rev: &str, path: &str) -> Result<Option<Vec<u8>>, String> {
+    run_git_bytes(dir, &["cat-file", "blob", &format!("{rev}:{path}")])
+        .map(Some)
+        .or_else(|_| Ok(None))
+}
+
+/// A renamed (R) or copied (C) entry in the parent→commit patch whose destination is `path`;
+/// its source path is where the old image lives. Missing when the file simply moved untouched.
+fn rename_source(dir: &str, parent: &str, hash: &str, path: &str) -> Option<String> {
+    let out = run_git(dir, &["diff", "--no-color", "--name-status", parent, hash]).ok()?;
+    for line in out.lines() {
+        let fields: Vec<&str> = line.split('\t').collect();
+        if fields.len() < 3 || !(fields[0].starts_with('R') || fields[0].starts_with('C')) {
+            continue;
+        }
+        if fields[2] == path {
+            return Some(fields[1].to_string());
+        }
+    }
+    None
+}
+
+fn version_of(bytes: Vec<u8>, path: &str) -> ImageVersion {
+    if bytes.len() > MAX_IMAGE_BYTES {
+        return ImageVersion { url: String::new(), bytes: bytes.len(), too_large: true };
+    }
+    let encoded = base64::engine::general_purpose::STANDARD.encode(&bytes);
+    ImageVersion {
+        url: format!("data:{};base64,{encoded}", image_mime(path)),
+        bytes: bytes.len(),
+        too_large: false,
+    }
+}
+
+/// Both sides of an image file change, the way GitHub diffs pictures: old = the parent's blob
+/// (HEAD's for `wip`), new = the commit's (the working file on disk for `wip`). The webview
+/// turns the data URLs into <img> elements with pixel-lossless copies of what git stores.
+#[tauri::command]
+pub async fn read_image_versions(
+    dir: String,
+    hash: String,
+    path: String,
+) -> Result<ImageVersions, String> {
+    run_blocking("image versions read", move || {
+        read_image_versions_in(&dir, &hash, &path)
+    })
+    .await
+}
+
+fn read_image_versions_in(dir: &str, hash: &str, path: &str) -> Result<ImageVersions, String> {
+    // The revision the OLD side comes from; empty means "no previous copy exists".
+    let old_rev: String = if hash == "wip" {
+        if run_git(dir, &["rev-parse", "--verify", "HEAD"]).is_ok() {
+            "HEAD".to_string()
+        } else {
+            String::new() // Unborn branch: an untracked image has no history at all.
+        }
+    } else {
+        let parent = format!("{hash}^1");
+        if run_git(dir, &["rev-parse", "--verify", &parent]).is_ok() {
+            parent
+        } else {
+            String::new() // Root commit: the file was born in it.
+        }
+    };
+
+    let old = if old_rev.is_empty() {
+        None
+    } else {
+        let mut bytes = blob_bytes(dir, &old_rev, path)?;
+        if bytes.is_none() {
+            // The image may have been renamed (or copied) into `path`; the old name holds the blob.
+            if let Some(source) = rename_source(dir, &old_rev, hash, path) {
+                bytes = blob_bytes(dir, &old_rev, &source)?;
+            }
+        }
+        bytes.map(|data| version_of(data, path))
+    };
+
+    let new = if hash == "wip" {
+        std::fs::read(Path::new(dir).join(path)).ok().map(|data| version_of(data, path))
+    } else {
+        blob_bytes(dir, hash, path)?.map(|data| version_of(data, path))
+    };
+
+    Ok(ImageVersions { old, new })
+}
+
 #[cfg(test)]
 mod tests {
     use super::*;
@@ -471,7 +670,7 @@ mod tests {
     #[test]
     fn open_repository_names_the_toplevel() {
         let repo = TempRepo::new("open");
-        let info = open_repository(repo.path()).expect("the repo opens");
+        let info = open_repository_in(repo.path()).expect("the repo opens");
         assert_eq!(info.path, repo.path());
         assert_eq!(info.name, PathBuf::from(repo.path()).file_name().unwrap().to_string_lossy());
     }
@@ -491,7 +690,7 @@ mod tests {
             .expect("git ran");
         assert!(bare.status.success());
         let target = dir.to_string_lossy().replace('\\', "/");
-        let err = open_repository(&target).unwrap_err();
+        let err = open_repository_in(&target).unwrap_err();
         assert!(err.contains("is not a Git repository"), "got: {err}");
         let _ = std::fs::remove_dir_all(&dir);
     }
@@ -502,7 +701,7 @@ mod tests {
         repo.commit("tracked.txt", "one\n", "c1");
         repo.0.join("untracked.txt");
 
-        let clean = read_status(repo.path()).expect("status read");
+        let clean = read_status_in(repo.path()).expect("status read");
         assert_eq!((clean.dirty, clean.changed), (false, 0), "a committed tree is clean");
         assert!(!clean.head.is_empty(), "HEAD is present");
         assert_eq!((clean.ahead, clean.behind), (0, 0));
@@ -510,7 +709,7 @@ mod tests {
         // One modified tracked path + one untracked path, each counted individually.
         std::fs::write(repo.0.join("tracked.txt"), "one\ntwo\n").expect("edit");
         std::fs::write(repo.0.join("untracked.txt"), "new\n").expect("untracked");
-        let dirty = read_status(repo.path()).expect("status read");
+        let dirty = read_status_in(repo.path()).expect("status read");
         assert_eq!((dirty.dirty, dirty.changed), (true, 2));
 
         // A commit after a push lands the branch ahead by exactly one.
@@ -519,7 +718,7 @@ mod tests {
         git(&repo.0, &["fetch", "-q", "origin", "main"]);
         git(&repo.0, &["branch", "--set-upstream-to=origin/main", "main"]);
         repo.commit("tracked.txt", "pushed\n", "c2");
-        let ahead = read_status(repo.path()).expect("status read");
+        let ahead = read_status_in(repo.path()).expect("status read");
         assert_eq!(ahead.ahead, 1);
         assert_eq!((dirty.behind, dirty.ahead), (0, 0), "the pre-push read stays at zero");
     }
@@ -527,7 +726,7 @@ mod tests {
     #[test]
     fn read_status_survives_an_unborn_branch() {
         let repo = TempRepo::new("unborn");
-        let info = read_status(repo.path()).expect("a repo without commits still reads");
+        let info = read_status_in(repo.path()).expect("a repo without commits still reads");
         // git status prints "## No commits yet on main"; the loader shows the branch hint as-is.
         assert_eq!(info.branch, "No commits yet on main");
         assert_eq!(info.head, "");
@@ -539,15 +738,15 @@ mod tests {
         let repo = TempRepo::new("digest");
         repo.commit("tracked.txt", "one\n", "c1");
 
-        let first = read_status(repo.path()).expect("first read");
-        let again = read_status(repo.path()).expect("second read");
+        let first = read_status_in(repo.path()).expect("first read");
+        let again = read_status_in(repo.path()).expect("second read");
         assert_eq!(first.worktree, again.worktree, "an untouched tree stamps identically");
 
         // Same path count (one modified file), different content: only the patch moves the stamp.
         std::fs::write(repo.0.join("tracked.txt"), "one\n").expect("touch");
-        let pre_edit = read_status(repo.path()).expect("read with one change");
+        let pre_edit = read_status_in(repo.path()).expect("read with one change");
         std::fs::write(repo.0.join("tracked.txt"), "two\n").expect("edit");
-        let post_edit = read_status(repo.path()).expect("read with same count");
+        let post_edit = read_status_in(repo.path()).expect("read with same count");
         assert_ne!(pre_edit.worktree, post_edit.worktree, "an edit inside one file moves the stamp");
     }
 
@@ -557,7 +756,7 @@ mod tests {
         repo.commit("one.txt", "one\n", "first: one");
         repo.commit("two.txt", "two\n", "second: two");
 
-        let raw = read_log(repo.path(), 10, 0).expect("log read");
+        let raw = read_log_in(repo.path(), 10, 0).expect("log read");
         let records = records_of(&raw);
         assert_eq!(records.len(), 2, "one record per commit, newest first");
         let head = run_git(repo.path(), &["rev-parse", "--verify", "HEAD"]).expect("rev-parse");
@@ -573,20 +772,20 @@ mod tests {
     fn read_log_order_matches_read_log_shape_and_delta_excludes_the_since_base() {
         let repo = TempRepo::new("delta");
         repo.commit("one.txt", "one\n", "first");
-        let old_head = read_log_order(repo.path(), 10).expect("ordering read");
+        let old_head = read_log_order_in(repo.path(), 10).expect("ordering read");
         repo.commit("two.txt", "two\n", "second");
 
-        let order = read_log_order(repo.path(), 10).expect("ordering read");
+        let order = read_log_order_in(repo.path(), 10).expect("ordering read");
         let lines: Vec<&str> = order.lines().collect();
         assert_eq!(lines.len(), 2, "one line per commit, nothing else");
-        let raw = read_log(repo.path(), 10, 0).expect("log read");
+        let raw = read_log_in(repo.path(), 10, 0).expect("log read");
         let hashes: Vec<String> = records_of(&raw)
             .iter()
             .map(|r| r[1].trim_start_matches('\n').to_string())
             .collect();
         assert_eq!(hashes, lines, "read_log and read_log_order describe the same window");
 
-        let delta = read_log_delta(repo.path(), old_head.trim(), 500).expect("delta read");
+        let delta = read_log_delta_in(repo.path(), old_head.trim(), 500).expect("delta read");
         let delta_hashes: Vec<String> = records_of(&delta)
             .iter()
             .map(|r| r[1].trim_start_matches('\n').to_string())
@@ -604,8 +803,8 @@ mod tests {
         repo.commit("two.txt", "two\n", "second");
 
         for raw in [
-            read_log(repo.path(), 10, 0).expect("log read"),
-            read_log_order(repo.path(), 10).expect("order read"),
+            read_log_in(repo.path(), 10, 0).expect("log read"),
+            read_log_order_in(repo.path(), 10).expect("order read"),
         ] {
             assert!(
                 !raw.contains(&stash_hash),
@@ -613,7 +812,7 @@ mod tests {
             );
         }
 
-        let stashes = read_stashes(repo.path()).expect("stash read");
+        let stashes = read_stashes_in(repo.path()).expect("stash read");
         let records = records_of(&stashes);
         assert_eq!(records.len(), 1, "the reflog is the only view over every entry");
         assert!(records[0][0].trim_start_matches('\n').starts_with("stash@{"));
@@ -629,7 +828,7 @@ mod tests {
         std::fs::write(repo.0.join("new.txt"), "l1\nl2\n").expect("untracked text");
         std::fs::write(repo.0.join("blob.bin"), [0u8, 1, 255, 9, 0]).expect("untracked binary");
 
-        let payload = read_commit_files(repo.path(), "wip").expect("wip payload");
+        let payload = read_commit_files_in(repo.path(), "wip").expect("wip payload");
         assert!(payload.name_status.contains("M\ttracked.txt"));
         assert!(payload.numstat.contains("2\t0\tnew.txt"));
         assert!(payload.name_status.contains("A\tnew.txt"), "`git diff` alone never lists untracked paths");
@@ -652,10 +851,10 @@ mod tests {
         let second_hash = second_hash.trim().to_string();
 
         // Root commits diff against the empty tree; the `^1` of a root resolves to nothing.
-        let root_files = read_commit_files(repo.path(), &root_hash).expect("root files");
+        let root_files = read_commit_files_in(repo.path(), &root_hash).expect("root files");
         assert!(root_files.numstat.contains("1\t0\troot.txt"), "got: {}", root_files.numstat);
 
-        let files = read_commit_files(repo.path(), &second_hash).expect("parent diff");
+        let files = read_commit_files_in(repo.path(), &second_hash).expect("parent diff");
         assert!(files.name_status.contains("A\tother.txt"));
 
         // git mv keeps the rename visible.
@@ -663,8 +862,66 @@ mod tests {
         git(&repo.0, &["commit", "-q", "-m", "renamed"]);
         let renamed_hash = run_git(repo.path(), &["rev-parse", "HEAD"]).expect("rev-parse");
         let renamed_hash = renamed_hash.trim().to_string();
-        let renamed = read_commit_files(repo.path(), &renamed_hash).expect("renamed files");
+        let renamed = read_commit_files_in(repo.path(), &renamed_hash).expect("renamed files");
         assert!(renamed.name_status.contains("R100\troot.txt\trenamed.txt"), "got: {}", renamed.name_status);
+    }
+
+    #[test]
+    fn image_versions_carry_both_sides_and_fall_back_for_roots_renames_and_wip() {
+        let repo = TempRepo::new("images");
+        let old_bytes = vec![137u8, 80, 78, 71, 13, 10, 1, 1];
+        std::fs::write(repo.0.join("a.png"), &old_bytes).expect("old image written");
+        git(&repo.0, &["add", "a.png"]);
+        git(&repo.0, &["commit", "-q", "-m", "add image"]);
+        let root_hash = run_git(repo.path(), &["rev-parse", "HEAD"]).expect("rev-parse");
+        let root_hash = root_hash.trim().to_string();
+
+        // Root commit: the file was born here, so there is no previous copy.
+        let root = read_image_versions_in(repo.path(), &root_hash, "a.png").expect("root versions");
+        assert!(root.old.is_none(), "a root commit has no old side");
+        let new = root.new.expect("new side");
+        assert_eq!(new.bytes, old_bytes.len());
+        assert!(new.url.starts_with("data:image/png;base64,"), "got: {}", new.url);
+        assert_eq!(
+            base64::engine::general_purpose::STANDARD
+                .decode(new.url.split_once(',').expect("comma").1)
+                .expect("round trip"),
+            old_bytes,
+            "the data URL carries the exact blob content"
+        );
+
+        let new_bytes = vec![255u8, 216, 255, 224, 9, 0];
+        std::fs::write(repo.0.join("a.jpg"), &new_bytes).expect("new image written");
+        std::fs::remove_file(repo.0.join("a.png")).expect("removed");
+        git(&repo.0, &["add", "."]);
+        git(&repo.0, &["commit", "-q", "-m", "second"]);
+        let second_hash = run_git(repo.path(), &["rev-parse", "HEAD"]).expect("rev-parse");
+        let second_hash = second_hash.trim().to_string();
+
+        // Deleted in this commit: only the parent's copy comes back.
+        let deleted = read_image_versions_in(repo.path(), &second_hash, "a.png").expect("deleted");
+        assert!(deleted.new.is_none(), "the commit deleted the image");
+        let old = deleted.old.expect("the parent held the image");
+        assert_eq!(old.bytes, old_bytes.len());
+        assert_eq!(image_mime("a.png"), "image/png");
+        assert_eq!(image_mime("photo.JPEG"), "image/jpeg", "the lookup is case-insensitive");
+
+        // Renamed in this commit: the old blob is found under the source path.
+        std::fs::write(repo.0.join("a.jpg").with_extension("jpeg"), &new_bytes).expect("file");
+        git(&repo.0, &["mv", "a.jpg", "renamed.jpeg"]);
+        git(&repo.0, &["commit", "-q", "-m", "renamed"]);
+        let renamed_hash = run_git(repo.path(), &["rev-parse", "HEAD"]).expect("rev-parse");
+        let renamed_hash = renamed_hash.trim().to_string();
+        let renamed = read_image_versions_in(repo.path(), &renamed_hash, "renamed.jpeg").expect("renamed");
+        assert_eq!(renamed.old.expect("rename keeps the old blob").bytes, new_bytes.len());
+        assert_eq!(renamed.new.expect("renamed keeps the blob").url.starts_with("data:image/jpeg;base64,"), true);
+
+        // wip: old side = HEAD's blob, new side = the file on disk.
+        let disk_bytes = vec![1u8, 2, 3, 4, 5];
+        std::fs::write(repo.0.join("renamed.jpeg"), &disk_bytes).expect("edited on disk");
+        let wip = read_image_versions_in(repo.path(), "wip", "renamed.jpeg").expect("wip versions");
+        assert_eq!(wip.old.expect("HEAD blob").bytes, new_bytes.len(), "the old side is HEAD's copy");
+        assert_eq!(wip.new.expect("disk copy").bytes, disk_bytes.len(), "the new side is the working file");
     }
 
     /// A bare repository to push/pull against: a local-path remote, no network.

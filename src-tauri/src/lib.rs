@@ -22,6 +22,7 @@ pub fn run() {
             git::read_refs,
             git::read_stashes,
             git::read_commit_files,
+            git::read_image_versions,
             git::checkout_branch
         ])
         .run(tauri::generate_context!())
