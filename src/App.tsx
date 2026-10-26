@@ -9,6 +9,7 @@ import { DetailsPanel } from "./components/DetailsPanel";
 import type { DiffScope } from "./components/DiffViewer";
 import { EmptyState } from "./components/EmptyState";
 import { TitleBar } from "./components/TitleBar";
+import { Toast } from "./components/Toast";
 import { SettingsModal } from "./components/SettingsModal";
 import { STORAGE_KEYS, usePersistedState } from "./lib/persisted";
 import { filterCommits } from "./lib/commitFilter";
@@ -73,7 +74,10 @@ function App() {
   const [filesLoading, setFilesLoading] = useState(false);
   const [opening, setOpening] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  // One transient failure notice (a toast, bottom-right): opening a non-git folder, a failed
+  // checkout, saved tabs that no longer open. `id` re-keys the toast so a new failure restarts
+  // its auto-dismiss timer.
+  const [notice, setNotice] = useState<{ title: string; detail: string; id: number } | null>(null);
 
   // Bottom panel: closable, and its height is draggable (null = the default percentage).
   const [detailsOpen, setDetailsOpen] = usePersistedState(STORAGE_KEYS.detailsOpen, true);
@@ -146,16 +150,29 @@ function App() {
     void (async () => {
       const stored = readStoredPaths();
       const loaded: Repository[] = [];
+      const failed: string[] = [];
       for (const path of stored) {
         try {
           loaded.push(await loadRepository(path));
         } catch (loadError) {
+          failed.push(path);
           console.error(`Could not open ${path}`, loadError);
         }
       }
       if (cancelled) return;
       hydratedPaths.current = true;
       setRepos(loaded);
+      // A saved tab whose folder stopped being a repository must not vanish silently.
+      if (failed.length > 0) {
+        setNotice({
+          title:
+            failed.length === 1
+              ? "A saved repository could not be reopened"
+              : "Some saved repositories could not be reopened",
+          detail: failed.join("\n"),
+          id: Date.now(),
+        });
+      }
       const restored = loaded.some((item) => item.id === activeRepoId) ? activeRepoId : null;
       setActiveRepoId(restored ?? loaded[0]?.id ?? null);
     })()
@@ -245,7 +262,6 @@ function App() {
 
   async function handleAdd() {
     setOpening(true);
-    setError(null);
     try {
       const opened = await pickAndLoadRepository();
       if (!opened) return;
@@ -254,7 +270,11 @@ function App() {
       );
       setActiveRepoId(opened.id);
     } catch (openError) {
-      setError(openError instanceof Error ? openError.message : String(openError));
+      setNotice({
+        title: "Could not open that folder",
+        detail: openError instanceof Error ? openError.message : String(openError),
+        id: Date.now(),
+      });
     } finally {
       setOpening(false);
     }
@@ -294,7 +314,11 @@ function App() {
         previous.map((item) => (item.id === refreshed.id ? refreshed : item)),
       );
     } catch (checkoutError) {
-      setError(checkoutError instanceof Error ? checkoutError.message : String(checkoutError));
+      setNotice({
+        title: `Could not check out ${branch}`,
+        detail: checkoutError instanceof Error ? checkoutError.message : String(checkoutError),
+        id: Date.now(),
+      });
     }
   }, [activeRepoPath, opening]);
 
@@ -501,7 +525,7 @@ function App() {
           booting ? (
             <BootScreen />
           ) : (
-            <EmptyState onOpen={handleAdd} error={error} loading={opening} repos={repos} />
+            <EmptyState onOpen={handleAdd} loading={opening} repos={repos} />
           )
         ) : (
           <div className="relative grid min-h-0 flex-1 gap-2.5" style={workspaceStyle}>
@@ -520,6 +544,7 @@ function App() {
             {detailsOpen && selectedCommit !== null && (
               <DetailsPanel
                 commit={selectedCommit}
+                repoPath={repo.path}
                 files={files}
                 filesLoading={filesLoading}
                 selectedFile={selectedFile}
@@ -557,6 +582,15 @@ function App() {
           target={contextMenu}
           onCheckout={handleMenuCheckout}
           onClose={closeContextMenu}
+        />
+      )}
+
+      {notice && (
+        <Toast
+          key={notice.id}
+          title={notice.title}
+          detail={notice.detail}
+          onClose={() => setNotice(null)}
         />
       )}
     </div>

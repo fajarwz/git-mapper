@@ -32,9 +32,11 @@ class FakeGit {
   ];
   stashes = "";
   files = {
-    numstat: "2\t0\tnew.txt\n",
-    name_status: "A\tnew.txt\n",
-    diff: "diff --git a/new.txt b/new.txt\n--- /dev/null\n+++ b/new.txt\n@@ -0,0 +1,2 @@\n+one\n+two\n",
+    numstat: "2\t0\tnew.txt\n1\t1\tsecond.txt\n",
+    name_status: "A\tnew.txt\nM\tsecond.txt\n",
+    diff:
+      "diff --git a/new.txt b/new.txt\n--- /dev/null\n+++ b/new.txt\n@@ -0,0 +1,2 @@\n+one\n+two\n" +
+      "diff --git a/second.txt b/second.txt\n--- a/second.txt\n+++ b/second.txt\n@@ -1,1 +1,1 @@\n-old\n+new\n",
   };
 
   respond(op: string, args: Record<string, unknown>): Promise<unknown> {
@@ -174,8 +176,8 @@ test("the diff scope toggle stacks every file and is remembered", async () => {
   await waitFor(() => {
     assert.equal(
       container.querySelectorAll("[data-diff-file]").length,
-      1,
-      "the wip payload's one file is stacked in the single-scroll view",
+      2,
+      "the wip payload's files are stacked in the single-scroll view",
     );
   });
   assert.equal(
@@ -240,6 +242,29 @@ test("the pull button runs the git pull and refreshes", async () => {
   });
 });
 
+test("clicking a file in the list previews that file, not the previous one", async () => {
+  localStorage.setItem(STORAGE_KEYS.repos, JSON.stringify(["C:/repos/demo"]));
+  const { container } = render(<App />);
+  await waitFor(() => {
+    assert.equal(container.querySelectorAll("[data-file-item]").length, 2, "both changed files list");
+  });
+
+  const rows = [...container.querySelectorAll("[data-file-item]")];
+  const second = rows.find((row) => row.textContent?.includes("second.txt")) as HTMLElement;
+  fireEvent.click(second);
+
+  await waitFor(() => {
+    const header = container.querySelector("[data-diff] > div")?.textContent ?? "";
+    assert.ok(header.includes("second.txt"), "the diff pane switched to the clicked file");
+    assert.ok(!header.includes("new.txt"), "the previously selected file is gone from the pane");
+  });
+  assert.equal(
+    second.getAttribute("data-selected"),
+    "true",
+    "the clicked row carries the selection",
+  );
+});
+
 test("right-clicking a row opens the context menu with copy and checkout", async () => {
   localStorage.setItem(STORAGE_KEYS.repos, JSON.stringify(["C:/repos/demo"]));
   const { container } = render(<App />);
@@ -262,5 +287,56 @@ test("right-clicking a row opens the context menu with copy and checkout", async
 
   fireEvent.click(within(menu).getByText("Copy commit hash"));
   assert.deepEqual(writeText.mock.calls[0], ["H1"]);
+});
+
+test("opening a folder that is not a git repository shows a toast, repo open or not", async () => {
+  localStorage.setItem(STORAGE_KEYS.repos, JSON.stringify(["C:/repos/demo"]));
+  const { container } = render(<App />);
+  await waitFor(() => {
+    assert.equal(container.querySelectorAll("[data-commit-row]").length, 3);
+  });
+
+  // The folder picker resolves to a path — plugin-dialog calls the RAW window internals, not the
+  // mocked core module — and the backend then refuses like a non-git folder does.
+  (window as unknown as Record<string, unknown>).__TAURI_INTERNALS__ = {
+    invoke: (op: string) =>
+      op === "plugin:dialog|open" ? Promise.resolve("C:/some/plain-folder") : Promise.resolve(null),
+  };
+  vi.mocked(invoke).mockImplementation((op: string, args: Record<string, unknown>) =>
+    op === "open_repository"
+      ? Promise.reject(new Error("C:/some/plain-folder is not a Git repository"))
+      : fake.respond(op, args),
+  );
+  fireEvent.click(within(container).getByRole("button", { name: "Open repository" }));
+
+  await waitFor(() => {
+    const toast = container.querySelector("[data-toast]");
+    assert.ok(toast, "the failure toast is up even though a repo is open");
+    assert.ok(toast?.textContent?.includes("Could not open that folder"));
+    assert.ok(toast?.textContent?.includes("is not a Git repository"), "git's message rides along");
+  });
+  assert.equal(
+    container.querySelectorAll("[data-commit-row]").length,
+    3,
+    "the already-open repository is untouched",
+  );
+});
+
+test("saved tabs that no longer open are announced instead of vanishing", async () => {
+  localStorage.setItem(STORAGE_KEYS.repos, JSON.stringify(["C:/repos/gone", "C:/repos/demo"]));
+  vi.mocked(invoke).mockImplementation((op: string, args: Record<string, unknown>) =>
+    op === "open_repository" && args.dir === "C:/repos/gone"
+      ? Promise.reject(new Error("C:/repos/gone is not a Git repository"))
+      : fake.respond(op, args),
+  );
+
+  const { container } = render(<App />);
+  await waitFor(() => {
+    assert.equal(container.querySelectorAll("[data-commit-row]").length, 3, "the good tab loads");
+  });
+  const toast = container.querySelector("[data-toast]");
+  assert.ok(toast, "the failed tab gets a notice");
+  assert.ok(toast?.textContent?.includes("A saved repository could not be reopened"));
+  assert.ok(toast?.textContent?.includes("C:/repos/gone"));
 });
 

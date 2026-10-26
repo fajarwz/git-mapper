@@ -4,6 +4,7 @@ import type { ChangedFile, Commit } from "../types";
 import { copyText } from "../lib/clipboard";
 import { formatAbsoluteDate } from "../lib/format";
 import type { SyntaxScheme } from "../lib/highlight";
+import { STORAGE_KEYS, usePersistedState } from "../lib/persisted";
 import {
   DEFAULT_DETAILS_HEIGHT,
   DEFAULT_SIDEBAR_WIDTH,
@@ -14,12 +15,14 @@ import {
 } from "../lib/tableLayout";
 import { PANEL } from "../lib/ui";
 import { DiffViewer, type DiffScope } from "./DiffViewer";
-import { FileList } from "./FileList";
+import { FileList, type FileView } from "./FileList";
 import { ResizeHandle } from "./ResizeHandle";
 import { ChevronDownIcon, CloseIcon } from "./icons";
 
 interface DetailsPanelProps {
   commit: Commit;
+  /** Repo root; passed down so image files can fetch their blob versions. */
+  repoPath: string;
   files: ChangedFile[];
   filesLoading: boolean;
   selectedFile: ChangedFile | null;
@@ -35,6 +38,7 @@ interface DetailsPanelProps {
 
 export function DetailsPanel({
   commit,
+  repoPath,
   files,
   filesLoading,
   selectedFile,
@@ -52,6 +56,9 @@ export function DetailsPanel({
 
   const [summaryCollapsed, setSummaryCollapsed] = useState(false);
   const [filesCollapsed, setFilesCollapsed] = useState(false);
+  // Flat path list or the folder tree for the changed files. The panel owns it (not App) so the
+  // whole file-list domain lives here; the choice is persisted like the rest of the panel state.
+  const [fileView, setFileView] = usePersistedState<FileView>(STORAGE_KEYS.fileView, "list");
   // Click-to-copy on the hash line: the marker resets itself, and a switch of commits clears it.
   const [hashCopied, setHashCopied] = useState(false);
   const hashTimer = useRef(0);
@@ -188,6 +195,8 @@ export function DetailsPanel({
           onSelect={onSelectFile}
           collapsed={filesCollapsed}
           onToggleCollapse={() => setFilesCollapsed((collapsed) => !collapsed)}
+          view={fileView}
+          onViewChange={setFileView}
         />
       </div>
 
@@ -197,6 +206,8 @@ export function DetailsPanel({
         scope={diffScope}
         onScopeChange={onDiffScopeChange}
         scheme={syntaxScheme}
+        repoPath={repoPath}
+        commitHash={commit.hash}
       />
 
       <ResizeHandle

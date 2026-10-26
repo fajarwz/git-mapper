@@ -4,12 +4,11 @@ import { PlusIcon } from "./icons";
 
 interface EmptyStateProps {
   onOpen: () => void;
-  error: string | null;
   loading: boolean;
   repos: Repository[];
 }
 
-export function EmptyState({ onOpen, error, loading, repos }: EmptyStateProps) {
+export function EmptyState({ onOpen, loading, repos }: EmptyStateProps) {
   return (
     <div className="grid min-h-0 flex-1 place-items-center">
       <div
@@ -33,7 +32,7 @@ export function EmptyState({ onOpen, error, loading, repos }: EmptyStateProps) {
           <PlusIcon />
           {loading ? "Opening…" : "Open folder"}
         </button>
-        {error && <p className="m-0 text-[12px] wrap-break-word text-danger-ink">{error}</p>}
+        {/* Failures surface as the app-wide toast (Toast.tsx) — this card only invites. */}
       </div>
     </div>
   );
