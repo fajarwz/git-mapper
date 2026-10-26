@@ -12,7 +12,7 @@ export function BootScreen() {
       data-boot-screen
       role="status"
       aria-live="polite"
-      className="grid min-h-0 flex-1 place-items-center"
+      className="grid min-h-0 flex-1 place-items-center bg-canvas"
     >
       <div className="flex flex-col items-center gap-3">
         <span className="grid place-items-center rounded-2xl bg-primary text-white soft-shadow size-12">
