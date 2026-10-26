@@ -31,12 +31,16 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
 
 ## Architecture
 
-- `src/App.tsx` — shell: `TitleBar` row (40px) over a flex-1 content area holding the commit list + details panel, per-repo selection state, details-panel open/height state. `Repository[]` lives in state (open tabs persisted to `localStorage` under `git-mapper:open-repos`, written only after the first load lands); empty state = `EmptyState.tsx`.
+- `src/App.tsx` — shell: `TitleBar` row (40px) over a flex-1 content area holding the commit list + details panel, per-repo selection state, details-panel open/height state. `Repository[]` lives in state (open tabs persisted to `localStorage` under `git-mapper:open-repos`, written only after the first load lands); empty state = `EmptyState.tsx`. Open/checkout/restore failures surface as a bottom-right toast (`Toast.tsx`, auto-dismisses in 6s) — with tabs open the empty state never renders, so an error line there would never be seen.
 - `src/components/BootScreen.tsx` — launch screen. `App` starts `booting` true whenever `readStoredPaths()` finds saved tabs (synchronous, so the decision exists before the first paint) and clears it in the hydration effect's `finally`. While it is up the content area shows the brand + dots, **not** `EmptyState` — the open-folder card must only ever mean "no repositories are open", never "still loading". Fresh installs skip it. Dots animate via the `boot-dot` utility in index.css.
 - `src/components/TitleBar.tsx` — the window IS undecorated (`decorations: false` in `tauri.conf.json`), so this bar doubles as the title bar: brand, repo tabs (Chrome-style shrink + `tab-fade` on clipped labels), toolbar actions (a search box that filters the active repo's loaded commits — Ctrl+F focuses it, Esc clears — plus a refresh button whose glyph spins for at least 550ms so a fast local read still reads as work, and settings) and the caption buttons. Tabs reorder through `@dnd-kit/sortable` (`horizontalListSortingStrategy` + `DragOverlay`); the sensors are **pointer only**, because the keyboard sensor claims Space/Enter on the focused tab and a tab must stay activatable from the keyboard. HTML5 drag-and-drop is not an option here: the webview routes drag events to Tauri's file-drop handler. `data-tauri-drag-region` covers the bar background and the tab strip; the caption buttons need the `core:window:allow-*` entries in `src-tauri/capabilities/default.json`.
 - `src-tauri/src/git.rs` — Tauri commands running the `git` CLI: `open_repository` (validates + toplevel/name), `read_status` (branch / ahead / behind / head + the worktree digest), `read_refs` (`hash	fullref` lines), `read_log` (porcelain fields `\x00`-separated, records `\x1e`-separated, decorations lead each record), `read_log_delta` (`git log --all ^<head>`), `read_log_order` (hashes only, for splicing),
   `read_commit_files` (numstat + name-status + patch, first-parent; root via `--root`; the
   pseudo hash `wip` means the working tree), `checkout_branch`. Folder picking is JS-side via `tauri-plugin-dialog` (`dialog:default` capability).
+  Every command is a thin async wrapper (`run_blocking`, String args) around a sync `*_in` body:
+  a sync `#[tauri::command]` runs on the main thread, and one slow read (a ~20s `git status` over
+  a `\\wsl.localhost` mount) greyed the whole window out with "Not responding". Tests call the
+  `*_in` bodies directly — no `block_on` needed.
 - `src/data/gitLoader.ts` — the only `invoke()` surface: `loadRepository`, `pickAndLoadRepository`,
   `refreshRepository`, `loadCommitFiles`, plus persisted-path storage. Build the `Repository`/`Commit`
   objects there; components stay invoke-free.
@@ -66,8 +70,24 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
   sticky per-file header, so a whole commit can be read without a click per file. In `all` scope the
   file list on the left becomes a jump list: selecting a file scrolls its section into view (guarded
   `scrollIntoView`, jsdom has none). Each file keeps its own `DiffBody`, so highlighting follows that
-  file's grammar rather than the previously selected file's. The header totals every file in `all`
+  file's grammar rather than the previously selected file's. The body mounts are keyed by path —
+  reusing the instance across files painted the previous file's token HTML onto the new file's rows
+  while the new grammar loaded. Image files (png/jpg/gif/webp/bmp/ico/avif/apng — `lib/imageDiff.ts`)
+  skip line rows entirely for a GitHub-style picture diff: `read_image_versions` (Rust, mirrored by
+  the dev middleware) serves both blobs as data URLs, and `ImageDiff` renders 2-up / swipe /
+  onion-peel with pixel dimensions and byte sizes, mode persisted (`git-mapper:image-diff-mode`).
+  Blobs load lazily: an IntersectionObserver (240px margin) gates each section's read until it
+  nears the viewport — "all files" stacks every image section, and eager reads once hung the app;
+  jsdom has no observer, so tests load immediately.
+  The header totals every file in `all`
   scope and the selected file in `file` scope. Scope is persisted (`git-mapper:diff-scope`).
+- `src/components/FileList.tsx` — the changed-file sidebar. A List/Tree toggle (same segmented
+  pattern as the diff-scope toggle) sits beside the counts; DetailsPanel owns the choice and
+  persists it (`git-mapper:file-view`; `src/lib/fileTree.ts` builds the tree). The tree renders
+  one row per folder level (`data-file-dir`, folders start expanded, collapse survives while the
+  same folder path returns) with the base name only — renames keep the `old → new` hint inline.
+  Both shapes share `FileRow` and keep `data-file-item` on file rows, so the
+  selection/`[data-file-item]` selectors behave identically in list and tree mode.
 - Window focus re-checks the visible repo only (throttled to one probe per 1.5s, hidden windows skipped). Other tabs are not refreshed — they are off screen and each refresh costs git reads.
 - `src/lib/graphGeometry.ts` — `ROW_HEIGHT` is shared between `CommitRow` and the SVG graph. Change both together or dots misalign with rows.
 - `src/lib/commitFilter.ts` — `filterCommits(commits, query)`: space-separated tokens AND together, case-insensitive substring over hash, subject, body, author, email and ref-pill names (literal text — no fuzzy `_`/`-` folding). An empty query returns the input array itself so rows keep object identity. Search covers ONLY the loaded window; paging is suspended while a query is active, and deep search over unpaginated history is a planned separate slice.
@@ -99,6 +119,13 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
 
 ## Known pitfalls
 
+- **Slow repos are the WSL mount, not the row count.** Opening a repo on `\\wsl.localhost`
+  (jersium: 12.8k commits, 585 branches) measured 2.5s for the 500-row log, 0.6s refs, but ~21s
+  for `git status --porcelain` (9P stat'ing every tracked file) — the worktree digest pays that
+  on every open and focus probe. TS-side parse + lane layout of 500 rows is ~7ms and the DOM
+  render is fine, so shrinking the first page (500) or adding virtualization does nothing for
+  it; the async commands above are what keep the window alive while git grinds. A repo opened
+  from inside WSL (`git` in the distro on ext4) is the real speedup if status stays painful.
 - **Never reload the webview.** WebView2's context-menu Reload (and F5 / Ctrl+R) reloads the
   custom-protocol origin and lands on Edge's "can't reach this page" instead of the app.
   `src/lib/webview.ts` blocks both paths at startup; dev keeps the context menu for Inspect,
