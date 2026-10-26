@@ -109,8 +109,8 @@ test("add and remove line gutters use the line tone, context stays muted", () =>
   const oldGutter = (row: Element) => row.children[0]?.className ?? "";
   const newGutter = (row: Element) => row.children[1]?.className ?? "";
 
-  assert.ok(oldGutter(removeRow!).includes("text-danger-ink"), "remove line's old number is danger ink");
-  assert.ok(newGutter(addRow!).includes("text-success-ink"), "add line's new number is success ink");
+  assert.ok(oldGutter(removeRow!).includes("bg-danger/30"), "remove line's old number box is danger tinted");
+  assert.ok(newGutter(addRow!).includes("bg-success/30"), "add line's new number box is success tinted");
   assert.ok(oldGutter(addRow!).includes("text-ink/45"), "add line's empty old gutter stays muted");
   assert.ok(newGutter(removeRow!).includes("text-ink/45"), "remove line's empty new gutter stays muted");
   assert.ok(oldGutter(contextRow!).includes("text-ink/45"), "context old gutter stays muted");

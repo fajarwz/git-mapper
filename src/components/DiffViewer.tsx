@@ -42,9 +42,9 @@ const PREFIX = {
 } as const;
 
 const LINE_TONES = {
-  add: { row: "bg-success/10", text: "text-success-ink" },
-  remove: { row: "bg-danger/10", text: "text-danger-ink" },
-  context: { row: "", text: "text-ink-soft" },
+  add: { lineNumberBox: "bg-success/30", row: "bg-success/10", text: "text-success-ink" },
+  remove: { lineNumberBox: "bg-danger/30", row: "bg-danger/10", text: "text-danger-ink" },
+  context: { lineNumberBox: "", row: "", text: "text-ink-soft" },
 } as const;
 
 /** Diff gutters: ink at low alpha, GitHub's muted gray — clearly fainter than the code next to
@@ -123,12 +123,12 @@ function DiffBody({ file, wrap }: { file: ChangedFile; wrap: boolean }) {
             className={`grid ${rowSpace} grid-cols-[44px_44px_14px_auto] ${tone.row}`}
           >
             <span
-              className={`select-none border-r border-rule pr-2 text-right ${line.type === "remove" ? tone.text : GUTTER_TONE}`}
+              className={`select-none border-r border-rule pr-2 text-right ${line.type === "remove" ? tone.lineNumberBox : GUTTER_TONE}`}
             >
               {line.oldNumber ?? ""}
             </span>
             <span
-              className={`select-none border-r border-rule pr-2 text-right ${line.type === "add" ? tone.text : GUTTER_TONE}`}
+              className={`select-none border-r border-rule pr-2 text-right ${line.type === "add" ? tone.lineNumberBox : GUTTER_TONE}`}
             >
               {line.newNumber ?? ""}
             </span>
@@ -209,11 +209,7 @@ function SplitCells({
     <>
       <span
         data-diff-num={side}
-        className={`select-none border-r border-rule pr-2 text-right ${GUTTER_TONE} ${tone.row} ${
-          (side === "old" && line.type === "remove") || (side === "new" && line.type === "add")
-            ? tone.text
-            : ""
-        }`}
+        className={`select-none border-r border-rule pr-2 text-right ${line.type === "add" || line.type === "remove" ? tone.lineNumberBox : GUTTER_TONE}`}
       >
         {number ?? ""}
       </span>
