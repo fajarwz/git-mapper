@@ -50,10 +50,10 @@ export const CommitRow = memo(function CommitRow({
       }
     >
       <span className="flex min-w-0 items-center gap-2 overflow-hidden">
-        {/* Branch-coloured segment: GitKraken's connector, tying this message to its graph node. */}
+        {/* Branch-coloured segment: continues the graph's connector bar to the first character. */}
         <span
           aria-hidden="true"
-          className="h-4 w-1 shrink-0 rounded-[2px]"
+          className="h-1 w-2.5 shrink-0 rounded-r-full"
           style={{ backgroundColor: branchColor(commit.branchColor) }}
         />
         <span className={`truncate text-[13px] text-ink ${weight}`}>
