@@ -3,6 +3,10 @@
 A standalone Git history viewer for the desktop. Tauri 2, React 19, TypeScript and Tailwind CSS v4,
 reading real repositories through the `git` CLI.
 
+<img src="docs/screenshots/main-light.png" alt="Commit list, light theme" width="49%"><img src="docs/screenshots/main-dark.png" alt="Commit list, dark theme" width="49%">
+
+<img src="docs/screenshots/split-light.png" alt="Split diff, light theme" width="49%"><img src="docs/screenshots/split-dark.png" alt="Split diff, dark theme" width="49%">
+
 ## What it does
 
 - Opens repositories as tabs. Each tab remembers its selected commit, file and panel state, and
@@ -10,8 +14,12 @@ reading real repositories through the `git` CLI.
 - Commit list with a graph whose lines keep their colour from tip to root, and branch,
   remote and tag pills. Double-click a branch
   pill to check it out.
-- Details panel with commit metadata, the changed-file list and a line-numbered diff, loaded per
-  selected commit.
+- Details panel with commit metadata and the changed-file list — flat or folder tree, with status
+  badges — and a line-numbered diff with lazy syntax highlighting. Image files get a picture diff
+  (2-up, swipe, onion peel) instead of a text diff.
+- Diff layout: unified or split (old lines left, new lines right, like GitHub). The empty side of
+  an added or deleted line carries a tinted void so it reads as coming from nothing, and long
+  lines soft-wrap by default with a toggle to scroll instead.
 - An `Uncommitted changes` row on top while the working tree is dirty: staged, unstaged and
   untracked files, diffed against `HEAD`.
 - Refresh on window focus (only the commits that are new get read) or from the toolbar button.
@@ -53,4 +61,3 @@ The only thing the app changes in a repository is a branch checkout.
 
 - Searching history beyond the loaded 500-commit window.
 - Staging, committing, merging, rebasing.
-- Side-by-side diff view.
