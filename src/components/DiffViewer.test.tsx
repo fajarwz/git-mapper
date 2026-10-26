@@ -70,6 +70,11 @@ test("DiffViewer renders bare text with the sign in its own cell", () => {
   assert.ok(within(container).getByText("+2"));
   assert.ok(within(container).getByText("−1"));
   const rows = [...container.querySelectorAll("[data-diff-line]")];
+  const contextRow = rows.find((row) => row.getAttribute("data-diff-line") === "context");
+  assert.ok(
+    contextRow?.firstElementChild?.className.includes("text-ink/45"),
+    "gutters are muted gray like GitHub's, clearly fainter than the code",
+  );
   assert.deepEqual(
     rows.map((row) =>
       row.getAttribute("data-diff-line") === "hunk"
@@ -165,6 +170,125 @@ test("the scope toggle reports the clicked side and marks the active one", () =>
 
   fireEvent.click(all as HTMLElement);
   assert.deepEqual(picked, ["all"], "the click asks the owner to change scope; it does not keep it");
+});
+
+test("split layout pairs old and new side by side, hunk spanning both panes", () => {
+  const { container } = render(
+    <DiffViewer
+      files={[sampleFile]}
+      file={sampleFile}
+      scope="file"
+      onScopeChange={() => {}}
+      layout="split"
+      onLayoutChange={() => {}}
+      scheme="app"
+    />,
+  );
+
+  assert.ok(container.querySelector("[data-diff-row='hunk']"), "the hunk header is its own row");
+  const oldCells = [...container.querySelectorAll("[data-diff-code='old']")];
+  const newCells = [...container.querySelectorAll("[data-diff-code='new']")];
+  assert.deepEqual(
+    oldCells.map((cell) => cell.textContent),
+    ["kept", "gone"],
+    "the left pane carries context and removes",
+  );
+  assert.deepEqual(
+    newCells.map((cell) => cell.textContent),
+    ["kept", "came"],
+    "the right pane carries context and adds; the change block zips into one row",
+  );
+  const oldNums = [...container.querySelectorAll("[data-diff-num='old']")];
+  const newNums = [...container.querySelectorAll("[data-diff-num='new']")];
+  assert.deepEqual(oldNums.map((cell) => cell.textContent), ["1", "2"]);
+  assert.deepEqual(newNums.map((cell) => cell.textContent), ["1", "2"]);
+});
+
+test("split layout leaves the old pane blank for an added file's lines", () => {
+  const { container } = render(
+    <DiffViewer
+      files={[secondFile]}
+      file={secondFile}
+      scope="file"
+      onScopeChange={() => {}}
+      layout="split"
+      onLayoutChange={() => {}}
+      scheme="app"
+    />,
+  );
+
+  const emptyOld = container.querySelector("[data-diff-code='old'][data-diff-line='empty']");
+  assert.ok(emptyOld, "a pure addition gets blank cells, not a shifted grid");
+  assert.equal(emptyOld?.textContent, " ");
+  assert.ok(emptyOld?.className.includes("bg-ink"), "the void side carries the neutral wash, not bare sheet");
+  assert.ok(
+    container.querySelector("[data-diff-num='old']")?.className.includes("bg-ink"),
+    "the void gutter is tinted with its cell",
+  );
+  const newCell = container.querySelector("[data-diff-code='new']");
+  assert.equal(newCell?.textContent, "# hi");
+});
+
+test("the layout toggle reports the clicked side and marks the active one", () => {
+  const picked: string[] = [];
+  const { container } = render(
+    <DiffViewer
+      files={[sampleFile]}
+      file={sampleFile}
+      scope="file"
+      onScopeChange={() => {}}
+      layout="unified"
+      onLayoutChange={(next) => picked.push(next)}
+    />,
+  );
+
+  const unified = container.querySelector("[data-diff-layout='unified']");
+  const split = container.querySelector("[data-diff-layout='split']");
+  assert.equal(unified?.getAttribute("aria-pressed"), "true");
+  assert.equal(split?.getAttribute("aria-pressed"), "false");
+
+  fireEvent.click(split as HTMLElement);
+  assert.deepEqual(picked, ["split"], "the click asks the owner to change layout");
+});
+
+test("long lines wrap by default; the wrap toggle asks the owner to switch", () => {
+  const picked: boolean[] = [];
+  const { container } = render(
+    <DiffViewer
+      files={[sampleFile]}
+      file={sampleFile}
+      scope="file"
+      onScopeChange={() => {}}
+      onWrapChange={(next) => picked.push(next)}
+    />,
+  );
+
+  const row = container.querySelector("[data-diff-line='context']");
+  assert.ok(row, "the unified row is on the page");
+  assert.ok(!row.className.includes("w-max"), "wrapped rows give up max-content width");
+  assert.ok(container.querySelector(".whitespace-pre-wrap"), "content cells soft-wrap");
+
+  const button = container.querySelector("[data-diff-wrap]");
+  assert.equal(button?.getAttribute("aria-pressed"), "true");
+  fireEvent.click(button as HTMLElement);
+  assert.deepEqual(picked, [false], "the click asks the owner to turn wrapping off");
+});
+
+test("wrap off restores the scrollable max-content rows", () => {
+  const { container } = render(
+    <DiffViewer
+      files={[sampleFile]}
+      file={sampleFile}
+      scope="file"
+      onScopeChange={() => {}}
+      wrap={false}
+      onWrapChange={() => {}}
+    />,
+  );
+
+  const row = container.querySelector("[data-diff-line='context']");
+  assert.ok(row?.className.includes("w-max"), "rows size to their longest line again");
+  assert.equal(container.querySelector(".whitespace-pre-wrap"), null, "nothing soft-wraps");
 });
 
 const imageFile: ChangedFile = {

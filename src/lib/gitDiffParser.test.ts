@@ -4,7 +4,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
-import { parseCommitFiles, parseDiffSections } from "./gitDiffParser";
+import { parseCommitFiles, parseDiffSections, splitDiffRows } from "./gitDiffParser";
 import { parseLog, parseRefs } from "./gitLogParser";
 
 const T = (type, text) => ({ type, text });
@@ -120,6 +120,41 @@ test("the fake binary hunk for untracked files still renders something", () => {
     T("hunk", "@@ Binary file, not shown @@"),
     T("context", ""),
   ], "the patch's trailing newline reads as one blank context line");
+});
+
+test("splitDiffRows pairs context on both panes and zips a remove/add block", () => {
+  const lines = [
+    T("hunk", "@@ -1,4 +1,4 @@"),
+    T("context", "kept"),
+    T("remove", "gone one"),
+    T("remove", "gone two"),
+    T("add", "came one"),
+  ];
+  const rows = splitDiffRows(lines);
+  assert.deepEqual(
+    rows.map((row) => [row.hunk?.text ?? null, row.old?.text ?? null, row.new?.text ?? null]),
+    [
+      ["@@ -1,4 +1,4 @@", null, null],
+      [null, "kept", "kept"],
+      [null, "gone one", "came one"],
+      [null, "gone two", null],
+    ],
+    "context repeats on both panes; the longer side of a change block keeps its row",
+  );
+});
+
+test("splitDiffRows leaves the old pane empty for a pure addition and records source indices", () => {
+  const lines = [T("add", "brand new"), T("add", "more"), T("context", "same")];
+  const rows = splitDiffRows(lines);
+  assert.deepEqual(
+    rows.map((row) => [row.old?.text ?? null, row.new?.text ?? null]),
+    [[null, "brand new"], [null, "more"], ["same", "same"]],
+  );
+  assert.deepEqual(
+    rows.map((row) => [row.oldIndex, row.newIndex]),
+    [[-1, 0], [-1, 1], [2, 2]],
+    "indices point back into the line list for the highlight lookup; -1 = no line",
+  );
 });
 
 test("parseLog keeps multi-line bodies, real parents and the branch pill", () => {

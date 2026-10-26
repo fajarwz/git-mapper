@@ -123,6 +123,61 @@ export function parseDiffSections(raw: string): Map<string, DiffLine[]> {
   return sections;
 }
 
+export interface DiffSplitRow {
+  /** Hunk header row: spans both panes, old/new are empty. */
+  hunk: DiffLine | null;
+  /** Left pane (a remove or context) and right pane (an add or context) of one visual row. */
+  old: DiffLine | null;
+  new: DiffLine | null;
+  /** Where each side's line sits in the source list (-1 when absent), for highlight lookups. */
+  oldIndex: number;
+  newIndex: number;
+}
+
+/**
+ * Pairs a unified line list into side-by-side rows (GitHub's split view): context shows on both
+ * sides, a block of removes and adds zips into rows, and whichever side runs out stays empty.
+ */
+export function splitDiffRows(lines: DiffLine[]): DiffSplitRow[] {
+  const rows: DiffSplitRow[] = [];
+  let index = 0;
+  while (index < lines.length) {
+    const line = lines[index];
+    if (!line) break;
+    if (line.type === "hunk") {
+      rows.push({ hunk: line, old: null, new: null, oldIndex: -1, newIndex: -1 });
+      index += 1;
+      continue;
+    }
+    if (line.type === "context") {
+      rows.push({ hunk: null, old: line, new: line, oldIndex: index, newIndex: index });
+      index += 1;
+      continue;
+    }
+    const removes: Array<[DiffLine, number]> = [];
+    const adds: Array<[DiffLine, number]> = [];
+    while (index < lines.length) {
+      const pending = lines[index];
+      if (!pending || pending.type === "context" || pending.type === "hunk") break;
+      (pending.type === "remove" ? removes : adds).push([pending, index]);
+      index += 1;
+    }
+    const count = Math.max(removes.length, adds.length);
+    for (let k = 0; k < count; k += 1) {
+      const old = removes[k];
+      const add = adds[k];
+      rows.push({
+        hunk: null,
+        old: old?.[0] ?? null,
+        new: add?.[0] ?? null,
+        oldIndex: old?.[1] ?? -1,
+        newIndex: add?.[1] ?? -1,
+      });
+    }
+  }
+  return rows;
+}
+
 export function parseCommitFiles(payload: RawCommitFiles): ChangedFile[] {
   const sections = parseDiffSections(payload.diff);
   const counts = parseNumstat(payload.numstat);

@@ -80,6 +80,7 @@ export function SearchIcon({ size = 13, className = "" }: GlyphProps) {
 /* Fixed-size glyphs re-exported as-is; their dimensions live in the SVG files. */
 export { default as BrandGlyph } from "../assets/brand.svg?react";
 export { default as RefreshIcon } from "../assets/refresh.svg?react";
+export { default as TextWrapIcon } from "../assets/text-wrap.svg?react";
 export { default as WindowMinimizeIcon } from "../assets/window-minimize.svg?react";
 export { default as WindowMaximizeIcon } from "../assets/window-maximize.svg?react";
 export { default as WindowRestoreIcon } from "../assets/window-restore.svg?react";

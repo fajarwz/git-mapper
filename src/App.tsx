@@ -6,7 +6,7 @@ import { BootScreen } from "./components/BootScreen";
 import { CommitList } from "./components/CommitList";
 import { ContextMenu, type ContextMenuTarget } from "./components/ContextMenu";
 import { DetailsPanel } from "./components/DetailsPanel";
-import type { DiffScope } from "./components/DiffViewer";
+import type { DiffLayout, DiffScope } from "./components/DiffViewer";
 import { EmptyState } from "./components/EmptyState";
 import { TitleBar } from "./components/TitleBar";
 import { Toast } from "./components/Toast";
@@ -93,6 +93,10 @@ function App() {
   // Diff pane scope: one file at a time (the default) or every file in one scroll. Persisted,
   // because a reader who prefers the stacked view wants it on every launch.
   const [diffScope, setDiffScope] = usePersistedState<DiffScope>(STORAGE_KEYS.diffScope, "file");
+  // Diff line layout: unified column (the default) or GitHub's side-by-side split.
+  const [diffLayout, setDiffLayout] = usePersistedState<DiffLayout>(STORAGE_KEYS.diffLayout, "unified");
+  // Long lines soft-wrap (the pane is narrow); the wrap toggle switches back to horizontal scroll.
+  const [diffWrap, setDiffWrap] = usePersistedState<boolean>(STORAGE_KEYS.diffWrap, true);
 
   // Updates: auto (background download on launch) by default, manual as the opt-out.
   const [updateMode, setUpdateMode] = usePersistedState<UpdateMode>(STORAGE_KEYS.updateMode, "auto");
@@ -551,6 +555,10 @@ function App() {
                 onSelectFile={handleSelectFile}
                 diffScope={diffScope}
                 onDiffScopeChange={setDiffScope}
+                diffLayout={diffLayout}
+                onDiffLayoutChange={setDiffLayout}
+                diffWrap={diffWrap}
+                onDiffWrapChange={setDiffWrap}
                 syntaxScheme={syntaxScheme}
                 onClose={() => setDetailsOpen(false)}
                 onHeightChange={setDetailsHeight}

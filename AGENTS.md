@@ -81,6 +81,15 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
   jsdom has no observer, so tests load immediately.
   The header totals every file in `all`
   scope and the selected file in `file` scope. Scope is persisted (`git-mapper:diff-scope`).
+  A second toggle beside the scope switch lays the lines out: `Unified` (one stacked column, the
+  default) or `Split` (old left, new right, GitHub-style — `splitDiffRows` in `gitDiffParser.ts`
+  pairs the lines; the split body is ONE grid per file so the two panes' gutters share tracks).
+  Layout is persisted (`git-mapper:diff-layout`).
+  Long lines soft-wrap by default (the pane is narrow — GitHub's diffs scroll instead, but there
+  they are full-width); a pressed wrap icon in the header switches to scrolling, persisted
+  (`git-mapper:diff-wrap`). A split row whose other side has no line (add-only/delete-only) tints
+  that void half with a neutral `bg-ink/[0.06]` wash so "came from empty" reads at a glance.
+  Diff gutters are muted `text-ink/45` (GitHub's gray), clearly fainter than the code beside them.
 - `src/components/FileList.tsx` — the changed-file sidebar. A List/Tree toggle (same segmented
   pattern as the diff-scope toggle) sits beside the counts; DetailsPanel owns the choice and
   persists it (`git-mapper:file-view`; `src/lib/fileTree.ts` builds the tree). The tree renders
@@ -208,5 +217,5 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
 
 ## Roadmap (not built yet)
 
-Deep search over unpaginated history (loaded-window filtering is built: the title-bar search box), staging / committing / merging, a side-by-side diff view.
+Deep search over unpaginated history (loaded-window filtering is built: the title-bar search box), staging / committing / merging.
 History pages at 500 commits per read; `loadMoreCommits` appends the next page on scroll.

@@ -14,7 +14,7 @@ import {
   MIN_SIDEBAR_WIDTH,
 } from "../lib/tableLayout";
 import { PANEL } from "../lib/ui";
-import { DiffViewer, type DiffScope } from "./DiffViewer";
+import { DiffViewer, type DiffLayout, type DiffScope } from "./DiffViewer";
 import { FileList, type FileView } from "./FileList";
 import { ResizeHandle } from "./ResizeHandle";
 import { ChevronDownIcon, CloseIcon } from "./icons";
@@ -30,6 +30,12 @@ interface DetailsPanelProps {
   /** One file at a time, or every file in a single scroll (the diff pane's toggle). */
   diffScope: DiffScope;
   onDiffScopeChange: (scope: DiffScope) => void;
+  /** Diff line layout: one unified column, or old/new side by side (the diff pane's toggle). */
+  diffLayout: DiffLayout;
+  onDiffLayoutChange: (layout: DiffLayout) => void;
+  /** Soft-wrap long lines (default on); the diff pane's wrap toggle flips it. */
+  diffWrap: boolean;
+  onDiffWrapChange: (wrap: boolean) => void;
   /** Diff token palette, chosen in settings and passed straight to the DiffViewer. */
   syntaxScheme: SyntaxScheme;
   onClose: () => void;
@@ -45,6 +51,10 @@ export function DetailsPanel({
   onSelectFile,
   diffScope,
   onDiffScopeChange,
+  diffLayout,
+  onDiffLayoutChange,
+  diffWrap,
+  onDiffWrapChange,
   syntaxScheme,
   onClose,
   onHeightChange,
@@ -205,6 +215,10 @@ export function DetailsPanel({
         file={selectedFile}
         scope={diffScope}
         onScopeChange={onDiffScopeChange}
+        layout={diffLayout}
+        onLayoutChange={onDiffLayoutChange}
+        wrap={diffWrap}
+        onWrapChange={onDiffWrapChange}
         scheme={syntaxScheme}
         repoPath={repoPath}
         commitHash={commit.hash}
