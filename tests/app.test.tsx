@@ -111,6 +111,23 @@ test("a fresh install shows the empty state and never touches git", () => {
   assert.equal(container.querySelectorAll("[data-commit-row]").length, 0);
 });
 
+test("a launch with saved tabs boots instead of flashing the open-folder card", () => {
+  localStorage.setItem(STORAGE_KEYS.repos, JSON.stringify(["C:/repos/demo"]));
+  // Hold the very first read open: that is the window the launch screen has to cover.
+  vi.mocked(invoke).mockImplementation((op: string, args: Record<string, unknown>) =>
+    op === "open_repository" ? new Promise(() => {}) : fake.respond(op, args),
+  );
+
+  const { container } = render(<App />);
+
+  assert.ok(container.querySelector("[data-boot-screen]"), "the launch screen is up");
+  assert.equal(
+    within(container).queryByText("Open a Git repository"),
+    null,
+    "the empty state never paints while saved tabs are still loading",
+  );
+});
+
 test("a stored path hydrates rows on launch, loads wip files and shows pills", async () => {
   localStorage.setItem(STORAGE_KEYS.repos, JSON.stringify(["C:/repos/demo"]));
   const { container } = render(<App />);
@@ -119,6 +136,7 @@ test("a stored path hydrates rows on launch, loads wip files and shows pills", a
     assert.equal(container.querySelectorAll("[data-commit-row]").length, 3,
       "wip, then two history rows (no stashes in the fake)");
   });
+  assert.equal(container.querySelector("[data-boot-screen]"), null, "the launch screen is gone");
   assert.ok(fake.calls.includes("open_repository"));
   assert.ok(fake.calls.includes("read_log"));
   assert.ok(fake.calls.includes("read_stashes"), "stash rows are looked up on every load");
