@@ -26,7 +26,7 @@ jobs:
         include:
           - platform: macos-latest # Apple Silicon
             args: --target aarch64-apple-darwin
-          - platform: macos-13 # Intel
+          - platform: macos-latest # Intel, cross-compiled from an Apple Silicon runner
             args: --target x86_64-apple-darwin
           - platform: ubuntu-22.04
             args: ""
@@ -43,7 +43,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ matrix.platform == 'macos-latest' && 'aarch64-apple-darwin' || matrix.platform == 'macos-13' && 'x86_64-apple-darwin' || '' }}
+          targets: ${{ contains(matrix.args, 'x86_64') && 'x86_64-apple-darwin' || contains(matrix.args, 'aarch64') && 'aarch64-apple-darwin' || '' }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
