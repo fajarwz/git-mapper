@@ -8,7 +8,7 @@
 [![Downloads](https://img.shields.io/github/downloads/fajarwz/git-mapper/total?labelColor=26233a&color=6e56cf&logo=github)](https://github.com/fajarwz/git-mapper/releases)
 [![Build release](https://github.com/fajarwz/git-mapper/actions/workflows/release.yml/badge.svg)](https://github.com/fajarwz/git-mapper/actions/workflows/release.yml)
 ![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue?labelColor=26233a)
-![Built with](https://img.shields.io/badge/Tauri%202-React%2019-TypeScript-6e56cf?labelColor=26233a)
+![Built with](https://img.shields.io/badge/Tauri_2_%C2%B7_React_19_%C2%B7_TypeScript-6e56cf?labelColor=26233a)
 
 A standalone Git history viewer for the desktop. Tauri 2, React 19, TypeScript and Tailwind CSS v4,
 reading real repositories through the `git` CLI.
