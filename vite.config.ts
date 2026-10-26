@@ -237,6 +237,87 @@ function gitDevApi(): Plugin {
       }
       return payload;
     },
+    // Mirrors read_image_versions in src-tauri/src/git.rs: blob bytes → base64 data URLs.
+    read_image_versions: ({ dir, hash, path: filePath }) => {
+      const repoDir = String(dir);
+      const h = String(hash);
+      const p = String(filePath);
+      const MAX_IMAGE_BYTES = 20 * 1024 * 1024;
+      const runBytes = (args: string[]): Buffer | null => {
+        try {
+          return execFileSync("git", args, { cwd: repoDir, encoding: "buffer" }) as Buffer;
+        } catch {
+          return null;
+        }
+      };
+      const utf8 = (args: string[]): string => {
+        try {
+          return run(repoDir, args);
+        } catch {
+          return "";
+        }
+      };
+      const mimeFor = (file: string): string => {
+        const mimes: Record<string, string> = {
+          png: "image/png",
+          jpg: "image/jpeg",
+          jpeg: "image/jpeg",
+          gif: "image/gif",
+          webp: "image/webp",
+          bmp: "image/bmp",
+          ico: "image/x-icon",
+          avif: "image/avif",
+          apng: "image/apng",
+        };
+        const ext = file.toLowerCase().split(".").pop() ?? "";
+        return mimes[ext] ?? "application/octet-stream";
+      };
+      const version = (bytes: Buffer | null, file: string) => {
+        if (bytes === null) return null;
+        if (bytes.length > MAX_IMAGE_BYTES) {
+          return { url: "", bytes: bytes.length, tooLarge: true };
+        }
+        return {
+          url: `data:${mimeFor(file)};base64,${bytes.toString("base64")}`,
+          bytes: bytes.length,
+          tooLarge: false,
+        };
+      };
+      // Empty old rev = no previous copy (root commit, or unborn branch under wip).
+      let oldRev = "";
+      if (h === "wip") {
+        if (utf8(["rev-parse", "--verify", "HEAD"]).trim() !== "") oldRev = "HEAD";
+      } else if (utf8(["rev-parse", "--verify", `${h}^1`]).trim() !== "") {
+        oldRev = `${h}^1`;
+      }
+      const blob = (rev: string, file: string) =>
+        rev === "" ? null : runBytes(["cat-file", "blob", `${rev}:${file}`]);
+      let oldBytes = blob(oldRev, p);
+      if (oldBytes === null && oldRev !== "") {
+        // A rename moved the file: the old blob lives under the source path (R/C entries).
+        const status = utf8(oldRev === "HEAD"
+          ? ["diff", "--no-color", "--name-status", "HEAD"]
+          : ["diff", "--no-color", "--name-status", oldRev, h]);
+        for (const line of status.split("\n")) {
+          const fields = line.split("\t");
+          if (fields.length >= 3 && /^[RC]/.test(fields[0]) && fields[2] === p) {
+            oldBytes = blob(oldRev, fields[1]);
+            break;
+          }
+        }
+      }
+      const newBytes =
+        h === "wip"
+          ? (() => {
+              try {
+                return fs.readFileSync(path.join(repoDir, p));
+              } catch {
+                return null; // Vanished between the file list and this read.
+              }
+            })()
+          : blob(h, p);
+      return { old: version(oldBytes, p), new: version(newBytes, p) };
+    },
   };
 
   return {

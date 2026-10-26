@@ -21,6 +21,10 @@ export interface DiffLine {
 
 export interface ChangedFile {
   path: string;
+  /** For renames/copies: the path the file moved from, shown as "old → new". */
+  oldPath?: string;
+  /** Rename/copy similarity in percent (git's R100 → 100); only present for renames. */
+  renameScore?: number;
   status: FileStatus;
   additions: number;
   deletions: number;

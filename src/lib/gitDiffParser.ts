@@ -26,6 +26,8 @@ interface NameStatusEntry {
   status: FileStatus;
   path: string;
   oldPath?: string;
+  /** Similarity percent parsed from the R/C code (R100 → 100). */
+  score?: number;
 }
 
 function parseNameStatus(raw: string): NameStatusEntry[] {
@@ -33,11 +35,18 @@ function parseNameStatus(raw: string): NameStatusEntry[] {
   for (const line of raw.split("\n")) {
     if (!line.trim()) continue;
     const parts = line.split("\t");
-    const letter = parts[0][0] ?? "";
+    const code = parts[0] ?? "";
+    const letter = code[0] ?? "";
     const status = STATUS_TYPES[letter];
     if (!status) continue;
     if (letter === "R" || letter === "C") {
-      out.push({ status, path: parts[2], oldPath: parts[1] });
+      const score = Number(code.slice(1));
+      out.push({
+        status,
+        path: parts[2],
+        oldPath: parts[1],
+        score: Number.isFinite(score) ? score : undefined,
+      });
     } else {
       out.push({ status, path: parts[1] });
     }
@@ -122,6 +131,8 @@ export function parseCommitFiles(payload: RawCommitFiles): ChangedFile[] {
     const count = counts.get(entry.path) ?? { additions: 0, deletions: 0 };
     return {
       path: entry.path,
+      oldPath: entry.oldPath,
+      renameScore: entry.score,
       status: entry.status,
       additions: count.additions,
       deletions: count.deletions,

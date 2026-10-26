@@ -119,6 +119,27 @@
   box-shadow: var(--shadow-soft);
 }
 
+/* GitHub-style transparency checkerboard behind diffed images. Tokens only, so it themes. */
+@utility image-checker {
+  background-image:
+    linear-gradient(
+      45deg,
+      var(--color-rule) 25%,
+      transparent 25%,
+      transparent 75%,
+      var(--color-rule) 75%
+    ),
+    linear-gradient(
+      45deg,
+      var(--color-rule) 25%,
+      transparent 25%,
+      transparent 75%,
+      var(--color-rule) 75%
+    );
+  background-position: 0 0, 8px 8px;
+  background-size: 16px 16px;
+}
+
 /* Chrome-style fade on a tab label that no longer fits; applied only while clipped. */
 @utility tab-fade {
   mask-image: linear-gradient(to right, #000 calc(100% - 18px), transparent);

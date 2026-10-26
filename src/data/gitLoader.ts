@@ -547,6 +547,45 @@ export async function loadCommitFiles(repoPath: string, hash: string): Promise<C
   return parseCommitFiles(payload);
 }
 
+interface RawImageVersion {
+  url: string;
+  bytes: number;
+  tooLarge: boolean;
+}
+
+interface RawImageVersions {
+  old: RawImageVersion | null;
+  new: RawImageVersion | null;
+}
+
+/** One side of an image diff: the blob as a data URL, ready for an <img> src. */
+export interface ImageVersion {
+  url: string;
+  bytes: number;
+  tooLarge: boolean;
+}
+
+export interface ImageVersions {
+  /** The parent's copy; null when the file was added (or the commit is a root). */
+  previous: ImageVersion | null;
+  /** The commit's copy; null when the file was deleted (the working file for "wip"). */
+  current: ImageVersion | null;
+}
+
+/** Both copies of an image file change, served as data URLs by the Rust command. */
+export async function loadImageVersions(
+  repoPath: string,
+  hash: string,
+  path: string,
+): Promise<ImageVersions> {
+  const raw = await call<RawImageVersions>(
+    "read_image_versions",
+    { dir: repoPath, hash, path },
+    (response) => response as RawImageVersions,
+  );
+  return { previous: raw.old ?? null, current: raw.new ?? null };
+}
+
 export function readStoredPaths(): string[] {
   try {
     const stored = JSON.parse(localStorage.getItem(OPEN_REPOS_KEY) ?? "[]");

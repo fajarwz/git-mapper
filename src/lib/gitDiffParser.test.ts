@@ -33,6 +33,9 @@ test("name-status letters become statuses, renames carry the live path", () => {
     ],
     "T is a typechange (rendered as modified); U does not map, so the entry is dropped",
   );
+  assert.equal(files[3].oldPath, "old/here.ts", "the rename keeps its source path");
+  assert.equal(files[3].renameScore, 100);
+  assert.equal(files[0].oldPath, undefined, "plain changes have no old path");
 });
 
 test("numstat counts land on the renamed live path; binary counts stay zero", () => {

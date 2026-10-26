@@ -24,6 +24,18 @@ export const STATUS_LABELS: Record<FileStatus, string> = {
   renamed: "Renamed",
 };
 
+/**
+ * Status badges, GitHub-style: the letter sits on its own hue (green added, amber modified,
+ * red deleted, violet renamed) so a scan of the file list reads the change kind at a glance.
+ * Tokens only; `.dark` re-points the ink colors without any dark: variants here.
+ */
+export const STATUS_TONES: Record<FileStatus, string> = {
+  added: "bg-success/15 text-success-ink",
+  modified: "bg-warning/15 text-warning-ink",
+  deleted: "bg-danger/15 text-danger-ink",
+  renamed: "bg-primary/15 text-primary-ink",
+};
+
 export function statusLetter(status: FileStatus): string {
   switch (status) {
     case "added":

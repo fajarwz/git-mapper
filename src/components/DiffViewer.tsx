@@ -1,7 +1,9 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangedFile } from "../types";
-import { STATUS_LABELS, numberDiffLines } from "../lib/format";
+import { STATUS_LABELS, STATUS_TONES, numberDiffLines } from "../lib/format";
 import { highlightSync, languageForPath, loadHighlighter, type SyntaxScheme } from "../lib/highlight";
+import { isImageFile } from "../lib/imageDiff";
+import { ImageDiff } from "./ImageDiff";
 
 /**
  * Which files the diff pane shows. "file" is the classic one-file-at-a-time view; "all" stacks
@@ -18,6 +20,9 @@ interface DiffViewerProps {
   onScopeChange: (scope: DiffScope) => void;
   /** Which syntax palette the tokens use (see index.css `data-syntax` blocks). Default: app. */
   scheme?: SyntaxScheme;
+  /** Where the image diff fetches its blobs: the repo path and the selected commit's hash. */
+  repoPath?: string;
+  commitHash?: string;
 }
 
 const PREFIX = {
@@ -34,7 +39,10 @@ const LINE_TONES = {
 
 /**
  * One file's diff lines, with its own lazy grammar load. Mounted per file so the highlighting
- * follows that file's language instead of whichever file was selected before.
+ * follows that file's language instead of whichever file was selected before. The mount has to
+ * be forced per file (key={file.path} at the call sites): reusing the instance across files kept
+ * the PREVIOUS file's token HTML on the new file's rows until the new grammar resolved — the
+ * preview read as the other file.
  */
 function DiffBody({ file }: { file: ChangedFile }) {
   const lines = useMemo(() => numberDiffLines(file.diff), [file]);
@@ -43,6 +51,7 @@ function DiffBody({ file }: { file: ChangedFile }) {
   // until then, and a file whose language we do not know just stays plain forever.
   const [highlighted, setHighlighted] = useState<string[] | null>(null);
   useEffect(() => {
+    setHighlighted(null);
     const language = languageForPath(file.path);
     if (!language || lines.length === 0) {
       setHighlighted(null);
@@ -109,16 +118,63 @@ function DiffBody({ file }: { file: ChangedFile }) {
   );
 }
 
+/** The diff body routes itself: image files get the GitHub-style picture diff, text gets lines. */
+function DiffSection({
+  file,
+  repoPath,
+  commitHash,
+}: {
+  file: ChangedFile;
+  repoPath?: string;
+  commitHash?: string;
+}) {
+  return isImageFile(file.path) ? (
+    <ImageDiff key={file.path} file={file} repoPath={repoPath} commitHash={commitHash} />
+  ) : (
+    <DiffBody key={file.path} file={file} />
+  );
+}
+
+/** Path line, as "old → new" when the file moved, so a rename reads at a glance. */
+function FilePath({ file }: { file: ChangedFile }) {
+  if (!file.oldPath) {
+    return (
+      <span className="min-w-0 truncate font-mono text-[11.5px] font-medium text-ink" title={file.path}>
+        {file.path}
+      </span>
+    );
+  }
+  return (
+    <span
+      className="flex min-w-0 items-center gap-1.5 font-mono text-[11.5px]"
+      title={`${file.oldPath} → ${file.path}`}
+    >
+      <span className="min-w-0 truncate text-ink-soft">{file.oldPath}</span>
+      <span className="shrink-0 text-ink-dim">→</span>
+      <span className="min-w-0 truncate font-medium text-ink">{file.path}</span>
+    </span>
+  );
+}
+
+/** Rename similarity, GitHub-style: only shown when the file actually changed while moving. */
+function RenameScore({ file }: { file: ChangedFile }) {
+  if (file.renameScore === undefined || file.renameScore >= 100) return null;
+  return (
+    <span className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10.5px] font-semibold text-primary-ink">
+      {file.renameScore}%
+    </span>
+  );
+}
+
 /** One file's header: path, status, line counts. Sticky, for the stacked "all files" view. */
 function FileHeader({ file }: { file: ChangedFile }) {
   return (
     <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-rule bg-sheet-strong px-3.5 py-2 backdrop-blur-md">
-      <span className="min-w-0 truncate font-mono text-[11.5px] font-medium text-ink" title={file.path}>
-        {file.path}
-      </span>
-      <span className="shrink-0 rounded-full bg-sheet-strong px-2 py-0.5 text-[10.5px] font-semibold text-ink-dim">
+      <FilePath file={file} />
+      <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${STATUS_TONES[file.status]}`}>
         {STATUS_LABELS[file.status]}
       </span>
+      <RenameScore file={file} />
       <span className="ml-auto flex shrink-0 gap-2 font-mono text-[11px] font-semibold">
         <span className="text-success-ink">+{file.additions}</span>
         <span className="text-danger-ink">−{file.deletions}</span>
@@ -167,7 +223,15 @@ function ScopeToggle({
   );
 }
 
-export function DiffViewer({ files, file, scope, onScopeChange, scheme = "app" }: DiffViewerProps) {
+export function DiffViewer({
+  files,
+  file,
+  scope,
+  onScopeChange,
+  scheme = "app",
+  repoPath,
+  commitHash,
+}: DiffViewerProps) {
   const totals = useMemo(
     () =>
       files.reduce(
@@ -197,16 +261,17 @@ export function DiffViewer({ files, file, scope, onScopeChange, scheme = "app" }
           <span className="min-w-0 truncate font-mono text-[11.5px] font-medium text-ink">
             {files.length} file{files.length === 1 ? "" : "s"} changed
           </span>
+        ) : file ? (
+          <FilePath file={file} />
         ) : (
-          <span className="min-w-0 truncate font-mono text-[11.5px] font-medium text-ink" title={file?.path}>
-            {file ? file.path : "Diff"}
-          </span>
+          <span className="min-w-0 truncate font-mono text-[11.5px] font-medium text-ink">Diff</span>
         )}
         {scope === "file" && file && (
-          <span className="shrink-0 rounded-full bg-sheet-strong px-2 py-0.5 text-[10.5px] font-semibold text-ink-dim">
+          <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${STATUS_TONES[file.status]}`}>
             {STATUS_LABELS[file.status]}
           </span>
         )}
+        {scope === "file" && file && <RenameScore file={file} />}
         <span className="ml-auto flex shrink-0 gap-2 font-mono text-[11px] font-semibold">
           <span className="text-success-ink">
             +{scope === "all" ? totals.additions : (file?.additions ?? 0)}
@@ -237,7 +302,7 @@ export function DiffViewer({ files, file, scope, onScopeChange, scheme = "app" }
               >
                 <FileHeader file={item} />
                 <div className="pt-1">
-                  <DiffBody file={item} />
+                  <DiffSection file={item} repoPath={repoPath} commitHash={commitHash} />
                 </div>
               </section>
             ))}
@@ -247,7 +312,7 @@ export function DiffViewer({ files, file, scope, onScopeChange, scheme = "app" }
         // One file at a time: the panel header above IS this file's header.
         <div className="min-h-0 flex-1 overflow-auto bg-sheet pb-3 pt-1 font-mono text-[12px] leading-[1.6]">
           {file ? (
-            <DiffBody file={file} />
+            <DiffSection file={file} repoPath={repoPath} commitHash={commitHash} />
           ) : (
             <p className="m-0 p-4 font-sans text-[12px] text-ink-dim">
               Select a changed file to see its diff.
