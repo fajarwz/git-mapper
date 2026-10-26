@@ -138,7 +138,7 @@ function SortableTab({ item, active, suppressed, onSelect, onClose }: SortableTa
         transform: CSS.Transform.toString(transform),
         transition,
       }}
-      className={`inline-flex h-7 min-w-0 items-center gap-1 rounded-lg border border-transparent bg-glass-soft pl-2.5 text-left text-ink-soft backdrop-blur-md transition-colors hover:bg-hover-glass data-[active=true]:border-hairline data-[active=true]:bg-glass-strong data-[active=true]:text-ink data-[active=true]:soft-shadow data-[dragging=true]:opacity-30`}
+      className={`inline-flex h-7 min-w-0 items-center gap-1 rounded-lg border border-transparent bg-glass-soft pl-2.5 text-left text-ink-soft backdrop-blur-md transition-[background-color,border-color,color,box-shadow] hover:bg-glass hover:text-ink hover:soft-shadow data-[active=true]:border-hairline data-[active=true]:bg-glass-strong data-[active=true]:text-ink data-[active=true]:soft-shadow data-[dragging=true]:opacity-30`}
     >
       <button
         type="button"
