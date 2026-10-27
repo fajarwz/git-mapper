@@ -8,6 +8,7 @@ import { invoke } from "@tauri-apps/api/core";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
 import App from "../src/App";
+import { SLEEP_AFTER_MS, SLEEP_TICK_MS } from "../src/data/gitLoader";
 import { STORAGE_KEYS } from "../src/lib/persisted";
 import { ROW_HEIGHT } from "../src/lib/graphGeometry";
 import type { Repository } from "../src/types";
@@ -43,7 +44,11 @@ class FakeGit {
     this.calls.push(op);
     switch (op) {
       case "open_repository":
-        return Promise.resolve({ path: this.openPath, name: this.name });
+        // Echo the requested dir so several tabs get distinct ids (id === path).
+        return Promise.resolve({
+          path: (args.dir as string) ?? this.openPath,
+          name: ((args.dir as string) ?? this.openPath).split("/").pop() ?? this.name,
+        });
       case "read_status":
         return Promise.resolve({
           branch: this.branch,
@@ -338,5 +343,38 @@ test("saved tabs that no longer open are announced instead of vanishing", async 
   assert.ok(toast, "the failed tab gets a notice");
   assert.ok(toast?.textContent?.includes("A saved repository could not be reopened"));
   assert.ok(toast?.textContent?.includes("C:/repos/gone"));
+});
+
+test("an inactive tab sleeps after five minutes and reloads when clicked", async () => {
+  localStorage.setItem(STORAGE_KEYS.repos, JSON.stringify(["C:/repos/demo", "C:/repos/other"]));
+  // Fake timers go up BEFORE render: the sleep interval arms at mount, so it must be created
+  // on the faked clock for advanceTimersByTimeAsync to reach it.
+  vi.useFakeTimers();
+  vi.setSystemTime(new Date());
+  const { container } = render(<App />);
+  const flush = async () => {
+    for (let i = 0; i < 50 && container.querySelectorAll("[data-commit-row]").length === 0; i++) {
+      await vi.advanceTimersByTimeAsync(10);
+    }
+  };
+  await flush();
+  assert.equal(container.querySelectorAll("[data-commit-row]").length, 3, "the active tab loads");
+
+  await vi.advanceTimersByTimeAsync(SLEEP_AFTER_MS + SLEEP_TICK_MS);
+  const sleepingTab = container.querySelector('[data-sleeping="true"]');
+  assert.ok(sleepingTab, "the inactive tab is marked as sleeping");
+  assert.equal(sleepingTab?.getAttribute("data-tab-id"), "C:/repos/other");
+
+  vi.useRealTimers();
+  fireEvent.click(within(container).getByRole("tab", { name: "other" }));
+  await waitFor(() => {
+    assert.equal(container.querySelectorAll("[data-commit-row]").length, 3, "the tab reloaded");
+  });
+  const wakeReads = vi
+    .mocked(invoke)
+    .mock.calls.filter(
+      ([op, args]) => op === "read_log" && (args as Record<string, unknown>).dir === "C:/repos/other",
+    );
+  assert.ok(wakeReads.length > 0, "waking re-read the sleeping tab's history");
 });
 

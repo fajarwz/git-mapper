@@ -36,6 +36,9 @@ import {
   readStoredPaths,
   refreshRepository,
   UNCOMMITTED_HASH,
+  FILES_CACHE_CAP,
+  SLEEP_AFTER_MS,
+  SLEEP_TICK_MS,
   storePaths,
 } from "./data/gitLoader";
 import type { Repository } from "./types";
@@ -69,10 +72,15 @@ function App() {
     {},
   );
   const [filesByCommitHash, setFilesByCommitHash] = useState<Record<string, ChangedFile[]>>({});
+  // Insert order of the cache keys, newest last: the cap drops from the front (least recently
+  // used). Full patch text per commit adds up fast, and nothing ever read it back before.
+  const filesCacheOrder = useRef<string[]>([]);
   const [loadingMoreByRepo, setLoadingMoreByRepo] = useState<Record<string, boolean>>({});
   const [allLoadedByRepo, setAllLoadedByRepo] = useState<Record<string, boolean>>({});
   const [filesLoading, setFilesLoading] = useState(false);
   const [opening, setOpening] = useState(false);
+  // The sleeping tab being reloaded right now (its history was dropped; see the sleep timer).
+  const [wakingId, setWakingId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   // One transient failure notice (a toast, bottom-right): opening a non-git folder, a failed
   // checkout, saved tabs that no longer open. `id` re-keys the toast so a new failure restarts
@@ -153,16 +161,20 @@ function App() {
     let cancelled = false;
     void (async () => {
       const stored = readStoredPaths();
+      // Parallel on purpose: hydration is nothing but git reads, and the read time
+      // per tab dominates cold start with several tabs, so this wait is the max of
+      // the per-tab loads, not their sum. Paths stay in stored order via index.
+      const results = await Promise.allSettled(stored.map((path) => loadRepository(path)));
       const loaded: Repository[] = [];
       const failed: string[] = [];
-      for (const path of stored) {
-        try {
-          loaded.push(await loadRepository(path));
-        } catch (loadError) {
-          failed.push(path);
-          console.error(`Could not open ${path}`, loadError);
+      results.forEach((result, index) => {
+        if (result.status === "fulfilled") {
+          loaded.push(result.value);
+        } else {
+          failed.push(stored[index]);
+          console.error(`Could not open ${stored[index]}`, result.reason);
         }
-      }
+      });
       if (cancelled) return;
       hydratedPaths.current = true;
       setRepos(loaded);
@@ -220,6 +232,32 @@ function App() {
     files[0] ??
     null;
 
+  const storeFiles = useCallback((key: string, files: ChangedFile[]) => {
+    const order = filesCacheOrder.current.filter((cached) => cached !== key);
+    order.push(key);
+    const evicted = order.length > FILES_CACHE_CAP ? order.splice(0, order.length - FILES_CACHE_CAP) : [];
+    filesCacheOrder.current = order;
+    setFilesByCommitHash((previous) => {
+      if (evicted.length === 0) return { ...previous, [key]: files };
+      const next = { ...previous, [key]: files };
+      for (const dropped of evicted) delete next[dropped];
+      return next;
+    });
+  }, []);
+
+  // Drops every cached payload of one repository: when its tab closes, and when the tab sleeps.
+  const evictRepoFiles = useCallback((repoPath: string) => {
+    const prefix = `${repoPath}::`;
+    const kept = filesCacheOrder.current.filter((key) => !key.startsWith(prefix));
+    if (kept.length === filesCacheOrder.current.length) return;
+    filesCacheOrder.current = kept;
+    setFilesByCommitHash((previous) => {
+      const next: Record<string, ChangedFile[]> = {};
+      for (const key of kept) next[key] = previous[key];
+      return next;
+    });
+  }, []);
+
   // Real diffs load per selected commit; files stay out of the commit list on purpose.
   useEffect(() => {
     if (!repo || !selectedCommit || !selectedFilesKey) return;
@@ -229,12 +267,12 @@ function App() {
     setFilesLoading(true);
     loadCommitFiles(repo.path, selectedCommit.hash)
       .then((loaded) => {
-        if (!cancelled) setFilesByCommitHash((prev) => ({ ...prev, [cacheKey]: loaded }));
+        if (!cancelled) storeFiles(cacheKey, loaded);
       })
       .catch((loadError) => {
         if (!cancelled) {
           console.error("Could not read changed files", loadError);
-          setFilesByCommitHash((prev) => ({ ...prev, [cacheKey]: [] }));
+          storeFiles(cacheKey, []);
         }
       })
       .finally(() => {
@@ -243,12 +281,33 @@ function App() {
     return () => {
       cancelled = true;
     };
-  }, [repo, selectedCommit, selectedFilesKey, filesByCommitHash]);
+  }, [repo, selectedCommit, selectedFilesKey, filesByCommitHash, storeFiles]);
 
-  const handleSelectRepo = useCallback((id: string) => {
-    setActiveRepoId(id);
-    setQuery("");
-  }, [setActiveRepoId]);
+  const handleSelectRepo = useCallback(
+    (id: string) => {
+      setActiveRepoId(id);
+      setQuery("");
+      const target = repos.find((item) => item.id === id);
+      if (!target?.sleeping) return;
+      setWakingId(id);
+      loadRepository(target.path)
+        .then((loaded) => {
+          setRepos((previous) =>
+            previous.map((item) => (item.id === loaded.id ? loaded : item)),
+          );
+        })
+        .catch((wakeError) => {
+          console.error("Could not wake the repository", wakeError);
+          setNotice({
+            title: "Could not reopen that repository",
+            detail: wakeError instanceof Error ? wakeError.message : String(wakeError),
+            id: Date.now(),
+          });
+        })
+        .finally(() => setWakingId((current) => (current === id ? null : current)));
+    },
+    [repos],
+  );
 
   // Tab order is the order of this array, so a drag is just a splice; the persist effect
   // stores the new order straight after.
@@ -285,6 +344,8 @@ function App() {
   }
 
   function handleCloseRepo(id: string) {
+    const closed = repos.find((item) => item.id === id);
+    if (closed) evictRepoFiles(closed.path);
     setRepos((previous) => {
       const next = previous.filter((item) => item.id !== id);
       if (id === activeRepoId) {
@@ -461,6 +522,49 @@ function App() {
     };
   }, [repo, opening, showFlash]);
 
+  // Tab sleeping, Chrome-style: a tab left inactive long enough drops its history and its
+  // cached file payloads. The repo object keeps name/path/branch so the tab strip stays
+  // readable; clicking the tab reloads it (handleSelectRepo). Mirrors keep the interval from
+  // re-arming on every state change, and the active tab never sleeps.
+  const reposRef = useRef<Repository[]>([]);
+  const activeIdRef = useRef<string | null>(null);
+  const lastActiveAt = useRef<Record<string, number>>({});
+  useEffect(() => {
+    reposRef.current = repos;
+    const now = Date.now();
+    for (const item of repos) {
+      if (lastActiveAt.current[item.id] === undefined) lastActiveAt.current[item.id] = now;
+    }
+  }, [repos]);
+  useEffect(() => {
+    activeIdRef.current = activeRepoId;
+    if (activeRepoId) lastActiveAt.current[activeRepoId] = Date.now();
+  }, [activeRepoId]);
+  useEffect(() => {
+    const timer = window.setInterval(() => {
+      const now = Date.now();
+      const tired = reposRef.current.filter(
+        (item) =>
+          !item.sleeping &&
+          item.id !== activeIdRef.current &&
+          now - (lastActiveAt.current[item.id] ?? now) >= SLEEP_AFTER_MS,
+      );
+      if (tired.length === 0) return;
+      const tiredIds = new Set(tired.map((item) => item.id));
+      setRepos((previous) =>
+        previous.map((item) =>
+          tiredIds.has(item.id) ? { ...item, sleeping: true, commits: [] } : item,
+        ),
+      );
+      for (const item of tired) {
+        evictRepoFiles(item.path);
+        setAllLoadedByRepo((previous) => ({ ...previous, [item.id]: false }));
+        setLoadingMoreByRepo((previous) => ({ ...previous, [item.id]: false }));
+      }
+    }, SLEEP_TICK_MS);
+    return () => window.clearInterval(timer);
+  }, [evictRepoFiles]);
+
   // The highlight is only a hint: drop it once the animation has played out.
   useEffect(() => {
     if (flashHashes.length === 0) return;
@@ -541,6 +645,7 @@ function App() {
               onSelect={handleSelectCommit}
               flashHashes={flashSet}
             loadingMore={loadingMoreByRepo[repo.id] ?? false}
+              waking={repo.id === wakingId}
               onNearBottom={handleNearBottom}
               onCheckoutBranch={handleCheckoutBranch}
               onContextMenu={(commit, ref, x, y) => setContextMenu({ commit, ref, x, y })}

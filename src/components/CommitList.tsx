@@ -37,6 +37,8 @@ interface CommitListProps {
   flashHashes: Set<string>;
   onSelect: (hash: string) => void;
   loadingMore: boolean;
+  /** True while a slept tab reloads after being clicked: history is on its way back. */
+  waking?: boolean;
   onNearBottom: () => void;
   onCheckoutBranch: (branch: string) => void;
   /** Right-click on a row (or one of its pills): opens the commit context menu. */
@@ -49,7 +51,7 @@ function widthOf(element: HTMLElement | null, fallback: number): number {
 
 const HEADER_CELL = "relative flex h-full min-w-0 items-center";
 
-export function CommitList({ repo, commits, query, selectedHash, flashHashes, onSelect, loadingMore, onNearBottom, onCheckoutBranch, onContextMenu }: CommitListProps) {
+export function CommitList({ repo, commits, query, selectedHash, flashHashes, onSelect, loadingMore, waking = false, onNearBottom, onCheckoutBranch, onContextMenu }: CommitListProps) {
   // One layout for the graph column and the SVG. Sizing the column from the dot lanes alone used to
   // clip the graph whenever a line ran right of every dot.
   const layout = useMemo(
@@ -245,6 +247,9 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
             <p className="m-0 py-2 text-center text-[12px] text-ink-dim">
               No commits in the loaded history match this search.
             </p>
+          )}
+          {waking && commits.length === 0 && query === "" && (
+            <p className="m-0 py-2 text-center text-[12px] text-ink-dim">Loading history…</p>
           )}
           {loadingMore && (
             <p className="m-0 py-2 text-center text-[12px] text-ink-dim">Loading more history…</p>

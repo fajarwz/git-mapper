@@ -38,6 +38,12 @@ async function call<T>(op: string, args: Record<string, unknown>, unwrap: (raw: 
 /** Pseudo-commit hash for the "Uncommitted changes" row (Rust + middleware treat it the same). */
 export const UNCOMMITTED_HASH = "wip";
 
+/** How long an inactive tab keeps its history before it is dropped, and how often that is checked. */
+export const SLEEP_AFTER_MS = 5 * 60_000;
+export const SLEEP_TICK_MS = 30_000;
+/** Changed-file payloads (full patch text) kept across all repos; the least recent used is dropped. */
+export const FILES_CACHE_CAP = 32;
+
 export const OPEN_REPOS_KEY = STORAGE_KEYS.repos;
 
 interface RepoInfo {

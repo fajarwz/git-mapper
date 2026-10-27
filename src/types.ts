@@ -75,4 +75,6 @@ export interface Repository {
   commits: Commit[];
   /** Commit pre-selected when the tab is first shown. */
   defaultCommitHash: string;
+  /** True when the tab sat inactive long enough that its history was dropped to save memory. */
+  sleeping?: boolean;
 }

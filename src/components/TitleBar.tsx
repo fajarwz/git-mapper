@@ -131,6 +131,7 @@ function SortableTab({ item, active, suppressed, onSelect, onClose }: SortableTa
       data-tab-id={item.id}
       data-active={active}
       data-dragging={isDragging}
+      data-sleeping={item.sleeping ? "true" : undefined}
       style={{
         flex: "1 1 200px",
         minWidth: 68,
@@ -138,13 +139,13 @@ function SortableTab({ item, active, suppressed, onSelect, onClose }: SortableTa
         transform: CSS.Transform.toString(transform),
         transition,
       }}
-      className={`inline-flex h-7 min-w-0 items-center gap-1 rounded-lg border border-transparent bg-glass-soft pl-2.5 text-left text-ink-soft backdrop-blur-md transition-[background-color,border-color,color,box-shadow] hover:bg-glass hover:text-ink hover:soft-shadow data-[active=true]:border-hairline data-[active=true]:bg-glass-strong data-[active=true]:text-ink data-[active=true]:soft-shadow data-[dragging=true]:opacity-30`}
+      className={`inline-flex h-7 min-w-0 items-center gap-1 rounded-lg border border-transparent bg-glass-soft pl-2.5 text-left text-ink-soft backdrop-blur-md transition-[background-color,border-color,color,box-shadow,opacity] hover:bg-glass hover:text-ink hover:soft-shadow data-[active=true]:border-hairline data-[active=true]:bg-glass-strong data-[active=true]:text-ink data-[active=true]:soft-shadow data-[dragging=true]:opacity-30 data-[sleeping=true]:opacity-55 data-[sleeping=true]:hover:opacity-100`}
     >
       <button
         type="button"
         role="tab"
         aria-selected={active}
-        title={item.path}
+        title={item.sleeping ? `${item.path} (slept to save memory — click to reload)` : item.path}
         {...listeners}
         {...handleAria}
         onClick={() => {
