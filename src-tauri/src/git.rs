@@ -3,6 +3,23 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
+#[cfg(windows)]
+use std::os::windows::process::CommandExt;
+
+/// Builds the git command every read runs through. `CREATE_NO_WINDOW` matters on Windows in
+/// release: the app is a GUI-subsystem process there (see the attribute in main.rs), so a child
+/// console app like git.exe opens its own visible cmd window on every spawn — and this app
+/// spawns git constantly (refresh probes, worktree digests, image blobs). In dev the app is a
+/// console process and children inherit the terminal's console, which is why `tauri dev` never
+/// shows them.
+fn git_command(dir: &str) -> Command {
+    let mut cmd = Command::new("git");
+    cmd.current_dir(dir);
+    #[cfg(windows)]
+    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    cmd
+}
+
 #[derive(Serialize, Debug)]
 pub struct RepoInfo {
     pub path: String,
@@ -33,9 +50,8 @@ pub struct FilePayload {
 }
 
 fn run_git(dir: &str, args: &[&str]) -> Result<String, String> {
-    Command::new("git")
+    git_command(dir)
         .args(args)
-        .current_dir(dir)
         .output()
         .map_err(|e| format!("failed to run git: {e}"))
         .and_then(|out| {
@@ -338,9 +354,8 @@ fn checkout_branch_in(dir: &str, branch: &str) -> Result<(), String> {
 #[tauri::command]
 pub async fn pull_branch(dir: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        Command::new("git")
+        git_command(&dir)
             .args(["pull", "--ff-only", "--no-edit"])
-            .current_dir(&dir)
             .env("GIT_TERMINAL_PROMPT", "0")
             .output()
             .map_err(|e| format!("failed to run git: {e}"))
@@ -362,9 +377,8 @@ pub async fn pull_branch(dir: String) -> Result<String, String> {
 #[tauri::command]
 pub async fn push_branch(dir: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
-        Command::new("git")
+        git_command(&dir)
             .args(["push", "-u", "origin", "HEAD"])
-            .current_dir(&dir)
             .env("GIT_TERMINAL_PROMPT", "0")
             .output()
             .map_err(|e| format!("failed to run git: {e}"))
@@ -468,9 +482,8 @@ fn args(v: &[String]) -> Vec<&str> {
 
 /// Git output that must stay bytes (a blob) instead of the lossy-text run_git.
 fn run_git_bytes(dir: &str, args: &[&str]) -> Result<Vec<u8>, String> {
-    Command::new("git")
+    git_command(dir)
         .args(args)
-        .current_dir(dir)
         .output()
         .map_err(|e| format!("failed to run git: {e}"))
         .and_then(|out| {
