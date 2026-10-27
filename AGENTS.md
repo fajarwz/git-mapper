@@ -146,10 +146,13 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
   embedded `icon.ico` — so `touch src-tauri/build.rs` and restart the app to see it.
 - **Releases feed the updater.** `tauri.conf.json` points at
   `github.com/fajarwz/git-mapper/releases/latest/download/latest.json`. To ship one: bump
-  `version` in `tauri.conf.json` (keep `package.json` and `Cargo.toml` in step), then
-  `TAURI_SIGNING_PRIVATE_KEY=C:/Users/fajar/.tauri/git-mapper.key TAURI_SIGNING_PRIVATE_KEY_PASSWORD="" npx tauri build`
-  — the private key lives OUTSIDE the repo and never gets committed. Attach `latest.json` plus
-  the signed artifacts to a GitHub release; the app checks that feed at launch when "Update
+  `version` in `tauri.conf.json` (keep `package.json` and `Cargo.toml` — and `Cargo.lock` via
+  `cargo update -p git-mapper` — in step), commit, then push a `v*` tag: `.github/workflows/release.yml`
+  builds every platform, signs with the key stored in CI, and opens a DRAFT release with
+  `latest.json` attached. Publish the draft with real changelog notes
+  (`gh release edit v<ver> --draft=false --latest --notes "…"`) and verify the feed answers
+  `HTTP 200` with the new version. The private signing key lives OUTSIDE the repo and never gets
+  committed. The app checks that feed at launch when "Update
   automatically" is on (the default), downloads in the background, and the settings modal offers
   "Restart to apply update" (`tauri-plugin-updater` + `tauri-plugin-process` + the gear dot).
 
