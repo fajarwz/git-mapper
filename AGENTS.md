@@ -7,7 +7,7 @@ Guidance for AI agents working in this repo. Written after the full redesign + r
 **Git Mapper** (formerly Git Trail) — standalone Git history viewer for Windows. Tauri 2 + React 19 + TypeScript + Tailwind CSS v4 + Vite. Reads real Git data: the Tauri backend runs the `git` CLI and returns porcelain output; TS parsers turn it into `types.ts` shapes. Read-only apart from a branch checkout (`checkout_branch`, from double-clicking a branch
 pill); there is no staging or committing.
 
-- Package/crate/identifier/brand are `git-mapper` / `git_mapper_lib` / `com.fajar.git-mapper` / "Git Mapper".
+- Package/crate/identifier/brand are `git-mapper` / `git_mapper_lib` / `com.fajarwz.git-mapper` / "Git Mapper".
 
 ## Commands
 
