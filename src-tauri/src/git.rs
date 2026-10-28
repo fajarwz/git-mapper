@@ -112,13 +112,20 @@ fn digest(text: &str) -> String {
 /// Fingerprint of the working tree: the status list (paths + codes) plus the tracked patch,
 /// plus size/mtime of every untracked file (git keeps those out of any diff).
 /// Only the equality of two stamps matters, so the length and hash of the text both go in.
-fn worktree_stamp(dir: &str, status_out: &str, changed: u32) -> String {
+/// `tracked_patch` hands in the `git diff HEAD` output — read_status_in starts that read
+/// beside the status scan instead of after it, so a dirty tree costs one cold scan, not two.
+fn worktree_stamp(
+    dir: &str,
+    status_out: &str,
+    changed: u32,
+    tracked_patch: impl FnOnce() -> Option<String>,
+) -> String {
     let mut stamp = status_out.to_string();
     if changed == 0 {
         return digest(&stamp);
     }
     // An edit inside a path the status list already had only shows up in the patch.
-    if let Ok(patch) = run_git(dir, &["diff", "--no-color", "HEAD"]) {
+    if let Some(patch) = tracked_patch() {
         stamp.push_str(&patch);
     }
     // Untracked files are absent from that patch; stat them instead of reading them.
@@ -200,47 +207,56 @@ pub async fn read_status(dir: String) -> Result<StatusInfo, String> {
 }
 
 fn read_status_in(dir: &str) -> Result<StatusInfo, String> {
-    // -uall so untracked files are counted one by one instead of per directory.
-    let out = run_git(dir, &["status", "-sb", "--untracked-files=all"])?;
-    let changed = out
-        .lines()
-        .filter(|l| !l.trim().is_empty() && !l.starts_with("## "))
-        .count() as u32;
-    let worktree = worktree_stamp(dir, &out, changed);
-    // First line: "## main...origin/main [ahead 1, behind 2]" with any piece optional.
-    let head = run_git(dir, &["rev-parse", "--verify", "HEAD"])
-        .map(|sha| sha.trim().to_string())
-        .unwrap_or_default();
-    let mut info = StatusInfo {
-        branch: String::new(),
-        ahead: 0,
-        behind: 0,
-        dirty: changed > 0,
-        changed,
-        head,
-        worktree,
-    };
-    if let Some(line) = out.lines().find(|l| l.starts_with("## ")) {
-        let head = line.trim_start_matches("## ");
-        // Branch name may contain dots; the upstream is after "..." and the counts in brackets.
-        let (branch_part, tail) = head.split_once("...").unwrap_or((head, ""));
-        info.branch = branch_part.to_string();
-        let bracket = tail.split_once('[').map(|(_, r)| r).unwrap_or(tail);
-        if let Some(close) = bracket.split_once(']') {
-            for part in close.0.split(", ") {
-                match part.split_once(' ') {
-                    Some(("ahead", n)) => info.ahead = n.parse().unwrap_or(0),
-                    Some(("behind", n)) => info.behind = n.parse().unwrap_or(0),
-                    _ => {}
+    // The digest's `git diff HEAD` starts beside the status read, not after it: on a slow
+    // mount (\\wsl.localhost) both are full worktree scans, and back to back they doubled
+    // every open and focus probe of a dirty repo. A clean tree never joins the result —
+    // the spare read finishes on its thread and is dropped.
+    std::thread::scope(|scope| {
+        let tracked_patch = scope.spawn(|| run_git(dir, &["diff", "--no-color", "HEAD"]).ok());
+        // -uall so untracked files are counted one by one instead of per directory.
+        let out = run_git(dir, &["status", "-sb", "--untracked-files=all"])?;
+        let changed = out
+            .lines()
+            .filter(|l| !l.trim().is_empty() && !l.starts_with("## "))
+            .count() as u32;
+        let worktree = worktree_stamp(dir, &out, changed, || {
+            tracked_patch.join().ok().flatten()
+        });
+        // First line: "## main...origin/main [ahead 1, behind 2]" with any piece optional.
+        let head = run_git(dir, &["rev-parse", "--verify", "HEAD"])
+            .map(|sha| sha.trim().to_string())
+            .unwrap_or_default();
+        let mut info = StatusInfo {
+            branch: String::new(),
+            ahead: 0,
+            behind: 0,
+            dirty: changed > 0,
+            changed,
+            head,
+            worktree,
+        };
+        if let Some(line) = out.lines().find(|l| l.starts_with("## ")) {
+            let head = line.trim_start_matches("## ");
+            // Branch name may contain dots; the upstream is after "..." and the counts in brackets.
+            let (branch_part, tail) = head.split_once("...").unwrap_or((head, ""));
+            info.branch = branch_part.to_string();
+            let bracket = tail.split_once('[').map(|(_, r)| r).unwrap_or(tail);
+            if let Some(close) = bracket.split_once(']') {
+                for part in close.0.split(", ") {
+                    match part.split_once(' ') {
+                        Some(("ahead", n)) => info.ahead = n.parse().unwrap_or(0),
+                        Some(("behind", n)) => info.behind = n.parse().unwrap_or(0),
+                        _ => {}
+                    }
                 }
             }
+            Ok(info)
+        } else {
+            // Detached HEAD or unborn branch: still return a usable row.
+            info.branch = "HEAD detached".into();
+            Ok(info)
         }
-        Ok(info)
-    } else {
-        // Detached HEAD or unborn branch: still return a usable row.
-        info.branch = "HEAD detached".into();
-        Ok(info)
-    }
+    })
 }
 
 /// `--all` includes refs/stash, which drags in the stash commit and the index snapshot it
