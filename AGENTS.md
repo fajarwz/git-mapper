@@ -36,7 +36,13 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
 - `src/components/TitleBar.tsx` — the window IS undecorated (`decorations: false` in `tauri.conf.json`), so this bar doubles as the title bar: brand, repo tabs (Chrome-style shrink + `tab-fade` on clipped labels), toolbar actions (a search box that filters the active repo's loaded commits — Ctrl+F focuses it, Esc clears — plus a refresh button whose glyph spins for at least 550ms so a fast local read still reads as work, and settings) and the caption buttons. Tabs reorder through `@dnd-kit/sortable` (`horizontalListSortingStrategy` + `DragOverlay`); the sensors are **pointer only**, because the keyboard sensor claims Space/Enter on the focused tab and a tab must stay activatable from the keyboard. HTML5 drag-and-drop is not an option here: the webview routes drag events to Tauri's file-drop handler. `data-tauri-drag-region` covers the bar background and the tab strip; the caption buttons need the `core:window:allow-*` entries in `src-tauri/capabilities/default.json`.
 - `src-tauri/src/git.rs` — Tauri commands running the `git` CLI: `open_repository` (validates + toplevel/name), `read_status` (branch / ahead / behind / head + the worktree digest), `read_refs` (`hash	fullref` lines), `read_log` (porcelain fields `\x00`-separated, records `\x1e`-separated, decorations lead each record), `read_log_delta` (`git log --all ^<head>`), `read_log_order` (hashes only, for splicing),
   `read_commit_files` (numstat + name-status + patch, first-parent; root via `--root`; the
-  pseudo hash `wip` means the working tree), `checkout_branch`. Folder picking is JS-side via `tauri-plugin-dialog` (`dialog:default` capability).
+  pseudo hash `wip` means the working tree; one `rev-list --parents -1` probe sets root and
+  the `stash -u` third parent, and the diff spawns run concurrently on scoped threads via
+  `parallel_git` — keep new reads in that batch, never serial. The wip reads stat the
+  worktree and run lock-free (`run_git_no_locks`, `GIT_OPTIONAL_LOCKS=0`) so concurrent
+  `git diff HEAD` calls cannot collide on index.lock; NEVER set that env on `git_command`
+  globally — the opportunistic index write it suppresses is the stat cache every later
+  read hits, and without it a WSL mount re-scans the whole tree (~20s) on every call), `checkout_branch`. Folder picking is JS-side via `tauri-plugin-dialog` (`dialog:default` capability).
   Every command is a thin async wrapper (`run_blocking`, String args) around a sync `*_in` body:
   a sync `#[tauri::command]` runs on the main thread, and one slow read (a ~20s `git status` over
   a `\\wsl.localhost` mount) greyed the whole window out with "Not responding". Tests call the
