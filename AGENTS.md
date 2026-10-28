@@ -123,7 +123,9 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
 2. **Use `panel-shadow` / `soft-shadow`** (custom `@utility` in index.css), never Tailwind's `shadow-panel`/`shadow-soft`. Reason: Tailwind v4 inlines `@theme` literals into generated utilities, so `.dark` overrides of shadow vars silently never applied. The custom utilities route through `var()` and theme correctly.
 3. Row heights and type sizes live in code (`graphGeometry.ts`, component classes) — don't pin them here; they get tuned. Full type/spacing scale lives in `index.css` + component classes; keep hierarchy bouncy (big accents, airy spacing) — density is what made the previous design look dated.
 4. Background depth strategy: vivid full-canvas gradient (light theme gets a linear violet→rose→warm base because radial spots alone measured sat 0.07 and washed out) + subtle shadows. Don't add heavy drop shadows.
-5. Pills: the checked-out branch is a filled `laneColor` pill with `text-surface`; every other ref
+5. Pills: the checked-out branch is a filled `laneColor` pill with `text-surface`, and so is
+   the detached-HEAD marker (`type: "head"`, label "HEAD (detached)" — it is where the working
+   copy sits but is not a branch, so nothing offers to check it out); every other ref
    is an outline pill with a 1.5px lane-coloured border and lane-tinted text. Spell the width
    `border-[1.5px]` - `border-1.5` is not a utility and silently renders 0px. Glass panels: `border-hairline` + `panel-shadow` + `backdrop-blur-xl` via `PANEL`.
 
