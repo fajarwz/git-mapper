@@ -63,6 +63,27 @@ fn run_git(dir: &str, args: &[&str]) -> Result<String, String> {
         })
 }
 
+/// A git read that stats the worktree. `git diff HEAD` refreshes the index opportunistically
+/// (taking index.lock), and the wip view runs three of those side by side, so the env var
+/// turns that opportunistic write off and the concurrent reads cannot lock-race. Everything
+/// serial (status above all) keeps its locks: the refreshed index it writes back is the stat
+/// cache every later read hits — without it a WSL mount re-stat's every tracked file, a
+/// ~20s scan, on every single call.
+fn run_git_no_locks(dir: &str, args: &[&str]) -> Result<String, String> {
+    git_command(dir)
+        .env("GIT_OPTIONAL_LOCKS", "0")
+        .args(args)
+        .output()
+        .map_err(|e| format!("failed to run git: {e}"))
+        .and_then(|out| {
+            if out.status.success() {
+                Ok(String::from_utf8_lossy(&out.stdout).to_string())
+            } else {
+                Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+            }
+        })
+}
+
 /// Runs a blocking git body on a worker thread. A sync `#[tauri::command]` executes on the main
 /// thread, so one slow read (a 20-second `git status` over a `\\wsl.localhost` mount) greyed the
 /// whole window out with "Not responding". Every command below is a thin async wrapper around
@@ -394,6 +415,22 @@ pub async fn push_branch(dir: String) -> Result<String, String> {
     .map_err(|e| format!("the push task failed: {e}"))?
 }
 
+/// Runs a command's git reads concurrently and returns their results in call order.
+/// Every `git` spawn over a `\\wsl.localhost` mount pays the slow 9P protocol for its own
+/// process startup, so the commit panel's back-to-back reads used to stack several of
+/// those startups in a row; run side by side, the wall time is just the slowest read.
+fn parallel_git<'a>(
+    reads: Vec<Box<dyn FnOnce() -> Result<String, String> + Send + 'a>>,
+) -> Vec<Result<String, String>> {
+    std::thread::scope(|scope| {
+        let handles: Vec<_> = reads.into_iter().map(|read| scope.spawn(read)).collect();
+        handles
+            .into_iter()
+            .map(|handle| handle.join().unwrap_or_else(|_| Err("a git read crashed".into())))
+            .collect()
+    })
+}
+
 /// Files of one commit. "wip" means the uncommitted working tree vs HEAD.
 /// Otherwise: diff against the first parent; root commits use the --root forms.
 #[tauri::command]
@@ -403,20 +440,25 @@ pub async fn read_commit_files(dir: String, hash: String) -> Result<FilePayload,
 
 fn read_commit_files_in(dir: &str, hash: &str) -> Result<FilePayload, String> {
     if hash == "wip" {
-        // Unborn branch: `diff HEAD` has nothing to compare against, so start from empty.
-        let diff = run_git(dir, &["diff", "--no-color", "HEAD"]).unwrap_or_default();
-        let numstat =
-            run_git(dir, &["diff", "--numstat", "--no-color", "HEAD"]).unwrap_or_default();
-        let name_status =
-            run_git(dir, &["diff", "--name-status", "--no-color", "HEAD"]).unwrap_or_default();
-        // `git diff` ignores untracked paths entirely, so a brand-new file would never show up.
-        let untracked = run_git(dir, &["ls-files", "--others", "--exclude-standard", "-z"])?;
+        // The three diff flavours are independent reads; a fourth one lists untracked
+        // paths, whose numstat / name-status / patch entries are appended right after.
+        // All four stat the worktree, so they run lock-free (see run_git_no_locks).
+        let out = parallel_git(vec![
+            Box::new(|| run_git_no_locks(dir, &["diff", "--numstat", "--no-color", "HEAD"])),
+            Box::new(|| run_git_no_locks(dir, &["diff", "--name-status", "--no-color", "HEAD"])),
+            Box::new(|| run_git_no_locks(dir, &["diff", "--no-color", "HEAD"])),
+            Box::new(|| run_git_no_locks(dir, &["ls-files", "--others", "--exclude-standard", "-z"])),
+        ]);
         let mut payload = FilePayload {
-            numstat,
-            name_status,
-            diff,
+            numstat: out[0].clone().unwrap_or_default(),
+            name_status: out[1].clone().unwrap_or_default(),
+            diff: out[2].clone().unwrap_or_default(),
         };
-        for path in untracked.split('\u{0}').filter(|entry| !entry.is_empty()) {
+        for path in out[3]
+            .clone()?
+            .split('\u{0}')
+            .filter(|entry| !entry.is_empty())
+        {
             let (num, status, patch) = untracked_entry(dir, path);
             payload.numstat.push_str(&num);
             payload.name_status.push_str(&status);
@@ -425,21 +467,27 @@ fn read_commit_files_in(dir: &str, hash: &str) -> Result<FilePayload, String> {
         return Ok(payload);
     }
 
-    let is_root_rev = format!("{hash}^1");
-    let is_root = run_git(dir, &["rev-parse", "--verify", &is_root_rev]).is_err();
-
-    let base: Vec<String> = if is_root {
-        vec![
+    // One git spawn answers every structural question the reads below need: `rev-list
+    // --parents` prints the commit followed by its parents, so an empty list says this is
+    // a root (diffing from the empty tree) and a third entry is a `stash -u` snapshot —
+    // previously two extra `rev-parse --verify` probes, each a whole git spawn.
+    let line = run_git(dir, &["rev-list", "--parents", "-1", hash])?;
+    let parents: Vec<String> = line
+        .split_whitespace()
+        .skip(1)
+        .map(String::from)
+        .collect();
+    let first = parents.first().cloned();
+    let base: Vec<String> = match first {
+        Some(parent) => vec!["diff".into(), "--no-color".into(), parent, hash.to_string()],
+        None => vec![
             "show".into(),
             "--root".into(),
             "--format=".into(),
             "--no-color".into(),
             hash.to_string(),
-        ]
-    } else {
-        vec!["diff".into(), "--no-color".into(), format!("{hash}^1"), hash.to_string()]
+        ],
     };
-
     let insert = |item: &str| -> Vec<String> {
         let mut v = base.clone();
         v.insert(1, item.into());
@@ -447,31 +495,44 @@ fn read_commit_files_in(dir: &str, hash: &str) -> Result<FilePayload, String> {
     };
     let numstat_args = insert("--numstat");
     let name_status_args = insert("--name-status");
-    let mut payload = FilePayload {
-        numstat: run_git(dir, &args(&numstat_args))?,
-        name_status: run_git(dir, &args(&name_status_args))?,
-        diff: run_git(dir, &args(&base))?,
-    };
-
     // `git stash -u` keeps the untracked-but-stashed files in a third parent: a parentless
-    // commit whose tree holds nothing but those files, so `git show` on it prints them as the
-    // additions they were, and `diff ^1 ^3` (a full tree against that fragment) prints every
-    // other file as deleted.
-    let third = format!("{hash}^3");
-    if run_git(dir, &["rev-parse", "--verify", &third]).is_ok() {
-        let stash_extra = |flag: Option<&str>| -> Result<String, String> {
+    // commit whose tree holds nothing but those files, so `git show` on it prints them as
+    // the additions they were, and `diff ^1 ^3` (a full tree against that fragment) prints
+    // every other file as deleted.
+    let stash_args: Option<Vec<Vec<String>>> = (parents.len() >= 3).then(|| {
+        let extra = |flag: Option<&str>| -> Vec<String> {
             let mut v: Vec<String> = vec!["show".into()];
             if let Some(flag) = flag {
                 v.push(flag.into());
             }
             v.push("--no-color".into());
             v.push("--format=".into());
-            v.push(third.clone());
-            run_git(dir, &args(&v))
+            v.push(parents[2].clone());
+            v
         };
-        payload.numstat.push_str(&stash_extra(Some("--numstat"))?);
-        payload.name_status.push_str(&stash_extra(Some("--name-status"))?);
-        payload.diff.push_str(&stash_extra(None)?);
+        vec![extra(Some("--numstat")), extra(Some("--name-status")), extra(None)]
+    });
+
+    let mut reads: Vec<Box<dyn FnOnce() -> Result<String, String> + Send + '_>> = vec![
+        Box::new(|| run_git(dir, &args(&numstat_args))),
+        Box::new(|| run_git(dir, &args(&name_status_args))),
+        Box::new(|| run_git(dir, &args(&base))),
+    ];
+    if let Some([s_numstat, s_status, s_diff]) = stash_args.as_deref() {
+        reads.push(Box::new(|| run_git(dir, &args(s_numstat))));
+        reads.push(Box::new(|| run_git(dir, &args(s_status))));
+        reads.push(Box::new(|| run_git(dir, &args(s_diff))));
+    }
+    let out = parallel_git(reads);
+    let mut payload = FilePayload {
+        numstat: out[0].clone()?,
+        name_status: out[1].clone()?,
+        diff: out[2].clone()?,
+    };
+    if stash_args.is_some() {
+        payload.numstat.push_str(&out[3].clone()?);
+        payload.name_status.push_str(&out[4].clone()?);
+        payload.diff.push_str(&out[5].clone()?);
     }
     Ok(payload)
 }
@@ -935,6 +996,40 @@ mod tests {
         let wip = read_image_versions_in(repo.path(), "wip", "renamed.jpeg").expect("wip versions");
         assert_eq!(wip.old.expect("HEAD blob").bytes, new_bytes.len(), "the old side is HEAD's copy");
         assert_eq!(wip.new.expect("disk copy").bytes, disk_bytes.len(), "the new side is the working file");
+    }
+
+    /// A two-parent merge is NOT a stash: no third parent is probed or appended, and the
+    /// first-parent diff shows the incoming branch's changes, not the merge base's.
+    #[test]
+    fn merge_commit_files_stay_first_parent_only() {
+        let repo = TempRepo::new("merge");
+        repo.commit("base.txt", "base\n", "base");
+        git(&repo.0, &["checkout", "-q", "-b", "side"]);
+        repo.commit("side.txt", "side\n", "side commit");
+        git(&repo.0, &["checkout", "-q", "-"]);
+        repo.commit("main.txt", "main\n", "main commit");
+        git(&repo.0, &["merge", "-q", "--no-ff", "side"]);
+        let merge_hash = run_git(repo.path(), &["rev-parse", "HEAD"]).expect("rev-parse");
+        // Sanity: the merge really has two parents.
+        assert_eq!(
+            run_git(repo.path(), &["rev-list", "--parents", "-1", "HEAD"])
+                .expect("parents")
+                .split_whitespace()
+                .count(),
+            3
+        );
+
+        let files = read_commit_files_in(repo.path(), merge_hash.trim()).expect("merge files");
+        assert!(
+            files.name_status.contains("A\tside.txt"),
+            "the first-parent diff carries the merged branch's change: {}",
+            files.name_status
+        );
+        assert!(
+            !files.name_status.contains("main.txt"),
+            "main.txt was already in the first parent: {}",
+            files.name_status
+        );
     }
 
     /// A bare repository to push/pull against: a local-path remote, no network.
