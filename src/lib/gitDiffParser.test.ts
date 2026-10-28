@@ -186,3 +186,19 @@ test("slashed decoration entries are dropped; for-each-ref supplies those branch
     ["branch:main", "tag:v2"],
   );
 });
+
+test("a detached HEAD decorates as a bare HEAD marker, not a branch", () => {
+  const detached = parseRefs("(HEAD)");
+  assert.deepEqual(
+    detached.map((r) => `${r.type}:${r.name}:${r.isCurrent ? "yes" : "no"}`),
+    ["head:HEAD:yes"],
+    "the detached commit keeps its bold row and graph marker",
+  );
+
+  // Detached at a commit that is also a branch tip or tag: the pills coexist.
+  const mixed = parseRefs("(HEAD, tag: v2)");
+  assert.deepEqual(
+    mixed.map((r) => `${r.type}:${r.name}`),
+    ["head:HEAD", "tag:v2"],
+  );
+});

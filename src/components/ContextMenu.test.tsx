@@ -62,6 +62,18 @@ test("the checked-out branch offers no checkout entry", () => {
   assert.ok(getByRole("menuitem", { name: "Copy branch name" }));
 });
 
+test("a detached HEAD offers no checkout; copying names it a ref", () => {
+  const { getByRole, queryByRole } = render(
+    <ContextMenu
+      target={target({ ref: { type: "head", name: "HEAD", isCurrent: true } })}
+      onCheckout={vi.fn()}
+      onClose={vi.fn()}
+    />,
+  );
+  assert.equal(queryByRole("menuitem", { name: /check out/i }), null);
+  assert.ok(getByRole("menuitem", { name: "Copy ref name" }));
+});
+
 test("copy entries write the commit's fields to the clipboard and confirm", async () => {
   const writeText = vi.fn().mockResolvedValue(undefined);
   (navigator as unknown as { clipboard: unknown }).clipboard = { writeText };

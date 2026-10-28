@@ -25,6 +25,7 @@ const COPY_LABELS: Record<CommitRef["type"], string> = {
   remote: "Copy remote name",
   tag: "Copy tag name",
   stash: "Copy stash name",
+  head: "Copy ref name",
 };
 
 /**

@@ -1,6 +1,6 @@
 import type { CommitRef, RefType } from "../types";
 
-const PRIORITY: RefType[] = ["stash", "branch", "tag", "remote"];
+const PRIORITY: RefType[] = ["head", "stash", "branch", "tag", "remote"];
 
 /**
  * Clean ref lists for the pills: `origin/HEAD` is noise; a local branch paired

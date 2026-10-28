@@ -1,6 +1,6 @@
-export type RefType = "branch" | "remote" | "tag" | "stash";
+export type RefType = "branch" | "remote" | "tag" | "stash" | "head";
 
-/** A label rendered beside the commit subject: local branch, remote branch, tag or stash. */
+/** A label rendered beside the commit subject: local branch, remote branch, tag, stash, or the detached-HEAD marker. */
 export interface CommitRef {
   type: RefType;
   name: string;

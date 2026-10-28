@@ -54,3 +54,21 @@ test("RefPill double-click checks out only local, non-current branches", () => {
   fireEvent.doubleClick(within(locked.container).getByText("main"));
   assert.equal(lockedCheckout, null, "the checked-out branch does not offer a checkout");
 });
+
+test("RefPill: a detached HEAD fills like a marker and never offers a checkout", () => {
+  let checkedOut: string | null = null;
+  const { container } = render(
+    <RefPill
+      ref={{ type: "head", name: "HEAD", isCurrent: true }}
+      color={0}
+      onCheckout={(name) => {
+        checkedOut = name;
+      }}
+    />,
+  );
+  const span = container.querySelector("span") as HTMLElement;
+  assert.ok(span.style.backgroundColor, "the detached HEAD is a filled pill");
+  assert.ok(within(container).getByText("HEAD (detached)"), "the pill tells the whole story");
+  fireEvent.doubleClick(within(container).getByText("HEAD (detached)"));
+  assert.equal(checkedOut, null, "a detached HEAD is not a branch you can check out");
+});

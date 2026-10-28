@@ -12,18 +12,21 @@ interface RefPillProps {
   onContextMenu?: (ref: CommitRef, x: number, y: number) => void;
 }
 
-const ICONS = {
+const ICONS: Record<CommitRef["type"], typeof BranchIcon> = {
   branch: BranchIcon,
   remote: RemoteIcon,
   tag: TagIcon,
   stash: StashIcon,
+  head: BranchIcon,
 };
 
-/** Branch / remote / tag / stash label shown inline after a commit subject. */
+/** Branch / remote / tag / stash / detached-HEAD label shown inline after a commit subject. */
 export function RefPill({ ref, color, onCheckout, onContextMenu }: RefPillProps) {
   const Icon = ICONS[ref.type];
   const checkoutable = ref.type === "branch" && !ref.isCurrent && onCheckout !== undefined;
   const colorValue = branchColor(color);
+  // A detached HEAD copies as plain "HEAD"; the longer story is display-only.
+  const label = ref.type === "head" ? "HEAD (detached)" : ref.name;
 
   return (
     <span
@@ -51,7 +54,9 @@ export function RefPill({ ref, color, onCheckout, onContextMenu }: RefPillProps)
             }
       }
       title={
-        ref.isCurrent
+        ref.type === "head"
+          ? "HEAD is detached here"
+            : ref.isCurrent
           ? `${ref.type}: ${ref.name} (checked out)`
           : checkoutable
             ? `Double-click to checkout ${ref.name}`
@@ -59,7 +64,7 @@ export function RefPill({ ref, color, onCheckout, onContextMenu }: RefPillProps)
       }
     >
       <Icon size={10} />
-      {ref.name}
+      {label}
       {ref.withRemote && (
         <span
           className="ml-0.5 pl-1 font-medium opacity-90"

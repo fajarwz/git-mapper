@@ -27,6 +27,12 @@ export function parseRefs(deco: string): CommitRef[] {
       if (entry.startsWith("tag: ")) {
         return { type: "tag", name: entry.slice(5) };
       }
+      // A detached HEAD decorates as a bare `HEAD` with no branch after the arrow. It is a real
+      // marker of where the working copy sits, so it carries isCurrent (bold row, graph marker)
+      // but types as "head", not a branch you could check out.
+      if (entry === "HEAD") {
+        return { type: "head", name: "HEAD", isCurrent: true };
+      }
       // Decorations never say which branch is checked out besides HEAD ->;
       // read_status decides that in the loader.
       const isCurrent = entry.startsWith("HEAD -> ");
