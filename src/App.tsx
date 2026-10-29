@@ -699,6 +699,7 @@ function App() {
                 diffWrap={diffWrap}
                 onDiffWrapChange={setDiffWrap}
                 syntaxScheme={syntaxScheme}
+                showAvatars={showAvatars}
                 onClose={() => setDetailsOpen(false)}
                 onHeightChange={setDetailsHeight}
               />

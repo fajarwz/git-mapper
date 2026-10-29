@@ -14,6 +14,7 @@ import {
   MIN_SIDEBAR_WIDTH,
 } from "../lib/tableLayout";
 import { PANEL } from "../lib/ui";
+import { Avatar } from "./Avatar";
 import { DiffViewer, type DiffLayout, type DiffScope } from "./DiffViewer";
 import { FileList, type FileView } from "./FileList";
 import { ResizeHandle } from "./ResizeHandle";
@@ -38,6 +39,8 @@ interface DetailsPanelProps {
   onDiffWrapChange: (wrap: boolean) => void;
   /** Diff token palette, chosen in settings and passed straight to the DiffViewer. */
   syntaxScheme: SyntaxScheme;
+  /** The avatar toggle in settings: initials + gravatar photo beside the author here too. */
+  showAvatars: boolean;
   onClose: () => void;
   onHeightChange: (height: number) => void;
 }
@@ -56,6 +59,7 @@ export function DetailsPanel({
   diffWrap,
   onDiffWrapChange,
   syntaxScheme,
+  showAvatars,
   onClose,
   onHeightChange,
 }: DetailsPanelProps) {
@@ -162,7 +166,10 @@ export function DetailsPanel({
                 >
                   {hashCopied ? "Copied!" : commit.hash}
                 </button>
-                <span className="text-[12.5px] font-semibold text-ink-soft">{commit.author}</span>
+                <span className="flex w-fit items-center gap-1.5">
+                  {showAvatars && <Avatar name={commit.author} email={commit.authorEmail} photos />}
+                  <span className="text-[12.5px] font-semibold text-ink-soft">{commit.author}</span>
+                </span>
                 <span className="truncate">{commit.authorEmail}</span>
                 <span>{formatAbsoluteDate(commit.date)}</span>
                 {commit.parents.length > 0 && (
