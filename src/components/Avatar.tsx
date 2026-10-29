@@ -35,19 +35,25 @@ export function Avatar({ name, email, photos = false }: AvatarProps) {
   // Mixed into the lane colour so both themes carry it and neighbouring authors mostly differ.
   const tone = `var(--color-lane-${avatarColorIndex(email) + 1})`;
   const tint = { backgroundColor: `color-mix(in oklab, ${tone} 22%, transparent)`, color: tone };
-  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  // The resolved photo is stapled to the email it belongs to: switching commits (a new email
+  // on the same component instance) must never keep painting the previous author's photo.
+  const [resolved, setResolved] = useState<{ email: string; url: string } | null>(null);
   const [photoShown, setPhotoShown] = useState(false);
   // The stale-guard: a photo resolving after the email prop changed must not paint over it.
   const wantedRef = useRef("");
 
   useEffect(() => {
-    if (!photos || photoUrl) return;
+    if (!photos) return;
     const wanted = email;
     wantedRef.current = wanted;
     void gravatarPhotoUrl(email).then((url) => {
-      if (wantedRef.current === wanted && url) setPhotoUrl(url);
+      if (wantedRef.current !== wanted || !url) return;
+      setPhotoShown(false);
+      setResolved({ email: wanted, url });
     });
-  }, [photos, email, photoUrl]);
+  }, [photos, email]);
+
+  const activePhoto = resolved?.email === email ? resolved : null;
 
   return (
     <span
@@ -56,9 +62,10 @@ export function Avatar({ name, email, photos = false }: AvatarProps) {
       style={tint}
     >
       {avatarInitial(name)}
-      {photoUrl && (
+      {activePhoto && (
         <img
-          src={photoUrl}
+          key={activePhoto.email}
+          src={activePhoto.url}
           alt=""
           className={`absolute inset-0 size-full object-cover ${photoShown ? "opacity-100" : "opacity-0"}`}
           onLoad={() => setPhotoShown(true)}
@@ -67,7 +74,7 @@ export function Avatar({ name, email, photos = false }: AvatarProps) {
             // record the miss so other rows of this author never retry, and drop the dead <img>.
             notePhotoMissing(email);
             wantedRef.current = "";
-            setPhotoUrl(null);
+            setResolved(null);
             setPhotoShown(false);
           }}
         />

@@ -103,7 +103,12 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
   same folder path returns) with the base name only — renames keep the `old → new` hint inline.
   Both shapes share `FileRow` and keep `data-file-item` on file rows, so the
   selection/`[data-file-item]` selectors behave identically in list and tree mode.
-- Window focus re-checks the visible repo only (throttled to one probe per 1.5s, hidden windows skipped). Other tabs are not refreshed — they are off screen and each refresh costs git reads.
+- Window focus re-checks the visible repo only (throttled to one probe per 1.5s, hidden
+  windows skipped). Beyond the cheap probe, a focus fetches `--all --prune` once every
+  3 minutes (`fetch_remote`), so ahead/behind and the tracking-refs pills speak for the
+  network, not the last fetch — opening a repo (browse-in or saved-tab wake) fetches too. The
+  fetch is silent on failure: offline is not an error worth a toast. Other tabs are not
+  refreshed — they are off screen and each refresh costs git reads.
 - `src/lib/graphGeometry.ts` — `ROW_HEIGHT` is shared between `CommitRow` and the SVG graph. Change both together or dots misalign with rows.
 - `src/lib/commitFilter.ts` — `filterCommits(commits, query)`: space-separated tokens AND together, case-insensitive substring over hash, subject, body, author, email and ref-pill names (literal text — no fuzzy `_`/`-` folding). An empty query returns the input array itself so rows keep object identity. Search covers ONLY the loaded window; paging is suspended while a query is active, and deep search over unpaginated history is a planned separate slice.
 - `src/lib/highlight.ts` — lazy highlight.js: the core is a dynamic import, and each grammar too (one small chunk per language, loaded the first time a diff of that type opens). `languageForPath` maps extension/basename → grammar, `loadHighlighter` + `highlightSync` produce ESCAPED token HTML (highlight.js escapes before wrapping — safe for dangerouslySetInnerHTML). The schemes are NOT highlight.js themes: index.css scopes palettes under `data-syntax` on the diff panel — `app` (design tokens, follows the theme), `github` and `neon` (literals with light/dark variants). The picker lives in settings, persisted as `git-mapper:syntax-scheme`, default `app` — there is no colour-off option.

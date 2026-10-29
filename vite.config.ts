@@ -178,6 +178,12 @@ function gitDevApi(): Plugin {
       run(String(dir), ["checkout", "--detach", h]);
       return null;
     },
+    fetch_remote: ({ dir }) => {
+      const remotes = String(run(String(dir), ["remote"])).trim();
+      if (!remotes) return null;
+      run(String(dir), ["fetch", "--all", "--prune", "--quiet"]);
+      return null;
+    },
     pull_branch: ({ dir }) =>
       run(String(dir), ["pull", "--ff-only", "--no-edit"]),
     push_branch: ({ dir }) =>

@@ -403,6 +403,23 @@ fn checkout_commit_in(dir: &str, hash: &str) -> Result<(), String> {
     run_git(dir, &["checkout", "--detach", hash]).map(|_| ())
 }
 
+/// Pulls every remote into the local tracking refs (`fetch --all --prune`). Ahead/behind are
+/// counts against the tracking refs, so they only tell the whole story after a quiet fetch —
+/// the app runs this on open and on window focus (throttled), and tolerates failures offline.
+#[tauri::command]
+pub async fn fetch_remote(dir: String) -> Result<(), String> {
+    run_blocking("fetch", move || fetch_remote_in(&dir)).await
+}
+
+fn fetch_remote_in(dir: &str) -> Result<(), String> {
+    let remotes = run_git(dir, &["remote"])?;
+    if remotes.trim().is_empty() {
+        // A repository without remotes has nothing to read; the error would only confuse.
+        return Ok(());
+    }
+    run_git(dir, &["fetch", "--all", "--prune", "--quiet"]).map(|_| ())
+}
+
 /// Pulls the current branch from its upstream. Fast-forward only: a pull that would need a
 /// merge is refused with git's own message instead of half-merging inside a history viewer.
 /// Runs on a blocking thread (network IO — a sync command would freeze the window) and
@@ -784,6 +801,38 @@ mod tests {
             String::from_utf8_lossy(&out.stderr)
         );
         String::from_utf8_lossy(&out.stdout).trim().to_string()
+    }
+
+    #[test]
+    fn fetch_remote_tracks_the_upstream_and_skips_remoless_repos() {
+        // The remote repository's history grows after the origin link is made; the fetch must
+        // pull that growth into the local tracking refs.
+        let remote = TempRepo::new("fetch-remote");
+        remote.commit("a.txt", "a\n", "first");
+        let repo = TempRepo::new("fetch");
+        repo.commit("b.txt", "b\n", "second");
+        git(&repo.0, &["remote", "add", "origin", remote.path()]);
+
+        // A repository with a remote but no new objects still fetches fine; the tracking ref
+        // now exists and points at the remote's head.
+        fetch_remote_in(repo.path()).expect("the fetch ran");
+        let tracked = git_out(&repo.0, &["rev-parse", "origin/main"]);
+        assert_eq!(tracked, git_out(&remote.0, &["rev-parse", "HEAD"]));
+
+        // New work on the remote moves origin/main only after a fetch.
+        let before = git_out(&repo.0, &["rev-parse", "origin/main"]);
+        remote.commit("c.txt", "c\n", "third");
+        fetch_remote_in(repo.path()).expect("the second fetch ran");
+        assert_ne!(
+            git_out(&repo.0, &["rev-parse", "origin/main"]),
+            before,
+            "the fetch caught up with the remote"
+        );
+
+        // A repository without remotes is not an error — there is simply nothing to read.
+        let lone = TempRepo::new("fetch-lone");
+        lone.commit("l.txt", "l\n", "lonely");
+        fetch_remote_in(lone.path()).expect("a remoless repo fetches as a no-op");
     }
 
     #[test]

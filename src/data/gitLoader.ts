@@ -544,6 +544,11 @@ export async function pullBranch(dir: string): Promise<string> {
   return call("pull_branch", { dir }, (raw) => raw as string);
 }
 
+/** Reads every remote into the tracking refs, so ahead/behind state includes remote commits. */
+export async function fetchRemote(dir: string): Promise<void> {
+  await call("fetch_remote", { dir }, (raw) => raw as void);
+}
+
 /** Pushes the current branch to origin with `-u`, so the first push sets the upstream. */
 export async function pushBranch(dir: string): Promise<string> {
   return call("push_branch", { dir }, (raw) => raw as string);

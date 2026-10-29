@@ -29,6 +29,7 @@ import type { Theme } from "./lib/theme";
 import {
   checkoutBranch,
   checkoutCommit,
+  fetchRemote,
   loadCommitFiles,
   loadMoreCommits,
   loadRepository,
@@ -54,6 +55,9 @@ import type { Repository } from "./types";
 function filesKey(repoPath: string, hash: string, worktree: string): string {
   return hash === UNCOMMITTED_HASH ? `${repoPath}::~wip:${worktree}` : `${repoPath}::${hash}`;
 }
+
+/** Auto-fetch window on refocus — often enough to notice a push, rare enough to stay quiet. */
+const FETCH_ON_FOCUS_MS = 180_000;
 
 function App() {
   const [repos, setRepos] = useState<Repository[]>([]);
@@ -195,6 +199,11 @@ function App() {
       }
       const restored = loaded.some((item) => item.id === activeRepoId) ? activeRepoId : null;
       setActiveRepoId(restored ?? loaded[0]?.id ?? null);
+      // The tab this launch shows catches up with its remotes once, right away: an opened
+      // app should speak for the network's state, not for whatever the last session fetched.
+      const shown =
+        restored !== null ? loaded.find((item) => item.id === restored) : (loaded[0] ?? null);
+      if (shown) void fetchAndRefresh(shown);
     })()
       .catch((loadError) => {
         console.error("Could not restore the open repositories", loadError);
@@ -299,6 +308,7 @@ function App() {
           setRepos((previous) =>
             previous.map((item) => (item.id === loaded.id ? loaded : item)),
           );
+          void fetchAndRefresh(loaded);
         })
         .catch((wakeError) => {
           console.error("Could not wake the repository", wakeError);
@@ -336,6 +346,7 @@ function App() {
         previous.some((item) => item.path === opened.path) ? previous : [...previous, opened],
       );
       setActiveRepoId(opened.id);
+      void fetchAndRefresh(opened);
     } catch (openError) {
       setNotice({
         title: "Could not open that folder",
@@ -420,6 +431,29 @@ function App() {
     window.requestAnimationFrame(() => setFlashHashes(hashes));
   }, []);
 
+  // Opening a repository — or refocusing the app — quietly pulls every remote into the
+  // tracking refs first: the ahead/behind counts and the pills only describe the network's
+  // state after a fetch. A failed fetch is offline, not a toast: the local state is already
+  // live, and the remote view catches up on a later fetch. The local refresh that follows
+  // runs forced — refs the fetch moved (even without any HEAD move) must splice their commits.
+  const lastFetchStamp = useRef(0);
+  const fetchAndRefresh = useCallback(
+    async (target: Repository) => {
+      try {
+        await fetchRemote(target.path);
+      } catch (fetchError) {
+        console.debug("Could not fetch remotes", fetchError);
+      }
+      const refreshed = await refreshRepository(target, true);
+      if (!refreshed) return;
+      setRepos((previous) =>
+        previous.map((item) => (item.id === refreshed.repo.id ? refreshed.repo : item)),
+      );
+      showFlash(refreshed.touched);
+    },
+    [showFlash],
+  );
+
   // Pull / push the checked-out branch, then force a refresh so the counters and the window
   // follow. A failed sync tints its button for a moment — the message is on the tooltip.
   const [syncing, setSyncing] = useState(false);
@@ -485,10 +519,11 @@ function App() {
   }, [repo, refreshing, showFlash]);
 
   // Repo data changes while the app sits in the background: a commit from a terminal, an
-  // editor save, a fetch that brings new remote branches. On window focus we re-check the
-  // visible repo only, and refreshRepository does the cheapest thing that is correct: two
-  // cheap git reads, then only the new commits are spliced in. The other tabs are not
-  // touched — they are off screen and each reload costs a full log read.
+  // editor save, a push somewhere else. On window focus the visible repo is re-checked with
+  // the cheapest thing that is correct: two cheap git reads, then only the new commits are
+  // spliced in — and, once in a while, a quiet fetch catches the drift only the network
+  // notices (a push to origin, a new remote branch). The other tabs are untouched; they are
+  // off screen and each reload costs a full log read.
   const refreshBusy = useRef(false);
   const lastProbe = useRef(0);
   useEffect(() => {
@@ -504,11 +539,18 @@ function App() {
       refreshBusy.current = true;
       try {
         const refreshed = await refreshRepository(activeRepo);
-        if (cancelled || refreshed === null) return;
-        setRepos((previous) =>
-          previous.map((item) => (item.id === refreshed.repo.id ? refreshed.repo : item)),
-        );
-        showFlash(refreshed.touched);
+        if (!cancelled && refreshed !== null) {
+          setRepos((previous) =>
+            previous.map((item) => (item.id === refreshed.repo.id ? refreshed.repo : item)),
+          );
+          showFlash(refreshed.touched);
+        }
+        // Remote state drifts even when the worktree and HEAD stand still; the fetch window
+        // keeps a focus parade from turning into a fetch parade.
+        if (!cancelled && Date.now() - lastFetchStamp.current >= FETCH_ON_FOCUS_MS) {
+          lastFetchStamp.current = Date.now();
+          await fetchAndRefresh(activeRepo);
+        }
       } catch (refreshError) {
         console.error("Could not refresh the repository", refreshError);
       } finally {
