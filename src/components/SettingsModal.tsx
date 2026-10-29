@@ -213,7 +213,7 @@ export function SettingsModal({
               title={showAvatars ? "Avatars are on" : "Avatars are off"}
               onClick={() => onShowAvatarsChange(!showAvatars)}
               className={`relative inline-flex h-5.5 w-10 shrink-0 cursor-default items-center rounded-full border border-hairline transition-colors ${
-                showAvatars ? "bg-primary" : "bg-sheet-strong"
+                showAvatars ? "bg-primary" : "bg-ink/15"
               }`}
             >
               <span
@@ -294,7 +294,7 @@ export function SettingsModal({
               title={updateMode === "auto" ? "Automatic updates are on" : "Updates are manual"}
               onClick={() => onUpdateModeChange(updateMode === "auto" ? "manual" : "auto")}
               className={`relative inline-flex h-5.5 w-10 shrink-0 cursor-default items-center rounded-full border border-hairline transition-colors ${
-                updateMode === "auto" ? "bg-primary" : "bg-sheet-strong"
+                updateMode === "auto" ? "bg-primary" : "bg-ink/15"
               }`}
             >
               <span
