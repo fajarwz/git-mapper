@@ -118,7 +118,8 @@ export function ContextMenu({ target, onCheckout, onCheckoutCommit, head, onClos
             onCheckoutCommit(target.commit.hash);
           }}
         >
-          Check out commit {target.commit.hash}…
+          {/* The menu is a fixed 240px: label the way the list does, with a short hash. */}
+          Check out commit {target.commit.hash.slice(0, 8)}…
         </button>
       )}
       <button type="button" role="menuitem" className={ITEM}

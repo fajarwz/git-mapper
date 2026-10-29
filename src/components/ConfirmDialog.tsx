@@ -16,6 +16,8 @@ interface ConfirmDialogProps {
  * moved in and returned, Escape and backdrop click cancel.
  */
 export function ConfirmDialog({ hash, onConfirm, onClose }: ConfirmDialogProps) {
+  // Title fits the panel: the full sha goes to git, only the short hash is for reading.
+  const shortHash = hash.slice(0, 8);
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
@@ -52,7 +54,7 @@ export function ConfirmDialog({ hash, onConfirm, onClose }: ConfirmDialogProps) 
         className={`${PANEL} w-full max-w-md p-5`}
       >
         <h2 id="detach-title" className="m-0 text-[16px] font-bold tracking-tight text-ink">
-          Check out commit {hash}?
+          Check out commit {shortHash}?
         </h2>
         <p className="mt-2 mb-0 text-[12.5px] leading-relaxed text-ink-dim">
           HEAD will detach — the checked-out pill reads <span className="font-semibold text-ink">HEAD (detached)</span>.
