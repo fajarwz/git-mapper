@@ -1,11 +1,12 @@
 /**
- * The offline avatar: a small circle with the author's initial, tinted by a hue derived from the
- * author's email. Every git client that wants avatars without a service reaches for this shape —
- * git itself carries no picture, only name + email, so the email becomes the one input the look
- * can be deterministic about. No network, no emails sent anywhere; a platform photo (Gravatar /
- * GitHub) can later sit behind the same prop.
+ * The avatar: a small circle left of the username. Base layer is the offline initials chip (a
+ * hue derived from the email — git carries no picture, just name + email); when a photo is
+ * wanted, the author's gravatar.com photo fades in over it, and a missing photo or no network
+ * silently leaves the initials. This is the two-tier shape every serious client uses.
  */
+import { useEffect, useRef, useState } from "react";
 import { LINE_COLOR_COUNT } from "../lib/graphLanes";
+import { gravatarPhotoUrl } from "../lib/avatarPhoto";
 
 /** Colour slot for an author: a stable hash of the email, spread over the lane palette. */
 export function avatarColorIndex(email: string): number {
@@ -26,21 +27,50 @@ export function avatarInitial(name: string): string {
 interface AvatarProps {
   name: string;
   email: string;
+  /** Photos load from gravatar.com; off means the initials chip alone. The setting owns this. */
+  photos?: boolean;
 }
 
-export function Avatar({ name, email }: AvatarProps) {
+export function Avatar({ name, email, photos = false }: AvatarProps) {
   // Mixed into the lane colour so both themes carry it and neighbouring authors mostly differ.
   const tone = `var(--color-lane-${avatarColorIndex(email) + 1})`;
+  const tint = { backgroundColor: `color-mix(in oklab, ${tone} 22%, transparent)`, color: tone };
+  const [photoUrl, setPhotoUrl] = useState<string | null>(null);
+  const [photoShown, setPhotoShown] = useState(false);
+  // The stale-guard: a photo resolving after the email prop changed must not paint over it.
+  const wantedRef = useRef("");
+
+  useEffect(() => {
+    if (!photos || photoUrl) return;
+    const wanted = email;
+    wantedRef.current = wanted;
+    void gravatarPhotoUrl(email).then((url) => {
+      if (wantedRef.current === wanted && url) setPhotoUrl(url);
+    });
+  }, [photos, email, photoUrl]);
+
   return (
     <span
       aria-hidden="true"
-      className="grid size-5 shrink-0 place-items-center rounded-full font-mono text-[10px] font-bold"
-      style={{
-        backgroundColor: `color-mix(in oklab, ${tone} 22%, transparent)`,
-        color: tone,
-      }}
+      className="relative grid size-5 shrink-0 place-items-center overflow-hidden rounded-full font-mono text-[10px] font-bold"
+      style={tint}
     >
       {avatarInitial(name)}
+      {photoUrl && (
+        <img
+          src={photoUrl}
+          alt=""
+          className={`absolute inset-0 size-full object-cover ${photoShown ? "opacity-100" : "opacity-0"}`}
+          onLoad={() => setPhotoShown(true)}
+          onError={() => {
+            // No gravatar for this email (d=404) or the request fell over: keep the initials,
+            // drop the URL so the dead <img> does not sit in every row of the same author.
+            wantedRef.current = "";
+            setPhotoUrl(null);
+            setPhotoShown(false);
+          }}
+        />
+      )}
     </span>
   );
 }

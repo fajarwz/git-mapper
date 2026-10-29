@@ -201,7 +201,8 @@ export function SettingsModal({
             <div className="min-w-0">
               <p className="m-0 text-[12px] font-semibold text-ink">Show avatars</p>
               <p className="m-0 text-[11px] leading-snug text-ink-dim">
-                Initial beside the username, tinted from the author email — no network is used
+                Photo from gravatar.com when the author has one, otherwise an initial tinted by
+                email
               </p>
             </div>
             <button
