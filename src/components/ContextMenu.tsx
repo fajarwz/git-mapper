@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import type { Commit, CommitRef } from "../types";
+import { UNCOMMITTED_HASH } from "../data/gitLoader";
 import { copyText } from "../lib/clipboard";
 
 /** What the menu was opened on: a position, the row's commit, and the ref it targets. */
@@ -14,6 +15,9 @@ export interface ContextMenuTarget {
 interface ContextMenuProps {
   target: ContextMenuTarget;
   onCheckout: (branch: string) => void;
+  onCheckoutCommit: (hash: string) => void;
+  /** Full sha of HEAD at the last read: the row that is HEAD gets no checkout entry. */
+  head: string;
   onClose: () => void;
 }
 
@@ -33,7 +37,7 @@ const COPY_LABELS: Record<CommitRef["type"], string> = {
  * local branch that is not the checked-out one; the copy entries always match their target.
  * Copying keeps the menu up for a beat with a "Copied!" marker so the action reads, then closes.
  */
-export function ContextMenu({ target, onCheckout, onClose }: ContextMenuProps) {
+export function ContextMenu({ target, onCheckout, onCheckoutCommit, head, onClose }: ContextMenuProps) {
   // The entry that just copied shows "Copied!" for a beat; the others keep their labels.
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -67,6 +71,13 @@ export function ContextMenu({ target, onCheckout, onClose }: ContextMenuProps) {
 
   const branch = target.ref?.type === "branch" ? target.ref : null;
   const checkoutable = branch !== null && !branch.isCurrent;
+  // The commit checkout detaches HEAD: real history rows only — the HEAD row itself offers
+  // nothing (it is already out), the uncommitted row ("wip") is not a commit, and stash rows
+  // check out nothing. The app confirms first.
+  const commitCheckoutable =
+    target.commit.stashIndex === undefined &&
+    target.commit.hash !== UNCOMMITTED_HASH &&
+    !head.startsWith(target.commit.hash);
   // A local copy the callbacks can close over (TS will not narrow the prop inside them).
   const activeRef = target.ref;
 
@@ -97,6 +108,17 @@ export function ContextMenu({ target, onCheckout, onClose }: ContextMenuProps) {
           }}
         >
           Check out {branch.name}
+        </button>
+      )}
+      {commitCheckoutable && (
+        <button type="button" role="menuitem" className={ITEM}
+          title="Detaches HEAD onto this commit — a warning shows first"
+          onClick={() => {
+            onClose();
+            onCheckoutCommit(target.commit.hash);
+          }}
+        >
+          Check out commit {target.commit.hash}…
         </button>
       )}
       <button type="button" role="menuitem" className={ITEM}

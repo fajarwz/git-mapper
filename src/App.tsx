@@ -10,6 +10,7 @@ import type { DiffLayout, DiffScope } from "./components/DiffViewer";
 import { EmptyState } from "./components/EmptyState";
 import { TitleBar } from "./components/TitleBar";
 import { Toast } from "./components/Toast";
+import { ConfirmDialog } from "./components/ConfirmDialog";
 import { SettingsModal } from "./components/SettingsModal";
 import { STORAGE_KEYS, usePersistedState } from "./lib/persisted";
 import { filterCommits } from "./lib/commitFilter";
@@ -27,6 +28,7 @@ import { applyTheme, initialTheme, storeTheme } from "./lib/theme";
 import type { Theme } from "./lib/theme";
 import {
   checkoutBranch,
+  checkoutCommit,
   loadCommitFiles,
   loadMoreCommits,
   loadRepository,
@@ -584,6 +586,35 @@ function App() {
     [closeContextMenu, handleCheckoutBranch],
   );
 
+  // A commit checkout is the one write this app performs on past history: HEAD detaches, and
+  // commits made there are lost without a branch. The menu queues the hash, a dialog owns the
+  // warning, and confirming runs the same reload path a branch checkout takes.
+  const [detachCandidate, setDetachCandidate] = useState<string | null>(null);
+  const handleMenuCheckoutCommit = useCallback(
+    (hash: string) => {
+      closeContextMenu();
+      setDetachCandidate(hash);
+    },
+    [closeContextMenu],
+  );
+  const handleConfirmCheckoutCommit = useCallback(async (hash: string) => {
+    if (!activeRepoPath || opening) return;
+    setDetachCandidate(null);
+    try {
+      await checkoutCommit(activeRepoPath, hash);
+      const refreshed = await loadRepository(activeRepoPath);
+      setRepos((previous) =>
+        previous.map((item) => (item.id === refreshed.id ? refreshed : item)),
+      );
+    } catch (checkoutError) {
+      setNotice({
+        title: `Could not check out ${hash}`,
+        detail: checkoutError instanceof Error ? checkoutError.message : String(checkoutError),
+        id: Date.now(),
+      });
+    }
+  }, [activeRepoPath, opening]);
+
   // The search filters the loaded window only — the visible rows AND the lanes/graph re-layout
   // over the subset. Searching unpaginated history stays out until the deep-search slice.
   const visibleCommits = useMemo(
@@ -694,7 +725,17 @@ function App() {
         <ContextMenu
           target={contextMenu}
           onCheckout={handleMenuCheckout}
+          onCheckoutCommit={handleMenuCheckoutCommit}
+          head={repo?.head ?? ""}
           onClose={closeContextMenu}
+        />
+      )}
+
+      {detachCandidate !== null && (
+        <ConfirmDialog
+          hash={detachCandidate}
+          onConfirm={() => void handleConfirmCheckoutCommit(detachCandidate)}
+          onClose={() => setDetachCandidate(null)}
         />
       )}
 

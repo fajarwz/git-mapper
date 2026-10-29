@@ -384,6 +384,25 @@ fn checkout_branch_in(dir: &str, branch: &str) -> Result<(), String> {
     run_git(dir, &["checkout", branch]).map(|_| ())
 }
 
+/// Detaches HEAD onto a commit. The app asks first — the dialog warns that new commits made
+/// on a detached HEAD are lost unless a branch is created — so this never runs unconfirmed.
+#[tauri::command]
+pub async fn checkout_commit(dir: String, hash: String) -> Result<(), String> {
+    run_blocking("checkout", move || checkout_commit_in(&dir, &hash)).await
+}
+
+fn checkout_commit_in(dir: &str, hash: &str) -> Result<(), String> {
+    let hash = hash.trim();
+    // The arg goes straight into git's CLI: only an abbreviated/full hex hash is accepted, so
+    // a branch name or any other string can never turn this into something else. A short hash
+    // that matches nothing comes back as git's "does not exist" error, which the toast shows.
+    if hash.len() < 4 || hash.len() > 40 || !hash.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(format!("\"{hash}\" is not a commit hash"));
+    }
+    // --detach is the explicit form: it detaches even when the hash sits on a branch tip.
+    run_git(dir, &["checkout", "--detach", hash]).map(|_| ())
+}
+
 /// Pulls the current branch from its upstream. Fast-forward only: a pull that would need a
 /// merge is refused with git's own message instead of half-merging inside a history viewer.
 /// Runs on a blocking thread (network IO — a sync command would freeze the window) and
@@ -755,6 +774,53 @@ mod tests {
             .filter(|r| !r.trim().is_empty())
             .map(|r| r.trim_matches('\n').split('\0').map(String::from).collect())
             .collect()
+    }
+
+    fn git_out(dir: &Path, args: &[&str]) -> String {
+        let out = Command::new("git").args(args).current_dir(dir).output().expect("git ran");
+        assert!(
+            out.status.success(),
+            "git {args:?} failed: {}",
+            String::from_utf8_lossy(&out.stderr)
+        );
+        String::from_utf8_lossy(&out.stdout).trim().to_string()
+    }
+
+    #[test]
+    fn checkout_commit_detaches_onto_a_commit() {
+        let repo = TempRepo::new("detach");
+        repo.commit("a.txt", "a\n", "first");
+        let first = git_out(&repo.0, &["rev-parse", "HEAD"]);
+        repo.commit("b.txt", "b\n", "second");
+        let second = git_out(&repo.0, &["rev-parse", "HEAD"]);
+
+        checkout_commit_in(repo.path(), &first[..7]).expect("the short hash detaches");
+        assert_eq!(git_out(&repo.0, &["rev-parse", "HEAD"]), first, "HEAD sits on the commit");
+        assert_eq!(
+            git_out(&repo.0, &["rev-parse", "--abbrev-ref", "HEAD"]),
+            "HEAD",
+            "no branch is checked out"
+        );
+        assert_eq!(
+            git_out(&repo.0, &["rev-parse", "refs/heads/main"]),
+            second,
+            "the branch did not move with the checkout"
+        );
+    }
+
+    #[test]
+    fn checkout_commit_rejects_everything_but_a_hash() {
+        let repo = TempRepo::new("detach-guard");
+        repo.commit("a.txt", "a\n", "first");
+
+        // A branch name is refused before git sees it — --detach is hash-only.
+        let err = checkout_commit_in(repo.path(), "main").unwrap_err();
+        assert!(err.contains("is not a commit hash"), "got: {err}");
+        assert_eq!(
+            git_out(&repo.0, &["rev-parse", "--abbrev-ref", "HEAD"]),
+            "main",
+            "HEAD did not move"
+        );
     }
 
     #[test]

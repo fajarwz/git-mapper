@@ -23,7 +23,8 @@ pub fn run() {
             git::read_stashes,
             git::read_commit_files,
             git::read_image_versions,
-            git::checkout_branch
+            git::checkout_branch,
+            git::checkout_commit
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

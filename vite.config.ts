@@ -170,6 +170,14 @@ function gitDevApi(): Plugin {
       run(String(dir), ["checkout", String(branch)]);
       return null;
     },
+    checkout_commit: ({ dir, hash }) => {
+      const h = String(hash).trim();
+      if (h.length < 4 || h.length > 40 || !/^[0-9a-fA-F]+$/.test(h)) {
+        throw new Error(`"${h}" is not a commit hash`);
+      }
+      run(String(dir), ["checkout", "--detach", h]);
+      return null;
+    },
     pull_branch: ({ dir }) =>
       run(String(dir), ["pull", "--ff-only", "--no-edit"]),
     push_branch: ({ dir }) =>

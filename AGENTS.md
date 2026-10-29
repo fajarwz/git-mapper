@@ -5,7 +5,7 @@ Guidance for AI agents working in this repo. Written after the full redesign + r
 ## Project
 
 **Git Mapper** (formerly Git Trail) — standalone Git history viewer for Windows. Tauri 2 + React 19 + TypeScript + Tailwind CSS v4 + Vite. Reads real Git data: the Tauri backend runs the `git` CLI and returns porcelain output; TS parsers turn it into `types.ts` shapes. Read-only apart from a branch checkout (`checkout_branch`, from double-clicking a branch
-pill); there is no staging or committing.
+pill), plus `checkout_commit` (detaches HEAD behind a confirm dialog); there is no staging or committing.
 
 - Package/crate/identifier/brand are `git-mapper` / `git_mapper_lib` / `com.fajarwz.git-mapper` / "Git Mapper".
 
@@ -107,7 +107,15 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
 - `src/lib/graphGeometry.ts` — `ROW_HEIGHT` is shared between `CommitRow` and the SVG graph. Change both together or dots misalign with rows.
 - `src/lib/commitFilter.ts` — `filterCommits(commits, query)`: space-separated tokens AND together, case-insensitive substring over hash, subject, body, author, email and ref-pill names (literal text — no fuzzy `_`/`-` folding). An empty query returns the input array itself so rows keep object identity. Search covers ONLY the loaded window; paging is suspended while a query is active, and deep search over unpaginated history is a planned separate slice.
 - `src/lib/highlight.ts` — lazy highlight.js: the core is a dynamic import, and each grammar too (one small chunk per language, loaded the first time a diff of that type opens). `languageForPath` maps extension/basename → grammar, `loadHighlighter` + `highlightSync` produce ESCAPED token HTML (highlight.js escapes before wrapping — safe for dangerouslySetInnerHTML). The schemes are NOT highlight.js themes: index.css scopes palettes under `data-syntax` on the diff panel — `app` (design tokens, follows the theme), `github` and `neon` (literals with light/dark variants). The picker lives in settings, persisted as `git-mapper:syntax-scheme`, default `app` — there is no colour-off option.
-- `src/components/ContextMenu.tsx` — the right-click menu on commit rows and ref pills. Entries: `Check out <branch>` (only for a local branch that is not current), `Copy commit hash` and `Copy branch|remote|tag|stash name`; a copy flips that entry to "Copied!" for 700ms, then the menu closes. Dismisses on outside pointerdown, Escape, scroll (capture) and resize. Clipboard goes through `src/lib/clipboard.ts` `copyText`, which falls back to a hidden textarea because WebView2 can deny the async clipboard API per-origin.
+- `src/components/ContextMenu.tsx` — the right-click menu on commit rows and ref pills. Entries:
+  `Check out <branch>` (only for a local branch that is not current), `Check out commit <hash>…`
+  (real history rows only — not the HEAD row, the `wip` row or a stash row; it opens
+  `ConfirmDialog.tsx`, because checking out a commit detaches HEAD and commits made there are
+  lost without a branch — the command is `checkout_commit`, hash-format-gated, `--detach`),
+  `Copy commit hash` and `Copy branch|remote|tag|stash name`; a copy flips that entry to "Copied!"
+  for 700ms, then the menu closes. Dismisses on outside pointerdown, Escape, scroll (capture) and
+  resize. Clipboard goes through `src/lib/clipboard.ts` `copyText`, which falls back to a hidden
+  textarea because WebView2 can deny the async clipboard API per-origin.
 - `src/lib/ui.ts` — `PANEL` and `GLASS_CONTROL` class strings; every panel/button picks these up.
 - `src/lib/tableLayout.ts` — column widths, grid templates, resize min/max.
 - `src/lib/persisted.ts` — `usePersistedState` (localStorage-backed `useState`) and the `STORAGE_KEYS`
