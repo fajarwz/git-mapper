@@ -95,7 +95,7 @@ test("a history row offers the commit checkout and hands over the hash", () => {
     />,
   );
 
-  const item = getByRole("menuitem", { name: "Check out commit aaaa1111…" });
+  const item = getByRole("menuitem", { name: "Check out commit aaaa1111" });
   fireEvent.click(item);
   assert.equal(onCheckoutCommit.mock.calls[0][0], "aaaa1111");
 });

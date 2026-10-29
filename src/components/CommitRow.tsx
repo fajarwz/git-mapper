@@ -78,7 +78,9 @@ export const CommitRow = memo(function CommitRow({
         {formatAbsoluteDate(commit.date)}
       </time>
 
-      <span className={`truncate font-mono text-[11px] text-ink-dim ${metaWeight}`}>{commit.hash}</span>
+      <span className={`font-mono text-[11px] text-ink-dim ${metaWeight}`}>
+        {commit.hash.slice(0, 8)}
+      </span>
 
       <span aria-hidden="true" />
     </button>
