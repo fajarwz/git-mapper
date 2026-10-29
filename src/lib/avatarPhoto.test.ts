@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
-import { emailSha256Hex, gravatarPhotoUrl } from "./avatarPhoto";
+import { emailSha256Hex, gravatarPhotoUrl, notePhotoMissing, resetPhotoCache } from "./avatarPhoto";
 
 // NIST's example vectors for SHA-256 — the fixture the hash must clear before anything else.
 const SHA256_ABC = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad";
@@ -17,6 +17,14 @@ test("the email hash is sha256 over the spec-normalised address", async () => {
 
 test("the photo URL carries the hash into gravatar's d=404 endpoint", async () => {
   if (globalThis.crypto?.subtle === undefined) return;
+  resetPhotoCache();
   const url = await gravatarPhotoUrl("abc");
   assert.equal(url, `https://www.gravatar.com/avatar/${SHA256_ABC}?s=64&d=404`);
+});
+
+test("an email proven to have no photo is never asked again", async () => {
+  notePhotoMissing("Nobody@Example.com ");
+  // Any shape of the same address resolves to null without touching the network.
+  assert.equal(await gravatarPhotoUrl("nobody@example.com"), null);
+  assert.equal(await gravatarPhotoUrl("nobody@example.com"), null);
 });

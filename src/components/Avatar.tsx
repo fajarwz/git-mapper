@@ -6,7 +6,7 @@
  */
 import { useEffect, useRef, useState } from "react";
 import { LINE_COLOR_COUNT } from "../lib/graphLanes";
-import { gravatarPhotoUrl } from "../lib/avatarPhoto";
+import { gravatarPhotoUrl, notePhotoMissing } from "../lib/avatarPhoto";
 
 /** Colour slot for an author: a stable hash of the email, spread over the lane palette. */
 export function avatarColorIndex(email: string): number {
@@ -64,7 +64,8 @@ export function Avatar({ name, email, photos = false }: AvatarProps) {
           onLoad={() => setPhotoShown(true)}
           onError={() => {
             // No gravatar for this email (d=404) or the request fell over: keep the initials,
-            // drop the URL so the dead <img> does not sit in every row of the same author.
+            // record the miss so other rows of this author never retry, and drop the dead <img>.
+            notePhotoMissing(email);
             wantedRef.current = "";
             setPhotoUrl(null);
             setPhotoShown(false);
