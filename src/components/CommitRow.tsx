@@ -4,12 +4,15 @@ import { formatAbsoluteDate } from "../lib/format";
 import { branchColor } from "../lib/graphGeometry";
 import { COMMIT_ROW_GRID } from "../lib/tableLayout";
 import { RefPill } from "./RefPill";
+import { Avatar } from "./Avatar";
 
 interface CommitRowProps {
   commit: Commit;
   selected: boolean;
   /** Just arrived (or its refs changed) in the last refresh: flash the row once. */
   fresh?: boolean;
+  /** The initials avatar sits left of the username; the settings toggle owns its visibility. */
+  showAvatar?: boolean;
   onSelect: (hash: string) => void;
   onCheckoutBranch?: (branch: string) => void;
   /** Right-click on the row body: the menu targets the commit and its most relevant ref. */
@@ -22,6 +25,7 @@ export const CommitRow = memo(function CommitRow({
   commit,
   selected,
   fresh = false,
+  showAvatar = false,
   onSelect,
   onCheckoutBranch,
   onContextMenu,
@@ -69,7 +73,10 @@ export const CommitRow = memo(function CommitRow({
         ))}
       </span>
 
-      <span className={`truncate text-[12px] text-ink-dim ${metaWeight}`}>{commit.author}</span>
+      <span className={`flex min-w-0 items-center gap-1.5 text-[12px] text-ink-dim ${metaWeight}`}>
+        {showAvatar && <Avatar name={commit.author} email={commit.authorEmail} />}
+        <span className="truncate">{commit.author}</span>
+      </span>
 
       <time
         className={`truncate text-[12px] text-ink-dim ${metaWeight}`}

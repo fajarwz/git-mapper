@@ -107,6 +107,8 @@ function App() {
   const [diffLayout, setDiffLayout] = usePersistedState<DiffLayout>(STORAGE_KEYS.diffLayout, "unified");
   // Long lines soft-wrap (the pane is narrow); the wrap toggle switches back to horizontal scroll.
   const [diffWrap, setDiffWrap] = usePersistedState<boolean>(STORAGE_KEYS.diffWrap, true);
+  // The initials avatar beside the username in the commit list; git itself has no picture.
+  const [showAvatars, setShowAvatars] = usePersistedState<boolean>(STORAGE_KEYS.showAvatars, true);
 
   // Updates: auto (background download on launch) by default, manual as the opt-out.
   const [updateMode, setUpdateMode] = usePersistedState<UpdateMode>(STORAGE_KEYS.updateMode, "auto");
@@ -677,6 +679,7 @@ function App() {
               flashHashes={flashSet}
             loadingMore={loadingMoreByRepo[repo.id] ?? false}
               waking={repo.id === wakingId}
+              showAvatars={showAvatars}
               onNearBottom={handleNearBottom}
               onCheckoutBranch={handleCheckoutBranch}
               onContextMenu={(commit, ref, x, y) => setContextMenu({ commit, ref, x, y })}
@@ -708,6 +711,8 @@ function App() {
         <SettingsModal
           theme={theme}
           onThemeChange={handleThemeChange}
+          showAvatars={showAvatars}
+          onShowAvatarsChange={setShowAvatars}
           syntaxScheme={syntaxScheme}
           onSyntaxSchemeChange={setSyntaxScheme}
           appVersion={appVersion}

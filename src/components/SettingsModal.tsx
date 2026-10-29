@@ -9,6 +9,9 @@ import { CheckIcon, CloseIcon } from "./icons";
 interface SettingsModalProps {
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
+  /** The initials avatar beside the username in the commit list. */
+  showAvatars: boolean;
+  onShowAvatarsChange: (show: boolean) => void;
   syntaxScheme: SyntaxScheme;
   onSyntaxSchemeChange: (scheme: SyntaxScheme) => void;
   /** The running release version, from the Tauri runtime ("dev" in a plain browser). */
@@ -107,6 +110,8 @@ function ThemePreview({ theme }: { theme: Theme }) {
 export function SettingsModal({
   theme,
   onThemeChange,
+  showAvatars,
+  onShowAvatarsChange,
   syntaxScheme,
   onSyntaxSchemeChange,
   appVersion,
@@ -189,6 +194,34 @@ export function SettingsModal({
           >
             <CloseIcon />
           </button>
+        </div>
+
+        <div className="mt-3 rounded-xl border border-rule bg-sheet p-3">
+          <div className="flex items-center justify-between gap-3">
+            <div className="min-w-0">
+              <p className="m-0 text-[12px] font-semibold text-ink">Show avatars</p>
+              <p className="m-0 text-[11px] leading-snug text-ink-dim">
+                Initial beside the username, tinted from the author email — no network is used
+              </p>
+            </div>
+            <button
+              type="button"
+              role="switch"
+              aria-checked={showAvatars}
+              aria-label="Show avatars"
+              title={showAvatars ? "Avatars are on" : "Avatars are off"}
+              onClick={() => onShowAvatarsChange(!showAvatars)}
+              className={`relative inline-flex h-5.5 w-10 shrink-0 cursor-default items-center rounded-full border border-hairline transition-colors ${
+                showAvatars ? "bg-primary" : "bg-sheet-strong"
+              }`}
+            >
+              <span
+                className={`absolute left-0.5 size-4.5 rounded-full bg-white soft-shadow transition-transform ${
+                  showAvatars ? "translate-x-4.5" : ""
+                }`}
+              />
+            </button>
+          </div>
         </div>
 
         <div className="mt-4 flex gap-2" role="group" aria-label="Theme">

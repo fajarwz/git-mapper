@@ -39,6 +39,8 @@ interface CommitListProps {
   loadingMore: boolean;
   /** True while a slept tab reloads after being clicked: history is on its way back. */
   waking?: boolean;
+  /** The initials avatar left of the username; a settings toggle owns this. */
+  showAvatars: boolean;
   onNearBottom: () => void;
   onCheckoutBranch: (branch: string) => void;
   /** Right-click on a row (or one of its pills): opens the commit context menu. */
@@ -51,7 +53,7 @@ function widthOf(element: HTMLElement | null, fallback: number): number {
 
 const HEADER_CELL = "relative flex h-full min-w-0 items-center";
 
-export function CommitList({ repo, commits, query, selectedHash, flashHashes, onSelect, loadingMore, waking = false, onNearBottom, onCheckoutBranch, onContextMenu }: CommitListProps) {
+export function CommitList({ repo, commits, query, selectedHash, flashHashes, onSelect, loadingMore, waking = false, showAvatars, onNearBottom, onCheckoutBranch, onContextMenu }: CommitListProps) {
   // One layout for the graph column and the SVG. Sizing the column from the dot lanes alone used to
   // clip the graph whenever a line ran right of every dot.
   const layout = useMemo(
@@ -233,6 +235,7 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
               commit={commit}
               selected={commit.hash === selectedHash}
               fresh={flashHashes.has(commit.hash)}
+              showAvatar={showAvatars}
               onSelect={onSelect}
               onCheckoutBranch={onCheckoutBranch}
               onContextMenu={onContextMenu ? (row, x, y) => {
