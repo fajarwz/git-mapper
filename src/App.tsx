@@ -437,19 +437,24 @@ function App() {
   // live, and the remote view catches up on a later fetch. The local refresh that follows
   // runs forced — refs the fetch moved (even without any HEAD move) must splice their commits.
   const lastFetchStamp = useRef(0);
+  // Returns whether the fetch itself succeeded: the auto paths only refresh, the manual
+  // button uses it to say "the remotes did not respond" before silently keeping the view.
   const fetchAndRefresh = useCallback(
-    async (target: Repository) => {
+    async (target: Repository): Promise<boolean> => {
+      let fetched = false;
       try {
         await fetchRemote(target.path);
+        fetched = true;
       } catch (fetchError) {
         console.debug("Could not fetch remotes", fetchError);
       }
       const refreshed = await refreshRepository(target, true);
-      if (!refreshed) return;
+      if (!refreshed) return fetched;
       setRepos((previous) =>
         previous.map((item) => (item.id === refreshed.repo.id ? refreshed.repo : item)),
       );
       showFlash(refreshed.touched);
+      return fetched;
     },
     [showFlash],
   );
@@ -490,6 +495,27 @@ function App() {
 
   const handlePull = useCallback(() => void runSync("pull"), [runSync]);
   const handlePush = useCallback(() => void runSync("push"), [runSync]);
+
+  // The manual fetch: the same quiet pull into the tracking refs the open/focus path runs,
+  // except a failure speaks up — the user asked for it, so unresponsiveness is worth a toast.
+  const [fetching, setFetching] = useState(false);
+  const handleFetch = useCallback(async () => {
+    const target = repo;
+    if (!target || fetching) return;
+    setFetching(true);
+    try {
+      const fetched = await fetchAndRefresh(target);
+      if (!fetched) {
+        setNotice({
+          title: `Could not fetch remotes for ${target.name}`,
+          detail: "The view still shows the refs from the last successful fetch.",
+          id: Date.now(),
+        });
+      }
+    } finally {
+      setFetching(false);
+    }
+  }, [repo, fetching, fetchAndRefresh]);
 
   // The refresh button: the same probe the focus path runs, minus the "nothing changed, return
   // null" exit, so clicking it always re-reads the working tree. The uncommitted row refetches
@@ -695,6 +721,8 @@ function App() {
         onClose={handleCloseRepo}
         onReorder={handleReorderRepos}
         onRefresh={() => void handleRefresh()}
+        onFetch={() => void handleFetch()}
+        fetching={fetching}
         onOpenSettings={() => setSettingsOpen(true)}
         updateReady={updateStatus.phase === "ready"}
         onPull={handlePull}

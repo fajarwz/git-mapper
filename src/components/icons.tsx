@@ -41,8 +41,8 @@ export function TagIcon({ size = 12 }: IconProps) {
   return <SizedIcon glyph={RawTagIcon} size={size} />;
 }
 
-export function RemoteIcon({ size = 12 }: IconProps) {
-  return <SizedIcon glyph={RawRemoteIcon} size={size} />;
+export function RemoteIcon({ size = 12, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawRemoteIcon} size={size} className={className} />;
 }
 
 export function StashIcon({ size = 12 }: IconProps) {

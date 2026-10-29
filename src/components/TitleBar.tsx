@@ -22,6 +22,7 @@ import {
   CloseIcon,
   PlusIcon,
   RefreshIcon,
+  RemoteIcon,
   RepoIcon,
   SearchIcon,
   SettingsIcon,
@@ -94,6 +95,9 @@ interface TitleBarProps {
   /** Move the tab at `from` into position `to`, after a drop. */
   onReorder: (from: number, to: number) => void;
   onRefresh: () => void;
+  /** Pull every remote into the tracking refs; `fetching` while the request is out. */
+  onFetch: () => void;
+  fetching: boolean;
   onOpenSettings: () => void;
   /** True when an update is downloaded and waiting: the settings gear shows a dot. */
   updateReady?: boolean;
@@ -191,6 +195,8 @@ export function TitleBar({
   onClose,
   onReorder,
   onRefresh,
+  onFetch,
+  fetching,
   onOpenSettings,
   updateReady = false,
   onPull,
@@ -397,6 +403,18 @@ export function TitleBar({
             <BranchIcon size={11} />
             <span className="truncate">{repo.branch}</span>
           </span>
+        )}
+        {repo && (
+          <button
+            type="button"
+            onClick={onFetch}
+            disabled={fetching}
+            aria-label="Fetch from remotes"
+            title={fetching ? "Fetching from the remotes…" : "Fetch all remotes (updates the ↑/↓ counters)"}
+            className={`${GLASS_CONTROL} grid cursor-default place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 disabled:opacity-50 size-7`}
+          >
+            <RemoteIcon size={13} className={fetching ? "animate-spin" : undefined} />
+          </button>
         )}
         {repo && repo.branch !== "HEAD detached" && (
           <>
