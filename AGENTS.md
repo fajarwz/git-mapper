@@ -242,6 +242,13 @@ and the README's Tests badge points at it.
   holding only the untracked files (`git show <hash>^3`), which `read_commit_files` appends.
   **Paging counts history rows only**: `loadMoreCommits`'s `--skip` excludes stash rows — git's
   log never contains them, so counting them skipped that many real commits per page.
+- **Tests must not assume the dev machine.** CI is the ubuntu runner: `git init` there still
+  defaults to `master` while every `git.rs` fixture asserts `main`, and there is no global
+  `user.name`, so a commit in a freshly cloned fixture dies with "Author identity unknown".
+  Fixtures init with `-b main` and reapply the identity after a `git clone`; a date assertion
+  passes an explicit IANA zone instead of trusting the runner's clock zone. Reproduce both
+  conditions locally by pointing `GIT_CONFIG_GLOBAL` at a config with
+  `[init] defaultBranch = master` and no identity — `cargo test` under it is the honest rehearsal.
 - **verifying without the desktop window:** `npm run dev` exposes the same git commands as
   `POST /api/git` (`{op, args}`), so a headless Chrome probe of `http://127.0.0.1:1420` exercises the
   real TS path (refresh, wip payloads, flash classes) without rebuilding Rust. Rust-side changes
