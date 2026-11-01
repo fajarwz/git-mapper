@@ -59,6 +59,14 @@
   --color-lane-7: #3f8f6f;
   --color-lane-8: #b06ab3;
 
+  /* Glow field: the corner glows behind the glass. Each glow owns one position
+     in body::before; retuning the mood means retuning these four + the dark
+     twins, nothing else. Dark theme goes white halos on the deep canvas. */
+  --color-glow-1: rgb(71 127 184 / 0.6); /* steel blue — top right */
+  --color-glow-2: rgb(207 106 146 / 0.5); /* rose — bottom centre-left */
+  --color-glow-3: rgb(47 161 134 / 0.45); /* teal — top centre */
+  --color-glow-4: rgb(110 86 207 / 0.6); /* Dusty Iris — left mid */
+
   /* Subtle. Depth comes from the vivid background, not the drop shadow
      (the reference art carries no shadow at all). */
   --shadow-panel: inset 0 1px 0 0 rgb(255 255 255 / 0.85), 0 14px 34px -26px rgb(48 36 100 / 0.45);
@@ -94,6 +102,12 @@
   --color-hover-glass: rgb(150 124 240 / 0.12);
   --color-selected-glass: rgb(123 97 255 / 0.24);
   --color-scrim: rgb(0 0 0 / 0.55);
+
+  /* Glow halos turn white on the deep canvas, at reduced strength. */
+  --color-glow-1: rgb(255 255 255 / 0.2);
+  --color-glow-2: rgb(255 255 255 / 0.15);
+  --color-glow-3: rgb(255 255 255 / 0.14);
+  --color-glow-4: rgb(255 255 255 / 0.22);
 
   --color-lane-1: #9b7bff;
   --color-lane-2: #5ba8de;
@@ -232,22 +246,21 @@
     pointer-events: none;
     background-color: #ffffff;
     background-image:
-      radial-gradient(36rem 30rem at 90% 4%, rgb(71 127 184 / 0.6), transparent 68%),
-      radial-gradient(32rem 28rem at 40% 100%, rgb(207 106 146 / 0.5), transparent 70%),
-      radial-gradient(28rem 24rem at 55% -6%, rgb(47 161 134 / 0.45), transparent 68%),
-      radial-gradient(36rem 30rem at 2% 55%, rgb(110 86 207 / 0.6), transparent 70%);
+      radial-gradient(36rem 30rem at 90% 4%, var(--color-glow-1), transparent 68%),
+      radial-gradient(32rem 28rem at 40% 100%, var(--color-glow-2), transparent 70%),
+      radial-gradient(28rem 24rem at 55% -6%, var(--color-glow-3), transparent 68%),
+      radial-gradient(36rem 30rem at 2% 55%, var(--color-glow-4), transparent 70%);
     filter: blur(24px);
   }
 
   .dark body::before {
-    /* Same glowing treatment, but the glows go white: deep dark canvas,
-       light halos breathing at the corners. */
+    /* Same geometry; the glow tokens re-point to white halos. */
     background-color: transparent;
     background-image:
-      radial-gradient(36rem 30rem at 90% 4%, rgb(255 255 255 / 0.2), transparent 68%),
-      radial-gradient(32rem 28rem at 40% 100%, rgb(255 255 255 / 0.15), transparent 70%),
-      radial-gradient(28rem 24rem at 55% -6%, rgb(255 255 255 / 0.14), transparent 68%),
-      radial-gradient(36rem 30rem at 2% 55%, rgb(255 255 255 / 0.22), transparent 70%);
+      radial-gradient(36rem 30rem at 90% 4%, var(--color-glow-1), transparent 68%),
+      radial-gradient(32rem 28rem at 40% 100%, var(--color-glow-2), transparent 70%),
+      radial-gradient(28rem 24rem at 55% -6%, var(--color-glow-3), transparent 68%),
+      radial-gradient(36rem 30rem at 2% 55%, var(--color-glow-4), transparent 70%);
   }
 
   #root {
