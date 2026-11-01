@@ -24,8 +24,12 @@ colors:
   sheet: "rgb(255 255 255 / 0.5)"
   sheet-strong: "rgb(255 255 255 / 0.85)"
   hover-glass: "rgb(110 86 207 / 0.07)"
-  selected-glass: "rgb(110 86 207 / 0.12)"
-  scrim: "rgb(16 12 28 / 0.35)"
+  selected-glass: "rgb(110 86 207 / 0.16)"
+  scrim: "rgb(16 12 28 / 0.2)"
+  glow-1: "rgb(71 127 184 / 0.6)"
+  glow-2: "rgb(207 106 146 / 0.5)"
+  glow-3: "rgb(47 161 134 / 0.45)"
+  glow-4: "rgb(110 86 207 / 0.6)"
   lane-1: "#6e56cf"
   lane-2: "#477fb8"
   lane-3: "#cf6a92"
@@ -108,7 +112,7 @@ components:
 
 **Creative North Star: "The Frosted Observatory"**
 
-A Git history viewer that behaves like glass instruments over an aurora sky: the data sits on translucent smoked panes, and the colour behind them is what makes each pane visible. Depth comes from the background and from glass tinting, almost never from drop shadows. The system is calm and precise — hierarchy is drawn through a bouncy type ladder (big 16px titles, a 14px body, tiny 10.5px data labels) rather than through decoration, and every metric object (hashes, counts, diffs) speaks in a mono micro-voice.
+A Git history viewer that behaves like glass instruments over a lit-white glow field: the data sits on translucent smoked panes, and the colour behind them is what makes each pane visible. Depth comes from the background and from glass tinting, almost never from drop shadows. The system is calm and precise — hierarchy is drawn through a bouncy type ladder (big 16px titles, a 14px body, tiny 10.5px data labels) rather than through decoration, and every metric object (hashes, counts, diffs) speaks in a mono micro-voice.
 
 Colour is disciplined: one muted violet accent (Dusty Iris #6e56cf, slightly greyed, never neon) carries all meaning, and a fixed family of eight muted lane hues owns the commit graph — where colour is not decoration but topology. Components only reference semantic tokens; re-pointing them under `.dark` themes the entire app without `dark:` variants in components.
 
@@ -142,10 +146,11 @@ A muted violet world with dusty steel/rose/teal/amber satellites — saturated e
 - **Paper Surface / Canvas** (`#ffffff` light; dark surface `#0f1523`, canvas `#070b12`): solid backgrounds used sparingly (knobs, filled pill text colour) — most backgrounds are glass instead.
 - **Ink** (`#17151f`, dark `#f3f4fc`) — primary text, on every surface.
 - **Ink Soft** (`#413d51`, dark `#c5cbdd`) — secondary text, panel body copy.
-- **Ink Dim** (`#544f68`, dark `#99a1b4`) — tertiary/metadata text, gutters, muted icons. The faintest text still fronting the aurora canvas.
+- **Ink Dim** (`#544f68`, dark `#99a1b4`) — tertiary/metadata text, gutters, muted icons. The faintest text still fronting the glow canvas.
 - **Rule** (`rgb(23 21 31 / 0.08)`, dark `rgb(255 255 255 / 0.1)`) — internal 1px separators.
 - **Glass stack** — `glass .76 / glass-strong .88 / glass-soft .55 / sheet .5 / sheet-strong .85 / hairline .14 ink` (light; the hairline is neutral ink since the white canvas swap — white-on-white edges were invisible, so edges lean on ink): the panel/control hierarchy itself. In dark these become smoked `rgb(18 24 37 / …)` equivalents, hairline back to `rgb(255 255 255 / 0.15)`.
 - **Scrim** (`rgb(16 12 28 / .2)` since the white canvas — dark stays focused but light no longer turns muddy; dark `.55`): behind modals.
+- **Glow field tokens** (`--color-glow-1..4`, dark re-points each to white at halved strength): the four corner glows behind the glass — steel blue top-right, rose bottom centre-left, teal top centre, Dusty Iris left mid. They live in `body::before` only; retuning the mood touches four lines per theme, never the positioned gradients. `hover-glass` stays at 7% on purpose: its white composite still reads (Δ≈19 on the red channel) as a whisper, which is what hover must be to keep `selected-glass` at 16% the clearly stronger state.
 
 ### Named Rules
 **The Token Rule.** Components never hardcode hex; they reference `--color-*` tokens, and `.dark` does the theming. The two sanctioned exceptions are the syntax-scheme palettes (`github`, `neon` mock fixed themes) and the SettingsModal theme previews (also mocked).
