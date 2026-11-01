@@ -28,6 +28,9 @@ cargo test           # in src-tauri/; git.rs against real throwaway repos (runs 
 `cargo test` builds throwaway git repos under the OS temp dir — keep them self-contained
 (no remote network, cheap fixtures). `npm run lint` is a Tailwind class checker, not a code
 linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass = verifiable state.
+`.github/workflows/ci.yml` runs exactly that gate on every push and pull request (ubuntu runner:
+`npm ci`, lint, build, vitest, then `cargo test` — tauri-build needs `dist/`, hence the build first),
+and the README's Tests badge points at it.
 
 ## Architecture
 

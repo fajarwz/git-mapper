@@ -1,0 +1,56 @@
+name: CI
+
+# The gate AGENTS.md describes, on every push and pull request: Tailwind class
+# lint, `tsc && vite build`, the vitest suite, then `cargo test` against real
+# throwaway repos (git.rs builds them in the OS temp dir, so the runner's git
+# CLI is the only dependency). The README's Tests badge points at this workflow.
+#
+# tauri-build validates `frontendDist` while compiling, so the Rust step runs
+# after the frontend build has produced dist/.
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  test:
+    runs-on: ubuntu-22.04
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - uses: dtolnay/rust-toolchain@stable
+
+      - name: Rust cache
+        uses: swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev libappindicator3-dev librsvg2-dev patchelf
+
+      - name: Install frontend dependencies
+        run: npm ci
+
+      - name: Lint (Tailwind class hygiene)
+        run: npm run lint:check
+
+      - name: Build (tsc + vite)
+        run: npm run build
+
+      - name: Frontend tests
+        run: npm test
+
+      - name: Rust tests
+        run: cargo test --manifest-path src-tauri/Cargo.toml
