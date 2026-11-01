@@ -1,11 +1,9 @@
-# Git Mapper website deploys as the subdomain gitmapper.fajarwz.com.
-# Connect the repo to Netlify once; this file carries the settings.
+# Git Mapper website on Netlify (public subdomain: gitmapper.fajarwz.com).
+# Explicit paths — no [build.base], some deploy paths ignore it.
 [build]
-  base = "website"
-  command = "npm run build"
-  publish = "dist"
+  command = "npm run build --prefix website"
+  publish = "website/dist"
 
-[[redirects]]
-  from = "/*"
-  to = "/404.html"
-  status = 404
+# No [[redirects]] here: the Astro build ships 404.html and the host serves it
+# for not-found paths natively.
+

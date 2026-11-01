@@ -36,3 +36,6 @@ src-tauri/target
 
 # Astro generated types
 website/.astro/
+
+# Local Netlify folder
+.netlify
