@@ -2,7 +2,7 @@
   "name": "git-mapper",
   "private": true,
   "version": "1.2.1",
-  "license": "MIT",
+  "license": "GPL-3.0-or-later",
   "author": "Fajar Windhu Zulfikar",
   "type": "module",
   "scripts": {
