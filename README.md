@@ -6,9 +6,19 @@
 
 [![Release](https://img.shields.io/github/v/release/fajarwz/git-mapper?logo=github&labelColor=26233a&color=6e56cf)](https://github.com/fajarwz/git-mapper/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/fajarwz/git-mapper/total?labelColor=26233a&color=6e56cf&logo=github)](https://github.com/fajarwz/git-mapper/releases)
-[![Build release](https://github.com/fajarwz/git-mapper/actions/workflows/release.yml/badge.svg)](https://github.com/fajarwz/git-mapper/actions/workflows/release.yml)
-![Platform](https://img.shields.io/badge/platform-Windows%20%7C%20macOS%20%7C%20Linux-blue?labelColor=26233a)
-![Built with](https://img.shields.io/badge/Tauri_2_%C2%B7_React_19_%C2%B7_TypeScript-6e56cf?labelColor=26233a)
+[![License: MIT](https://img.shields.io/badge/license-MIT-6e56cf.svg?labelColor=26233a&logo=opensourceinitiative&logoColor=white)](LICENSE)
+
+[![Tests](https://img.shields.io/github/actions/workflow/status/fajarwz/git-mapper/ci.yml?label=tests&logo=vitest&logoColor=white&labelColor=26233a)](https://github.com/fajarwz/git-mapper/actions/workflows/ci.yml)
+[![Release build](https://img.shields.io/github/actions/workflow/status/fajarwz/git-mapper/release.yml?label=Release%20build&logo=tauri&logoColor=24C8DB&labelColor=26233a)](https://github.com/fajarwz/git-mapper/actions/workflows/release.yml)
+
+![Windows](https://img.shields.io/badge/Windows-0078D6?labelColor=26233a&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0iI2ZmZmZmZiIgZD0iTTMgM2g4LjR2OC40SDNWM3ptOS42IDBIMjF2OC40aC04LjRWM3pNMyAxMi42aDguNFYyMUgzdi04LjR6bTkuNiAwSDIxVjIxaC04LjR2LTguNHoiLz48L3N2Zz4%3D)
+![macOS](https://img.shields.io/badge/macOS-A2AAAD?labelColor=26233a&logo=apple&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-FCC624?labelColor=26233a&logo=linux&logoColor=black)
+
+![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?labelColor=26233a&logo=tauri&logoColor=24C8DB)
+![React](https://img.shields.io/badge/React-19-61DAFB?labelColor=26233a&logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?labelColor=26233a&logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?labelColor=26233a&logo=tailwindcss&logoColor=06B6D4)
 
 A standalone Git history viewer for the desktop. Tauri 2, React 19, TypeScript and Tailwind CSS v4,
 reading real repositories through the `git` CLI.
@@ -85,3 +95,8 @@ The only thing the app changes in a repository is a branch checkout.
 
 - Searching history beyond the loaded 500-commit window.
 - Staging, committing, merging, rebasing.
+
+## License
+
+[MIT](LICENSE). Use it, fork it, ship it, sell it — just keep the copyright notice and the license
+text with any copy you hand on. Nothing needs to be credited in the app's UI.
