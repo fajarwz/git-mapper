@@ -28,9 +28,7 @@ Grab the latest installer from [the releases page](https://github.com/fajarwz/gi
 The links above always resolve to the newest release. On macOS, the first launch gets a Gatekeeper
 warning because the app isn't notarized — right-click the app and pick **Open** to run it.
 
-<img src="docs/screenshots/main-light.png" alt="Commit list, light theme" width="49%"><img src="docs/screenshots/main-dark.png" alt="Commit list, dark theme" width="49%">
-
-<img src="docs/screenshots/split-light.png" alt="Split diff, light theme" width="49%"><img src="docs/screenshots/split-dark.png" alt="Split diff, dark theme" width="49%">
+<img src="docs/screenshot.png" alt="Commit list, light theme" width="100%">
 
 ## What it does
 
