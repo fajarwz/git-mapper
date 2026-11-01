@@ -20,7 +20,7 @@ colors:
   glass: "rgb(255 255 255 / 0.76)"
   glass-strong: "rgb(255 255 255 / 0.88)"
   glass-soft: "rgb(255 255 255 / 0.55)"
-  hairline: "rgb(255 255 255 / 0.78)"
+  hairline: "rgb(23 21 31 / 0.14)"
   sheet: "rgb(255 255 255 / 0.5)"
   sheet-strong: "rgb(255 255 255 / 0.85)"
   hover-glass: "rgb(110 86 207 / 0.07)"
@@ -144,8 +144,8 @@ A muted violet world with dusty steel/rose/teal/amber satellites — saturated e
 - **Ink Soft** (`#413d51`, dark `#c5cbdd`) — secondary text, panel body copy.
 - **Ink Dim** (`#544f68`, dark `#99a1b4`) — tertiary/metadata text, gutters, muted icons. The faintest text still fronting the aurora canvas.
 - **Rule** (`rgb(23 21 31 / 0.08)`, dark `rgb(255 255 255 / 0.1)`) — internal 1px separators.
-- **Glass stack** — `glass .76 / glass-strong .88 / glass-soft .55 / sheet .5 / sheet-strong .85 / hairline .78` (white, light): the panel/control hierarchy itself. In dark these become smoked `rgb(18 24 37 / …)` equivalents.
-- **Scrim** (`rgb(16 12 28 / .35)`, dark `.55`): behind modals.
+- **Glass stack** — `glass .76 / glass-strong .88 / glass-soft .55 / sheet .5 / sheet-strong .85 / hairline .14 ink` (light; the hairline is neutral ink since the white canvas swap — white-on-white edges were invisible, so edges lean on ink): the panel/control hierarchy itself. In dark these become smoked `rgb(18 24 37 / …)` equivalents, hairline back to `rgb(255 255 255 / 0.15)`.
+- **Scrim** (`rgb(16 12 28 / .2)` since the white canvas — dark stays focused but light no longer turns muddy; dark `.55`): behind modals.
 
 ### Named Rules
 **The Token Rule.** Components never hardcode hex; they reference `--color-*` tokens, and `.dark` does the theming. The two sanctioned exceptions are the syntax-scheme palettes (`github`, `neon` mock fixed themes) and the SettingsModal theme previews (also mocked).
