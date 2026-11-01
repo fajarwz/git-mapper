@@ -1,0 +1,189 @@
+@import "tailwindcss";
+
+/* Fonts bundled locally (same files the app ships in public/fonts). */
+@font-face {
+  font-family: "Plus Jakarta Sans";
+  src: url("/fonts/plus-jakarta-sans.woff2") format("woff2");
+  font-weight: 200 800;
+  font-style: normal;
+  font-display: swap;
+}
+
+@font-face {
+  font-family: "JetBrains Mono";
+  src: url("/fonts/jetbrains-mono.woff2") format("woff2");
+  font-weight: 400 700;
+  font-style: normal;
+  font-display: swap;
+}
+
+/* Design tokens: copied from the app's src/index.css @theme (light values).
+   The site renders light-only; if a token system change lands in the app,
+   re-copy this block so the site never drifts from the product. */
+@theme {
+  --color-primary: #6e56cf;
+  --color-primary-ink: #563d9a;
+  --color-secondary: #57536e;
+  --color-success: #30a46c;
+  --color-success-ink: #218358;
+  --color-warning: #e0a24b;
+  --color-warning-ink: #8a5a11;
+  --color-danger: #d5535e;
+  --color-danger-ink: #c23a55;
+
+  --color-surface: #ffffff;
+  --color-canvas: #ffffff;
+  --color-ink: #17151f;
+  --color-ink-soft: #413d51;
+  --color-ink-dim: #544f68;
+  --color-rule: rgb(23 21 31 / 0.08);
+
+  --color-glass: rgb(255 255 255 / 0.76);
+  --color-glass-strong: rgb(255 255 255 / 0.88);
+  --color-glass-soft: rgb(255 255 255 / 0.55);
+  --color-hairline: rgb(23 21 31 / 0.14);
+  --color-sheet: rgb(255 255 255 / 0.5);
+  --color-sheet-strong: rgb(255 255 255 / 0.85);
+  --color-hover-glass: rgb(110 86 207 / 0.07);
+  --color-selected-glass: rgb(110 86 207 / 0.16);
+  --color-scrim: rgb(16 12 28 / 0.2);
+
+  --color-lane-1: #6e56cf;
+  --color-lane-2: #477fb8;
+  --color-lane-3: #cf6a92;
+  --color-lane-4: #2fa186;
+  --color-lane-5: #dd9438;
+  --color-lane-6: #7c77a3;
+  --color-lane-7: #3f8f6f;
+  --color-lane-8: #b06ab3;
+
+  --color-glow-1: rgb(71 127 184 / 0.6); /* steel blue — top right */
+  --color-glow-2: rgb(207 106 146 / 0.5); /* rose — bottom centre-left */
+  --color-glow-3: rgb(47 161 134 / 0.45); /* teal — top centre */
+  --color-glow-4: rgb(110 86 207 / 0.6); /* Dusty Iris — left mid */
+
+  --shadow-panel: inset 0 1px 0 0 rgb(255 255 255 / 0.85), 0 14px 34px -26px rgb(48 36 100 / 0.45);
+  --shadow-soft: 0 6px 16px -10px rgb(48 36 100 / 0.4);
+
+  --font-ui: "Plus Jakarta Sans", "Segoe UI Variable Text", "Segoe UI", system-ui, sans-serif;
+  --font-mono: "JetBrains Mono", "Cascadia Mono", Consolas, "Courier New", monospace;
+}
+
+/* Tailwind v4 inlines @theme literals into its generated utilities, so shadow
+   overrides must route through var() — same reason the app ships these. */
+@utility panel-shadow {
+  box-shadow: var(--shadow-panel);
+}
+
+@utility soft-shadow {
+  box-shadow: var(--shadow-soft);
+}
+
+@utility glass-panel {
+  border: 1px solid var(--color-hairline);
+  background-color: var(--color-glass);
+  backdrop-filter: blur(20px);
+}
+
+@layer base {
+  :root {
+    color-scheme: light;
+  }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  html {
+    @media (prefers-reduced-motion: reduce) {
+      scroll-behavior: auto;
+    }
+  }
+
+  body {
+    margin: 0;
+    background-color: var(--color-canvas);
+    color: var(--color-ink);
+    font-family: var(--font-ui);
+    font-size: 16px;
+    line-height: 1.6;
+    -webkit-font-smoothing: antialiased;
+    text-rendering: optimizeLegibility;
+    caret-color: var(--color-primary);
+  }
+
+  /* White canvas with soft glowing corners — the app's depth language. Fixed so
+     the field stays still while the page scrolls; glass panes blur what sits
+     behind them. Colour lives at the edges, never under text. */
+  body::before {
+    content: "";
+    position: fixed;
+    inset: -12%;
+    z-index: 0;
+    pointer-events: none;
+    background-color: #ffffff;
+    background-image:
+      radial-gradient(40rem 34rem at 88% 2%, var(--color-glow-1), transparent 68%),
+      radial-gradient(36rem 30rem at 45% 104%, var(--color-glow-2), transparent 70%),
+      radial-gradient(30rem 26rem at 58% -6%, var(--color-glow-3), transparent 68%),
+      radial-gradient(40rem 34rem at 2% 58%, var(--color-glow-4), transparent 70%);
+    filter: blur(24px);
+  }
+
+  ::selection {
+    background-color: rgb(110 86 207 / 0.25);
+  }
+
+  :focus-visible {
+    outline-color: var(--color-primary);
+  }
+
+  ::-webkit-scrollbar {
+    width: 10px;
+    height: 10px;
+  }
+
+  ::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  ::-webkit-scrollbar-thumb {
+    background: rgb(120 126 150 / 0.4);
+    border: 2px solid transparent;
+    background-clip: content-box;
+    border-radius: 6px;
+  }
+
+  ::-webkit-scrollbar-thumb:hover {
+    background: rgb(120 126 150 / 0.6);
+    background-clip: content-box;
+  }
+
+  ::-webkit-scrollbar-corner {
+    background: transparent;
+  }
+}
+
+/* One authored entrance: hero content rises once as a body (not per-section).
+   Content starts visible-friendly from the loading frame; motion off keeps it. */
+@keyframes site-rise {
+  from {
+    opacity: 0;
+    transform: translateY(14px);
+    filter: blur(6px);
+  }
+
+  to {
+    opacity: 1;
+    transform: translateY(0);
+    filter: blur(0);
+  }
+}
+
+.site-rise {
+  animation: site-rise 0.9s cubic-bezier(0.22, 1, 0.36, 1) both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}

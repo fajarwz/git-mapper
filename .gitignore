@@ -33,3 +33,6 @@ src-tauri/target
 .impeccable/mocks/
 .impeccable/review/
 .impeccable/build/
+
+# Astro generated types
+website/.astro/

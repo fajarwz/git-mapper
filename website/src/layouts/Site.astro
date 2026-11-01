@@ -1,0 +1,60 @@
+---
+import "../styles/global.css";
+
+type Props = {
+  title: string;
+  description: string;
+  ogImage?: string;
+};
+
+const { title, description, ogImage = "/screens/main-light.png" } = Astro.props;
+const canonical = new URL(Astro.url.pathname, Astro.site).toString();
+const ogImageAbs = new URL(ogImage, Astro.site).toString();
+
+const jsonLd = {
+  "@context": "https://schema.org",
+  "@type": "SoftwareApplication",
+  name: "Git Mapper",
+  operatingSystem: "Windows, macOS, Linux",
+  applicationCategory: "DeveloperApplication",
+  description: "A standalone Git history viewer: frosted-glass commit feed, lane-coloured commit graph, split/unified syntax-highlighted diffs.",
+  url: canonical,
+  author: { "@type": "Person", name: "Fajar Windhu Zulfikar" },
+  offers: { "@type": "Offer", price: "0", priceCurrency: "USD" },
+  downloadUrl: "https://github.com/fajarwz/git-mapper/releases/latest",
+};
+---
+
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <title>{title}</title>
+    <meta name="description" content={description} />
+    <link rel="canonical" href={canonical} />
+    <link rel="icon" href="/favicon.ico" />
+    <link rel="preload" as="font" href="/fonts/plus-jakarta-sans.woff2" type="font/woff2" crossorigin />
+    <link rel="preload" as="font" href="/fonts/jetbrains-mono.woff2" type="font/woff2" crossorigin />
+
+    <meta property="og:type" content="website" />
+    <meta property="og:site_name" content="Git Mapper" />
+    <meta property="og:title" content={title} />
+    <meta property="og:description" content={description} />
+    <meta property="og:url" content={canonical} />
+    <meta property="og:image" content={ogImageAbs} />
+    <meta property="og:image:width" content="2240" />
+    <meta property="og:image:height" content="1440" />
+    <meta name="twitter:card" content="summary_large_image" />
+    <meta name="twitter:title" content={title} />
+    <meta name="twitter:description" content={description} />
+    <meta name="twitter:image" content={ogImageAbs} />
+
+    <script type="application/ld+json" set:html={JSON.stringify(jsonLd)} />
+  </head>
+  <body>
+    <div class="relative z-[1]">
+      <slot />
+    </div>
+  </body>
+</html>

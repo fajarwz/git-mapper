@@ -1,0 +1,267 @@
+---
+import Site from "../layouts/Site.astro";
+import ThemeSlider from "../react/ThemeSlider";
+
+const title = "Git Mapper — a frosted-glass Git history viewer for Windows, macOS and Linux";
+const description =
+  "Git Mapper is a standalone Git history viewer: a frosted-glass commit feed, a lane-coloured commit graph, split or unified syntax-highlighted diffs, and stashes as first-class rows. Free download.";
+
+const RELEASES = "https://github.com/fajarwz/git-mapper/releases/latest";
+const REPO = "https://github.com/fajarwz/git-mapper";
+const DOWNLOADS = {
+  windows: `${RELEASES}/download/Git.Mapper_x64-setup.exe`,
+  macos: `${RELEASES}/download/Git.Mapper.dmg`,
+  linux: `${RELEASES}/download/Git.Mapper_amd64.AppImage`,
+};
+---
+
+<Site title={title} description={description}>
+  <header class="sticky top-0 z-50 border-b border-rule backdrop-blur-xl" style="background-color: var(--color-glass-soft)">
+    <div class="mx-auto flex h-14 max-w-6xl items-center justify-between px-6">
+      <a href="/" class="flex items-center gap-2.5" aria-label="Git Mapper home">
+        <span class="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-white soft-shadow">
+          <svg viewBox="0 0 18 18" class="h-4.5 w-4.5" fill="none" stroke="currentColor" aria-hidden="true">
+            <path d="M4.5 4.5v9" stroke-width="1.9" stroke-linecap="round"></path>
+            <path d="M13.5 4.5v3c0 3.2-4.2 2.6-7.6 3.6" stroke-width="1.9" stroke-linecap="round"></path>
+            <circle cx="4.5" cy="4.5" r="2.1" fill="currentColor" stroke="none"></circle>
+            <circle cx="13.5" cy="4.5" r="2.1" fill="currentColor" stroke="none"></circle>
+            <circle cx="4.5" cy="13.5" r="1.7" stroke-width="1.6"></circle>
+          </svg>
+        </span>
+        <span class="text-[15px] font-bold tracking-tight">Git Mapper</span>
+      </a>
+      <nav class="flex items-center gap-1 text-sm font-semibold" aria-label="Main">
+        <a href="#features" class="hidden rounded-lg px-3 py-1.5 text-ink-soft hover:bg-hover-glass hover:text-ink sm:block">Features</a>
+        <a href="#install" class="hidden rounded-lg px-3 py-1.5 text-ink-soft hover:bg-hover-glass hover:text-ink sm:block">Install</a>
+        <a
+          href={REPO}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="ml-2 flex items-center gap-2 rounded-lg border border-hairline px-3 py-1.5 text-ink backdrop-blur-md transition-colors hover:bg-hover-glass"
+          style="background-color: var(--color-glass-strong)"
+        >
+          <svg viewBox="0 0 16 16" fill="currentColor" class="h-4 w-4" aria-hidden="true"><path d="M8 0C3.58 0 0 3.58 0 8c0 3.54 2.29 6.53 5.47 7.59.4.07.55-.17.55-.38 0-.19-.01-.82-.01-1.49-2.01.37-2.53-.49-2.69-.94-.09-.23-.48-.94-.82-1.13-.28-.15-.68-.52-.01-.53.63-.01 1.08.58 1.23.82.72 1.21 1.87.87 2.33.66.07-.52.28-.87.51-1.07-1.78-.2-3.64-.89-3.64-3.95 0-.87.31-1.59.82-2.15-.08-.2-.36-1.02.08-2.12 0 0 .67-.21 2.2.82.64-.18 1.32-.27 2-.27s1.36.09 2 .27c1.53-1.04 2.2-.82 2.2-.82.44 1.1.16 1.92.08 2.12.51.56.82 1.27.82 2.15 0 3.07-1.87 3.75-3.65 3.95.29.25.54.73.54 1.48 0 1.07-.01 1.93-.01 2.2 0 .21.15.46.55.38A8.01 8.01 0 0 0 16 8c0-4.42-3.58-8-8-8Z"></path></svg>
+          GitHub
+        </a>
+      </nav>
+    </div>
+  </header>
+
+  <main class="mx-auto max-w-6xl px-6">
+    <!-- Hero -->
+    <section class="site-rise mx-auto max-w-3xl pb-12 pt-20 text-center md:pt-28">
+      <h1 class="text-balance text-[clamp(2.6rem,5.4vw,4.25rem)] font-bold leading-[1.06] tracking-[-0.03em]">
+        Git history worth having on screen.
+      </h1>
+      <p class="mx-auto mt-5 max-w-xl text-lg leading-relaxed text-ink-soft">
+        Git Mapper is a standalone Git history viewer. Open a repository and read the
+        graph: what happened, which line belongs to which branch, what changed
+        and in which file — without touching a terminal.
+      </p>
+      <div class="mt-9 flex flex-wrap items-center justify-center gap-3">
+        <a
+          href={RELEASES}
+          class="flex items-center gap-2 rounded-lg bg-primary px-5 py-2.5 text-sm font-semibold text-white soft-shadow transition-[filter] hover:brightness-110"
+        >
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="h-4 w-4" aria-hidden="true"><path d="M12 4v11" /><path d="m7 10 5 5 5-5" /><path d="M5 20h14" /></svg>
+          Download free
+        </a>
+        <a
+          href={REPO}
+          target="_blank"
+          rel="noopener noreferrer"
+          class="rounded-lg border border-hairline px-5 py-2.5 text-sm font-semibold text-ink backdrop-blur-md transition-colors hover:bg-hover-glass"
+          style="background-color: var(--color-glass-strong)"
+        >
+          Browse source
+        </a>
+      </div>
+      <p class="mt-5 font-mono text-xs tracking-tight text-ink-dim">
+        Windows · macOS · Linux — free, and it updates itself
+      </p>
+    </section>
+
+    <!-- Theme comparison dragger -->
+    <section class="site-rise mx-auto max-w-5xl pb-10">
+      <div class="panel-shadow rounded-3xl border border-hairline p-2.5 backdrop-blur-xl md:p-3.5" style="background-color: var(--color-glass / 0.55)">
+        <ThemeSlider
+          client:visible
+          lightSrc="/screens/main-light.png"
+          darkSrc="/screens/main-dark.png"
+          altLight="Git Mapper with a repository open, light theme: glass commit feed, lane-coloured graph, diff panel"
+          altDark="The same repository in the dark theme: deep canvas with white halos, smoked glass panes"
+        />
+        <p class="mt-2.5 px-1.5 font-mono text-xs text-ink-dim">
+          Same repository, both themes — drag the divider, or press arrow keys while it is focused.
+        </p>
+      </div>
+    </section>
+
+    <!-- Features -->
+    <section id="features" class="mt-24 scroll-mt-24 md:mt-32">
+      <div class="mx-auto max-w-2xl">
+        <h2 class="text-balance text-[clamp(1.7rem,3vw,2.4rem)] font-bold leading-snug tracking-[-0.02em]">
+          Made for reading history, not managing it
+        </h2>
+        <p class="mt-4 text-ink-soft">
+          Every pane serves the same job: looking at a repository and understanding
+          it fast. Nothing to configure — point it at a folder.
+        </p>
+      </div>
+
+      <div class="mt-10 grid gap-4 md:grid-cols-6">
+        <!-- The graph -->
+        <article class="glass-panel panel-shadow rounded-2xl p-5 md:col-span-4 md:p-6">
+          <div class="flex h-28 w-full items-stretch gap-4">
+            <svg viewBox="0 0 300 112" preserveAspectRatio="xMinYMid meet" class="h-28 w-40 shrink-0 md:w-56" aria-hidden="true">
+              <g fill="none" stroke-linecap="round" stroke-width="2.5">
+                <!-- lane 1: main line -->
+                <path d="M24 106V16" stroke="var(--color-lane-1)" />
+                <!-- lane 2 forks from lane 1, rejoins it -->
+                <path d="M24 84 C 44 84, 52 78, 56 72 M56 34 V72 M56 34 C 60 28, 20 30, 24 22" stroke="var(--color-lane-2)" />
+                <!-- lane 3 is a short-lived tip off lane 2 -->
+                <path d="M56 62 C 72 62, 86 58, 88 50 V36" stroke="var(--color-lane-3)" />
+              </g>
+              <circle cx="24" cy="106" r="5.5" fill="var(--color-lane-1)" />
+              <circle cx="24" cy="84" r="5.5" fill="var(--color-lane-1)" />
+              <circle cx="56" cy="72" r="5.5" fill="var(--color-lane-2)" />
+              <circle cx="88" cy="36" r="5.5" fill="var(--color-lane-3)" />
+              <circle cx="56" cy="34" r="5.5" fill="var(--color-lane-2)" />
+              <circle cx="24" cy="22" r="5.5" fill="var(--color-lane-1)" />
+            </svg>
+            <div class="flex-1 self-end">
+              <span class="inline-flex items-center gap-1.5 rounded-full border px-2 py-0.5 text-[11px] font-bold" style="border-color: var(--color-lane-1); color: var(--color-lane-1)">main</span>
+            </div>
+          </div>
+          <h3 class="mt-4 text-[1.15rem] font-bold tracking-tight">The graph, in lane colours</h3>
+          <p class="mt-2 text-[0.95rem] text-ink-soft">
+            Every branch owns a hue. Forks bend exactly at their commit, merges
+            join back cleanly, and dense lanes stay readable hundreds of rows in.
+          </p>
+        </article>
+
+        <!-- Diffs -->
+        <article class="glass-panel panel-shadow rounded-2xl p-5 md:col-span-2 md:p-6">
+          <div class="rounded-xl border border-rule p-3 font-mono text-[11px] leading-relaxed">
+            <div class="rounded-md px-2 py-0.5 text-ink-dim" style="background-color: rgb(213 83 94 / 0.12)"><span class="text-danger-ink font-bold">−</span> const files = loadAll();</div>
+            <div class="mt-1 rounded-md px-2 py-0.5 text-ink-soft" style="background-color: rgb(48 164 108 / 0.12)"><span class="text-success-ink font-bold">+</span> <span><span class="font-bold" style="color: var(--color-primary-ink)">const</span> files = <span class="font-bold" style="color: var(--color-secondary)">loadByCommit</span>(hash);</span></div>
+          </div>
+          <h3 class="mt-4 text-[1.15rem] font-bold tracking-tight">Diffs that read</h3>
+          <p class="mt-2 text-[0.95rem] text-ink-soft">
+            Unified or split side-by-side, syntax highlighted, with picture diffs
+            for image changes. Every changed file: one click away.
+          </p>
+        </article>
+
+        <!-- Always current -->
+        <article class="glass-panel panel-shadow rounded-2xl p-5 md:col-span-2 md:p-6">
+          <div class="flex flex-wrap gap-2">
+            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px] font-bold" style="background-color: rgb(110 86 207 / 0.14); color: var(--color-primary-ink)">main ↑2</span>
+            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px] font-bold" style="background-color: rgb(208 160 75 / 0.14); color: var(--color-warning-ink)">dirty ×3</span>
+            <span class="inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 font-mono text-[11px] font-bold" style="background-color: rgb(48 164 108 / 0.14); color: var(--color-success-ink)">synced</span>
+          </div>
+          <h3 class="mt-4 text-[1.15rem] font-bold tracking-tight">Always current</h3>
+          <p class="mt-2 text-[0.95rem] text-ink-soft">
+            Focus the window and it re-checks branches and the worktree — pushes,
+            pulls and file edits flash in. No hammering git, no stale rows.
+          </p>
+        </article>
+
+        <!-- Stashes -->
+        <article class="glass-panel panel-shadow rounded-2xl p-5 md:col-span-2 md:p-6">
+          <div class="flex items-center gap-2">
+            <span class="inline-flex items-center gap-1.5 rounded-full border px-2.5 py-1 text-[11px] font-bold" style="border-color: var(--color-lane-3); color: var(--color-lane-3)">stash&#64;&#123;0&#125;</span>
+            <svg viewBox="0 0 24 24" fill="none" stroke-width="1.8" stroke-linecap="round" class="h-4 w-4 text-ink-dim" aria-hidden="true"><path d="m12 3 9 5-9 5-9-5 9-5Z" stroke="currentColor"></path><path d="m3 13 9 5 9-5" stroke="currentColor"></path></svg>
+          </div>
+          <h3 class="mt-4 text-[1.15rem] font-bold tracking-tight">Stashes, first-class</h3>
+          <p class="mt-2 text-[0.95rem] text-ink-soft">
+            Each stash gets its own row, dated where it was taken. Apply, pop or
+            drop straight from the list — with confirms where they matter.
+          </p>
+        </article>
+
+        <!-- Read-only -->
+        <article class="glass-panel panel-shadow rounded-2xl p-5 md:col-span-2 md:p-6">
+          <div class="inline-flex items-center gap-2 rounded-full border border-hairline px-2.5 py-1 text-[11px] font-bold text-ink-soft" style="background-color: var(--color-sheet-strong)">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" class="h-3.5 w-3.5" aria-hidden="true"><rect x="5" y="11" width="14" height="9" rx="2" /><path d="M8 11V7a4 4 0 0 1 8 0v4" /></svg>
+            read-only
+          </div>
+          <h3 class="mt-4 text-[1.15rem] font-bold tracking-tight">Gentle on your repo</h3>
+          <p class="mt-2 text-[0.95rem] text-ink-soft">
+            It looks, it does not write. Checking out a branch is a double-click;
+            checking out a commit asks first. No staging, no surprise side effects.
+          </p>
+        </article>
+      </div>
+    </section>
+
+    <!-- Install -->
+    <section id="install" class="mt-24 scroll-mt-24 pb-24 md:mt-32">
+      <div class="mx-auto max-w-2xl">
+        <h2 class="text-balance text-[clamp(1.7rem,3vw,2.4rem)] font-bold leading-snug tracking-[-0.02em]">
+          Point, download, open a repo
+        </h2>
+        <p class="mt-4 text-ink-soft">
+          Every build ships straight from GitHub Releases; the app checks for new
+          versions at launch and updates itself in the background.
+        </p>
+      </div>
+
+      <div class="glass-panel panel-shadow mt-10 overflow-hidden rounded-2xl">
+        <div class="flex items-center gap-4 border-b border-rule px-5 py-4 max-sm:flex-col max-sm:items-stretch max-sm:gap-3">
+          <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg glass-panel text-ink">
+            <svg viewBox="0 0 24 24" class="h-4 w-4" fill="currentColor" aria-hidden="true"><rect x="3.5" y="3.5" width="7.6" height="7.6" rx="1" /><rect x="12.9" y="3.5" width="7.6" height="7.6" rx="1" /><rect x="3.5" y="12.9" width="7.6" height="7.6" rx="1" /><rect x="12.9" y="12.9" width="7.6" height="7.6" rx="1" /></svg>
+          </span>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-bold">Windows</p>
+            <p class="truncate font-mono text-[11px] text-ink-dim">Git.Mapper_x64-setup.exe</p>
+          </div>
+          <a href={DOWNLOADS.windows} class="shrink-0 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white soft-shadow transition-[filter] hover:brightness-110">Download</a>
+        </div>
+
+        <div class="flex items-center gap-4 border-b border-rule px-5 py-4 max-sm:flex-col max-sm:items-stretch max-sm:gap-3">
+          <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg glass-panel text-ink">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><path d="M17.05 12.62c-.03-2.65 2.16-3.92 2.26-3.98-1.24-1.81-3.16-2.06-3.84-2.09-1.63-.17-3.19.96-4.02.96-.83 0-2.11-.93-3.47-.91-1.79.03-3.44 1.04-4.36 2.64-1.86 3.23-.47 8.01 1.34 10.62.89 1.28 1.95 2.72 3.34 2.67 1.34-.05 1.85-.86 3.47-.86s2.08.86 3.5.83c1.45-.02 2.36-1.31 3.24-2.6a11.6 11.6 0 0 0 1.46-3.02c-.03-.01-2.81-1.08-2.92-4.16ZM14.4 4.83c.73-.89 1.22-2.12 1.09-3.35-1.05.04-2.33.7-3.09 1.59-.68.79-1.28 2.05-1.12 3.25 1.18.09 2.39-.6 3.12-1.49Z"/></svg>
+          </span>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-bold">macOS</p>
+            <p class="font-mono text-[11px] text-ink-dim">Git.Mapper.dmg — Apple Silicon &#43; Intel · first launch: right-click &#42; Open (signed, not notarized)</p>
+          </div>
+          <a href={DOWNLOADS.macos} class="shrink-0 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white soft-shadow transition-[filter] hover:brightness-110">Download</a>
+        </div>
+
+        <div class="flex items-center gap-4 px-5 py-4 max-sm:flex-col max-sm:items-stretch max-sm:gap-3">
+          <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg glass-panel text-ink">
+            <svg viewBox="0 0 24 24" fill="currentColor" aria-hidden="true"><rect x="3.5" y="3.5" width="17" height="6" rx="2" /><rect x="3.5" y="13.5" width="17" height="6" rx="2"/></svg>
+          </span>
+          <div class="min-w-0 flex-1">
+            <p class="text-sm font-bold">Linux</p>
+            <p class="font-mono text-[11px] text-ink-dim">Git.Mapper_amd64.AppImage — runs without installing</p>
+          </div>
+          <a href={DOWNLOADS.linux} class="shrink-0 rounded-lg bg-primary px-4 py-2 text-xs font-semibold text-white soft-shadow transition-[filter] hover:brightness-110">Download</a>
+        </div>
+      </div>
+
+      <p class="mt-6 text-center text-sm text-ink-soft">
+        Or browse <a class="font-semibold text-primary-ink underline underline-offset-2 hover:underline" href={REPO}>the source on GitHub</a> and build it yourself with Tauri 2.
+      </p>
+    </section>
+  </main>
+
+  <footer class="border-t border-rule">
+    <div class="mx-auto flex max-w-6xl flex-wrap items-center justify-between gap-4 px-6 py-8 text-sm text-ink-dim">
+      <div class="flex items-center gap-2.5">
+        <span class="flex h-6 w-6 items-center justify-center rounded-md bg-primary text-white">
+          <svg viewBox="0 0 18 18" class="h-3.5 w-3.5" fill="none" stroke="currentColor" aria-hidden="true"><path d="M4.5 4.5v9" stroke-width="1.9" stroke-linecap="round" /><path d="M13.5 4.5v3c0 3.2-4.2 2.6-7.6 3.6" stroke-width="1.9" stroke-linecap="round" /><circle cx="4.5" cy="4.5" r="2.1" fill="currentColor" stroke="none" /><circle cx="13.5" cy="4.5" r="2.1" fill="currentColor" stroke="none" /><circle cx="4.5" cy="13.5" r="1.7" stroke-width="1.6" /></svg>
+        </span>
+        <span class="font-semibold text-ink-soft">Git Mapper</span>
+        <span class="text-ink-dim">— a viewer for real git repositories</span>
+      </div>
+      <nav class="flex items-center gap-5" aria-label="Footer">
+        <a class="hover:text-ink" href={REPO}>GitHub</a>
+        <a class="hover:text-ink" href={`${REPO}/releases`}>Releases</a>
+        <a class="hover:text-ink" href="https://fajarwz.com">fajarwz.com</a>
+      </nav>
+    </div>
+  </footer>
+</Site>
