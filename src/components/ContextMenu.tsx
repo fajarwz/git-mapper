@@ -3,6 +3,9 @@ import type { Commit, CommitRef } from "../types";
 import { UNCOMMITTED_HASH } from "../data/gitLoader";
 import { copyText } from "../lib/clipboard";
 
+/** What a stash row offers: the safe apply, or the two that need a confirm first. */
+export type StashAction = "apply" | "pop" | "drop";
+
 /** What the menu was opened on: a position, the row's commit, and the ref it targets. */
 export interface ContextMenuTarget {
   x: number;
@@ -16,6 +19,7 @@ interface ContextMenuProps {
   target: ContextMenuTarget;
   onCheckout: (branch: string) => void;
   onCheckoutCommit: (hash: string) => void;
+  onStashAction: (index: number, action: StashAction) => void;
   /** Full sha of HEAD at the last read: the row that is HEAD gets no checkout entry. */
   head: string;
   onClose: () => void;
@@ -37,7 +41,7 @@ const COPY_LABELS: Record<CommitRef["type"], string> = {
  * local branch that is not the checked-out one; the copy entries always match their target.
  * Copying keeps the menu up for a beat with a "Copied!" marker so the action reads, then closes.
  */
-export function ContextMenu({ target, onCheckout, onCheckoutCommit, head, onClose }: ContextMenuProps) {
+export function ContextMenu({ target, onCheckout, onCheckoutCommit, onStashAction, head, onClose }: ContextMenuProps) {
   // The entry that just copied shows "Copied!" for a beat; the others keep their labels.
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -83,7 +87,14 @@ export function ContextMenu({ target, onCheckout, onCheckoutCommit, head, onClos
 
   // Keep the menu on screen when opened near the right or bottom edge.
   const left = Math.max(4, Math.min(target.x, window.innerWidth - 240));
-  const top = Math.max(4, Math.min(target.y, window.innerHeight - 180));
+  const stashIndex = target.commit.stashIndex;
+  // The menu is ~32px an entry; the estimate grows with it so it never opens off-screen.
+  const entries =
+    (checkoutable ? 1 : 0) +
+    (commitCheckoutable ? 1 : 0) +
+    (stashIndex !== undefined ? 3 : 0) +
+    1 + 1 + (activeRef ? 1 : 0); // two copy entries always: hash + (ref or none)
+  const top = Math.max(4, Math.min(target.y, window.innerHeight - entries * 32 - 20));
 
   function copy(key: string, text: string) {
     setCopiedKey(key);
@@ -121,6 +132,37 @@ export function ContextMenu({ target, onCheckout, onCheckoutCommit, head, onClos
           {/* The menu is a fixed 240px: the label reads the short hash, like the list. */}
           Check out commit {target.commit.hash.slice(0, 8)}
         </button>
+      )}
+      {stashIndex !== undefined && (
+        <>
+          <button type="button" role="menuitem" className={ITEM}
+            title="Bring the stash back into the working tree; the entry stays"
+            onClick={() => {
+              onClose();
+              onStashAction(stashIndex, "apply");
+            }}
+          >
+            Apply stash
+          </button>
+          <button type="button" role="menuitem" className={ITEM}
+            title="Apply the stash and remove the entry — a warning shows first"
+            onClick={() => {
+              onClose();
+              onStashAction(stashIndex, "pop");
+            }}
+          >
+            Pop stash…
+          </button>
+          <button type="button" role="menuitem" className={ITEM}
+            title="Remove the entry without applying it — a warning shows first"
+            onClick={() => {
+              onClose();
+              onStashAction(stashIndex, "drop");
+            }}
+          >
+            Drop stash…
+          </button>
+        </>
       )}
       <button type="button" role="menuitem" className={ITEM}
         title="The short hash shown in the list"

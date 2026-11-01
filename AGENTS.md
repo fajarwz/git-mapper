@@ -118,7 +118,10 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
   `ConfirmDialog.tsx`, because checking out a commit detaches HEAD and commits made there are
   lost without a branch — the command is `checkout_commit`, hash-format-gated, `--detach`),
   `Copy commit hash` and `Copy branch|remote|tag|stash name`; a copy flips that entry to "Copied!"
-  for 700ms, then the menu closes. Dismisses on outside pointerdown, Escape, scroll (capture) and
+  for 700ms, then the menu closes. A stash row additionally offers `Apply stash` (no confirm —
+  git refuses an apply that would conflict and keeps the entry) plus `Pop stash…` / `Drop stash…`
+  (red danger confirm via `ConfirmDialog`; the command is `stash_action` with a typed index and
+  verb whitelist). Dismisses on outside pointerdown, Escape, scroll (capture) and
   resize. Clipboard goes through `src/lib/clipboard.ts` `copyText`, which falls back to a hidden
   textarea because WebView2 can deny the async clipboard API per-origin.
 - `src/lib/ui.ts` — `PANEL` and `GLASS_CONTROL` class strings; every panel/button picks these up.

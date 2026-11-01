@@ -544,6 +544,11 @@ export async function pullBranch(dir: string): Promise<string> {
   return call("pull_branch", { dir }, (raw) => raw as string);
 }
 
+/** Applies, pops or drops the stash entry at `index` (0 = newest); pop/drop are confirmed first. */
+export async function stashAction(dir: string, index: number, action: "apply" | "pop" | "drop"): Promise<void> {
+  await call("stash_action", { dir, index, action }, (raw) => raw as void);
+}
+
 /** Reads every remote into the tracking refs, so ahead/behind state includes remote commits. */
 export async function fetchRemote(dir: string): Promise<void> {
   await call("fetch_remote", { dir }, (raw) => raw as void);

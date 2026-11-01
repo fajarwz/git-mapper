@@ -178,6 +178,18 @@ function gitDevApi(): Plugin {
       run(String(dir), ["checkout", "--detach", h]);
       return null;
     },
+    stash_action: ({ dir, index, action }) => {
+      const verb = String(action);
+      if (verb !== "apply" && verb !== "pop" && verb !== "drop") {
+        throw new Error(`"${verb}" is not a stash action`);
+      }
+      const n = Math.trunc(Number(index));
+      if (!Number.isInteger(n) || n < 0) {
+        throw new Error(`"${index}" is not a stash position`);
+      }
+      run(String(dir), ["stash", verb, `stash@{${n}}`]);
+      return null;
+    },
     fetch_remote: ({ dir }) => {
       const remotes = String(run(String(dir), ["remote"])).trim();
       if (!remotes) return null;

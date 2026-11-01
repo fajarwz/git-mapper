@@ -1,23 +1,25 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, type ReactNode } from "react";
 import { PANEL } from "../lib/ui";
 
 interface ConfirmDialogProps {
-  /** The short hash the dialog asks about, shown in the title and body. */
-  hash: string;
+  title: string;
+  /** The story under the title: what happens, and the way back when there is one. */
+  body: ReactNode;
+  confirmLabel: string;
+  /** Destructive confirmations (drop a stash) confirm in red; plain ones stay violet. */
+  danger?: boolean;
   onConfirm: () => void;
   onClose: () => void;
 }
 
 /**
- * The one dangerous action this viewer offers: checking out a commit detaches HEAD, and commits
- * made there are lost unless a branch is created. The body spills the story (what the pill will
- * read, how to get back) because a first crash into detached HEAD is exactly the confusion this
- * dialog exists to prevent. Copy follows SettingsModal's modal pattern: backdrop panel, focus
- * moved in and returned, Escape and backdrop click cancel.
+ * The dialog dangerous actions confirm through: checking out a commit detaches HEAD and the
+ * stash actions can delete entries. The body spills the story (what the pill will read, what
+ * is lost) because a first crash into that outcome is exactly the confusion this dialog
+ * exists to prevent. Copy follows SettingsModal's modal pattern: backdrop panel, focus moved
+ * in and returned, Escape and backdrop click cancel.
  */
-export function ConfirmDialog({ hash, onConfirm, onClose }: ConfirmDialogProps) {
-  // Title fits the panel: the full sha goes to git, only the short hash is for reading.
-  const shortHash = hash.slice(0, 8);
+export function ConfirmDialog({ title, body, confirmLabel, danger = false, onConfirm, onClose }: ConfirmDialogProps) {
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
@@ -50,19 +52,15 @@ export function ConfirmDialog({ hash, onConfirm, onClose }: ConfirmDialogProps) 
         ref={dialogRef}
         role="dialog"
         aria-modal="true"
-        aria-labelledby="detach-title"
+        aria-labelledby="confirm-title"
         className={`${PANEL} w-full max-w-md p-5`}
       >
-        <h2 id="detach-title" className="m-0 text-[16px] font-bold tracking-tight text-ink">
-          Check out commit {shortHash}?
+        <h2 id="confirm-title" className="m-0 text-[16px] font-bold tracking-tight text-ink">
+          {title}
         </h2>
-        <p className="mt-2 mb-0 text-[12.5px] leading-relaxed text-ink-dim">
-          HEAD will detach — the checked-out pill reads <span className="font-semibold text-ink">HEAD (detached)</span>.
-          New commits you make there are lost unless you create a branch first.
-        </p>
-        <p className="mt-1.5 mb-0 text-[12.5px] leading-relaxed text-ink-dim">
-          Double-click any branch pill to get back to it.
-        </p>
+        <div className="mb-0 mt-2 text-[12.5px] leading-relaxed text-ink-dim [&_p]:mb-0 [&_p:first-child]:mt-0 [&_p]:mt-1.5">
+          {body}
+        </div>
         <div className="mt-4 flex justify-end gap-2">
           <button
             ref={closeRef}
@@ -75,9 +73,11 @@ export function ConfirmDialog({ hash, onConfirm, onClose }: ConfirmDialogProps) 
           <button
             type="button"
             onClick={onConfirm}
-            className="rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white soft-shadow transition-colors hover:brightness-110"
+            className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white soft-shadow transition-colors hover:brightness-110 ${
+              danger ? "bg-danger" : "bg-primary"
+            }`}
           >
-            Check out &amp; detach
+            {confirmLabel}
           </button>
         </div>
       </div>

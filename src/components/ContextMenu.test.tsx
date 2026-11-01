@@ -44,6 +44,7 @@ test("a local branch that is not checked out offers the checkout", () => {
       target={target({ ref: { type: "branch", name: "feature" } })}
       onCheckout={onCheckout}
       onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
       head={HEAD}
       onClose={onClose}
     />,
@@ -61,6 +62,7 @@ test("the checked-out branch offers no checkout entry", () => {
       target={target({ ref: { type: "branch", name: "main", isCurrent: true } })}
       onCheckout={vi.fn()}
       onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
       head={HEAD}
       onClose={vi.fn()}
     />,
@@ -75,6 +77,7 @@ test("a detached HEAD offers no checkout; copying names it a ref", () => {
       target={target({ ref: { type: "head", name: "HEAD", isCurrent: true } })}
       onCheckout={vi.fn()}
       onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
       head={HEAD}
       onClose={vi.fn()}
     />,
@@ -100,12 +103,51 @@ test("a history row offers the commit checkout and hands over the hash", () => {
   assert.equal(onCheckoutCommit.mock.calls[0][0], "aaaa1111");
 });
 
+test("a stash row offers its actions and apply runs without a confirm", () => {
+  const onStashAction = vi.fn();
+  const stashCommit = commit({ hash: "cccc3333", subject: "On feature: halfway", stashIndex: 1 });
+  const { getByRole } = render(
+    <ContextMenu
+      target={target({ commit: stashCommit, ref: { type: "stash", name: "stash@{1}" } })}
+      onCheckout={vi.fn()}
+      onCheckoutCommit={vi.fn()}
+      onStashAction={onStashAction}
+      head={HEAD}
+      onClose={vi.fn()}
+    />,
+  );
+
+  const apply = getByRole("menuitem", { name: "Apply stash" });
+  fireEvent.click(apply);
+  assert.deepEqual(onStashAction.mock.calls[0], [1, "apply"]);
+
+  assert.ok(getByRole("menuitem", { name: "Pop stash…" }), "pop shows the confirm ellipsis");
+  assert.ok(getByRole("menuitem", { name: "Drop stash…" }));
+});
+
+test("a history row offers no stash actions", () => {
+  const { queryByRole } = render(
+    <ContextMenu
+      target={target({})}
+      onCheckout={vi.fn()}
+      onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
+      onStashAction={vi.fn()}
+      head={HEAD}
+      onClose={vi.fn()}
+    />,
+  );
+  assert.equal(queryByRole("menuitem", { name: "Apply stash" }), null);
+  assert.equal(queryByRole("menuitem", { name: /stash/ }), null);
+});
+
 test("the HEAD row offers no commit checkout", () => {
   const { queryByRole } = render(
     <ContextMenu
       target={target({})}
       onCheckout={vi.fn()}
       onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
       head={HEAD}
       onClose={vi.fn()}
     />,
@@ -123,6 +165,7 @@ test("the uncommitted row offers no commit checkout", () => {
       target={target({ commit: commit({ hash: "wip", subject: "Uncommitted changes" }) })}
       onCheckout={vi.fn()}
       onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
       head={HEAD}
       onClose={vi.fn()}
     />,
@@ -136,6 +179,7 @@ test("a stash row offers no commit checkout", () => {
       target={target({ commit: commit({ hash: "cccc3333", subject: "On feature: halfway", stashIndex: 0 }) })}
       onCheckout={vi.fn()}
       onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
       head={HEAD}
       onClose={vi.fn()}
     />,
@@ -152,6 +196,7 @@ test("copy entries write the commit's fields to the clipboard and confirm", asyn
       target={target({ ref: { type: "tag", name: "v2.0.1" } })}
       onCheckout={vi.fn()}
       onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
       head={HEAD}
       onClose={onClose}
     />,
@@ -172,6 +217,7 @@ test("a right-click anywhere else than the menu closes it", async () => {
       target={target({})}
       onCheckout={vi.fn()}
       onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
       head={HEAD}
       onClose={onClose}
     />,

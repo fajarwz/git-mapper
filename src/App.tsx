@@ -1,10 +1,10 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { CSSProperties } from "react";
 import { getVersion } from "@tauri-apps/api/app";
 import type { ChangedFile } from "./types";
 import { BootScreen } from "./components/BootScreen";
 import { CommitList } from "./components/CommitList";
-import { ContextMenu, type ContextMenuTarget } from "./components/ContextMenu";
+import { ContextMenu, type ContextMenuTarget, type StashAction } from "./components/ContextMenu";
 import { DetailsPanel } from "./components/DetailsPanel";
 import type { DiffLayout, DiffScope } from "./components/DiffViewer";
 import { EmptyState } from "./components/EmptyState";
@@ -38,6 +38,7 @@ import {
   pushBranch,
   readStoredPaths,
   refreshRepository,
+  stashAction,
   UNCOMMITTED_HASH,
   FILES_CACHE_CAP,
   SLEEP_AFTER_MS,
@@ -656,34 +657,105 @@ function App() {
     [closeContextMenu, handleCheckoutBranch],
   );
 
-  // A commit checkout is the one write this app performs on past history: HEAD detaches, and
-  // commits made there are lost without a branch. The menu queues the hash, a dialog owns the
-  // warning, and confirming runs the same reload path a branch checkout takes.
-  const [detachCandidate, setDetachCandidate] = useState<string | null>(null);
+  // Writes confirm? A commit checkout detaches HEAD and a drop/pop deletes a stash entry —
+  // the menu queues the intent, a dialog owns the warning. Confirming runs the action, then
+  // the same reload paths the other write (branch checkout) already uses.
+  interface PendingConfirm {
+    title: string;
+    body: ReactNode;
+    confirmLabel: string;
+    danger?: boolean;
+    run: () => Promise<void> | void;
+  }
+  const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
   const handleMenuCheckoutCommit = useCallback(
     (hash: string) => {
       closeContextMenu();
-      setDetachCandidate(hash);
-    },
-    [closeContextMenu],
-  );
-  const handleConfirmCheckoutCommit = useCallback(async (hash: string) => {
-    if (!activeRepoPath || opening) return;
-    setDetachCandidate(null);
-    try {
-      await checkoutCommit(activeRepoPath, hash);
-      const refreshed = await loadRepository(activeRepoPath);
-      setRepos((previous) =>
-        previous.map((item) => (item.id === refreshed.id ? refreshed : item)),
-      );
-    } catch (checkoutError) {
-      setNotice({
-        title: `Could not check out ${hash}`,
-        detail: checkoutError instanceof Error ? checkoutError.message : String(checkoutError),
-        id: Date.now(),
+      setPendingConfirm({
+        title: `Check out commit ${hash.slice(0, 8)}?`,
+        body: (
+          <>
+            <p>
+              HEAD will detach — the checked-out pill reads{" "}
+              <span className="font-semibold text-ink">HEAD (detached)</span>. New commits you
+              make there are lost unless you create a branch first.
+            </p>
+            <p>Double-click any branch pill to get back to it.</p>
+          </>
+        ),
+        confirmLabel: "Check out & detach",
+        run: async () => {
+          if (!activeRepoPath || opening) return;
+          try {
+            await checkoutCommit(activeRepoPath, hash);
+            const refreshed = await loadRepository(activeRepoPath);
+            setRepos((previous) =>
+              previous.map((item) => (item.id === refreshed.id ? refreshed : item)),
+            );
+          } catch (checkoutError) {
+            setNotice({
+              title: `Could not check out ${hash}`,
+              detail: checkoutError instanceof Error ? checkoutError.message : String(checkoutError),
+              id: Date.now(),
+            });
+          }
+        },
       });
-    }
-  }, [activeRepoPath, opening]);
+    },
+    [closeContextMenu, activeRepoPath, opening],
+  );
+
+  // Apply is reversible-ish (it just does to the working tree what it says), so it runs
+  // straight away. Pop deletes the entry after a clean apply and drop deletes outright —
+  // both go through the dialog, and a failed pop keeps the entry (git's own rule).
+  const handleMenuStashAction = useCallback(
+    (index: number, action: StashAction) => {
+      const target = repos.find((item) => item.id === activeRepoId);
+      if (!target) return;
+      const label = `stash@{${index}}`;
+      const runStash = async () => {
+        setPendingConfirm(null);
+        try {
+          await stashAction(target.path, index, action);
+          // The stash digest notices a drop, the worktree digest notices an apply, and a
+          // drop renumbers the survivors — the forced refresh handles all three at once.
+          const refreshed = await refreshRepository(target, true);
+          if (refreshed) {
+            setRepos((previous) =>
+              previous.map((item) => (item.id === refreshed.repo.id ? refreshed.repo : item)),
+            );
+            showFlash(refreshed.touched);
+          }
+        } catch (stashError) {
+          setNotice({
+            title: `Could not ${action} ${label}`,
+            detail: stashError instanceof Error ? stashError.message : String(stashError),
+            id: Date.now(),
+          });
+        }
+      };
+      if (action === "apply") void runStash();
+      else
+        setPendingConfirm({
+          title: action === "drop" ? `Drop ${label}?` : `Apply and drop ${label}?`,
+          body: action === "drop" ? (
+            <>
+              <p>The entry is deleted without applying it; its changes stay parked for good.</p>
+              <p>The working tree is untouched. Undo means a terminal and the reflog.</p>
+            </>
+          ) : (
+            <>
+              <p>The entry comes back into the working tree, and is deleted once it applies cleanly.</p>
+              <p>Conflicts keep the entry, so nothing is lost mid-merge.</p>
+            </>
+          ),
+          confirmLabel: action === "drop" ? "Drop stash" : "Apply & drop",
+          danger: true,
+          run: runStash,
+        });
+    },
+    [repos, activeRepoId, showFlash],
+  );
 
   // The search filters the loaded window only — the visible rows AND the lanes/graph re-layout
   // over the subset. Searching unpaginated history stays out until the deep-search slice.
@@ -802,16 +874,20 @@ function App() {
           target={contextMenu}
           onCheckout={handleMenuCheckout}
           onCheckoutCommit={handleMenuCheckoutCommit}
+          onStashAction={handleMenuStashAction}
           head={repo?.head ?? ""}
           onClose={closeContextMenu}
         />
       )}
 
-      {detachCandidate !== null && (
+      {pendingConfirm !== null && (
         <ConfirmDialog
-          hash={detachCandidate}
-          onConfirm={() => void handleConfirmCheckoutCommit(detachCandidate)}
-          onClose={() => setDetachCandidate(null)}
+          title={pendingConfirm.title}
+          body={pendingConfirm.body}
+          confirmLabel={pendingConfirm.confirmLabel}
+          danger={pendingConfirm.danger}
+          onConfirm={() => void pendingConfirm.run()}
+          onClose={() => setPendingConfirm(null)}
         />
       )}
 

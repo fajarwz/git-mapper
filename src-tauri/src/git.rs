@@ -403,6 +403,27 @@ fn checkout_commit_in(dir: &str, hash: &str) -> Result<(), String> {
     run_git(dir, &["checkout", "--detach", hash]).map(|_| ())
 }
 
+/// Applies, pops or drops a stash entry addressed by its `stash@{n}` position (0 is the
+/// newest). Drop loses the entry for good, pop drops it after a clean apply — both come
+/// through a confirm dialog in the app; apply is quiet because git refuses to overwrite
+/// conflicting working-tree changes and keeps the entry in that case.
+#[tauri::command]
+pub async fn stash_action(dir: String, index: u32, action: String) -> Result<(), String> {
+    run_blocking("stash action", move || stash_action_in(&dir, index, &action)).await
+}
+
+fn stash_action_in(dir: &str, index: u32, action: &str) -> Result<(), String> {
+    // The action goes straight into git's CLI and `stash@{n}` lands as a single spawn
+    // argument (no shell quoting involved). The index is typed so nothing but a stash
+    // position can arrive — a stray branch name or garbage has no way past the u32 — and
+    // the verb is whitelisted to the three moves off the stash stack.
+    let verb = match action {
+        "apply" | "pop" | "drop" => action,
+        other => return Err(format!("\"{other}\" is not a stash action")),
+    };
+    run_git(dir, &["stash", verb, &format!("stash@{{{index}}}")]).map(|_| ())
+}
+
 /// Pulls every remote into the local tracking refs (`fetch --all --prune`). Ahead/behind are
 /// counts against the tracking refs, so they only tell the whole story after a quiet fetch —
 /// the app runs this on open and on window focus (throttled), and tolerates failures offline.
@@ -833,6 +854,41 @@ mod tests {
         let lone = TempRepo::new("fetch-lone");
         lone.commit("l.txt", "l\n", "lonely");
         fetch_remote_in(lone.path()).expect("a remoless repo fetches as a no-op");
+    }
+
+    #[test]
+    fn stash_actions_apply_pop_and_drop_the_entry() {
+        let repo = TempRepo::new("stash-actions");
+        repo.commit("a.txt", "a\n", "first");
+
+        // A stashed working-tree edit: the index clean, the edit parked in the entry.
+        std::fs::write(repo.0.join("a.txt"), "b\n").expect("edit");
+        git(&repo.0, &["stash", "-q"]);
+
+        // Apply restores the change and KEEPS the entry — the stash list still shows one.
+        stash_action_in(repo.path(), 0, "apply").expect("the apply ran");
+        assert_eq!(std::fs::read_to_string(repo.0.join("a.txt")).expect("file"), "b\n");
+        assert_eq!(git_out(&repo.0, &["stash", "list"]).lines().count(), 1);
+
+        // Pop restores and drops: the list is empty after it.
+        std::fs::write(repo.0.join("a.txt"), "a\n").expect("reset");
+        stash_action_in(repo.path(), 0, "pop").expect("the pop ran");
+        assert_eq!(std::fs::read_to_string(repo.0.join("a.txt")).expect("file"), "b\n");
+        assert!(git_out(&repo.0, &["stash", "list"]).trim().is_empty());
+
+        // Drop removes the entry without touching anything else — and because saving a
+        // stash resets the worktree to HEAD first, the file is back at the committed text.
+        std::fs::write(repo.0.join("a.txt"), "c\n").expect("edit");
+        git(&repo.0, &["stash", "-q"]);
+        stash_action_in(repo.path(), 0, "drop").expect("the drop ran");
+        assert!(git_out(&repo.0, &["stash", "list"]).trim().is_empty());
+        assert_eq!(std::fs::read_to_string(repo.0.join("a.txt")).expect("file"), "a\n");
+
+        // Actions outside the stack are refused, as is an unknown op.
+        let err = stash_action_in(repo.path(), 0, "clear").unwrap_err();
+        assert!(err.contains("is not a stash action"), "got: {err}");
+        let err = stash_action_in(repo.path(), 5, "apply").unwrap_err();
+        assert!(!err.is_empty(), "an absent entry errors, not panics");
     }
 
     #[test]
