@@ -777,16 +777,24 @@ mod tests {
         );
     }
 
+    /// Identity and line-ending settings every fixture needs. A fresh clone carries
+    /// its own config, so this runs again right after `git clone`.
+    fn set_identity(dir: &Path) {
+        git(dir, &["config", "user.name", "Test User"]);
+        git(dir, &["config", "user.email", "test@example.com"]);
+        git(dir, &["config", "core.autocrlf", "false"]);
+    }
+
     impl TempRepo {
         fn new(label: &str) -> Self {
             let dir = std::env::temp_dir()
                 .join(format!("git-mapper-test-{}-{label}", std::process::id()));
             let _ = std::fs::remove_dir_all(&dir);
             std::fs::create_dir_all(&dir).expect("temp repo created");
-            git(&dir, &["init", "-q"]);
-            git(&dir, &["config", "user.name", "Test User"]);
-            git(&dir, &["config", "user.email", "test@example.com"]);
-            git(&dir, &["config", "core.autocrlf", "false"]);
+            // Pin the branch name: `git init` still defaults to master on some machines
+            // (the GitHub ubuntu runner does) and every expectation below names main.
+            git(&dir, &["init", "-q", "-b", "main"]);
+            set_identity(&dir);
             TempRepo(dir)
         }
 
@@ -1225,7 +1233,7 @@ mod tests {
         let _ = std::fs::remove_dir_all(&dir);
         std::fs::create_dir_all(&dir).expect("bare repo created");
         Command::new("git")
-            .args(["init", "--bare", "-q"])
+            .args(["init", "--bare", "-q", "-b", "main"])
             .current_dir(&dir)
             .output()
             .expect("git ran");
@@ -1270,6 +1278,7 @@ mod tests {
             &work.0.parent().unwrap().to_path_buf(),
             &["clone", "-q", origin.to_str().unwrap(), other.to_str().unwrap()],
         );
+        set_identity(&other);
         std::fs::write(other.join("theirs.txt"), "theirs\n").expect("file written");
         git(&other, &["add", "theirs.txt"]);
         git(&other, &["commit", "-q", "-m", "theirs"]);
