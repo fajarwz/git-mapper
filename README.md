@@ -4,24 +4,26 @@
 
 # Git Mapper
 
-[![Release](https://img.shields.io/github/v/release/fajarwz/git-mapper?logo=github&labelColor=26233a&color=6e56cf)](https://github.com/fajarwz/git-mapper/releases/latest)
-[![Downloads](https://img.shields.io/github/downloads/fajarwz/git-mapper/total?labelColor=26233a&color=6e56cf&logo=github)](https://github.com/fajarwz/git-mapper/releases)
-[![License: MIT](https://img.shields.io/badge/license-MIT-6e56cf.svg?labelColor=26233a&logo=opensourceinitiative&logoColor=white)](LICENSE)
+**Every branch, crystal clear.**
 
-[![Tests](https://img.shields.io/github/actions/workflow/status/fajarwz/git-mapper/ci.yml?label=tests&logo=vitest&logoColor=white&labelColor=26233a)](https://github.com/fajarwz/git-mapper/actions/workflows/ci.yml)
-[![Release build](https://img.shields.io/github/actions/workflow/status/fajarwz/git-mapper/release.yml?label=Release%20build&logo=tauri&logoColor=24C8DB&labelColor=26233a)](https://github.com/fajarwz/git-mapper/actions/workflows/release.yml)
+A fast, lightweight Git history viewer for the desktop. Open a repository and follow the graph,
+diffs and stashes on a clean pane — no account, no setup.
 
-![Windows](https://img.shields.io/badge/Windows-0078D6?labelColor=26233a&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0iI2ZmZmZmZiIgZD0iTTMgM2g4LjR2OC40SDNWM3ptOS42IDBIMjF2OC40aC04LjRWM3pNMyAxMi42aDguNFYyMUgzdi04LjR6bTkuNiAwSDIxVjIxaC04LjR2LTguNHoiLz48L3N2Zz4%3D)
-![macOS](https://img.shields.io/badge/macOS-A2AAAD?labelColor=26233a&logo=apple&logoColor=white)
-![Linux](https://img.shields.io/badge/Linux-FCC624?labelColor=26233a&logo=linux&logoColor=black)
+[![Release](https://img.shields.io/github/v/release/fajarwz/git-mapper?logo=github&labelColor=17151f&color=6e56cf)](https://github.com/fajarwz/git-mapper/releases/latest)
+[![Downloads](https://img.shields.io/github/downloads/fajarwz/git-mapper/total?labelColor=17151f&color=6e56cf&logo=github)](https://github.com/fajarwz/git-mapper/releases)
+[![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0--or--later-6e56cf.svg?labelColor=17151f&logo=gnu&logoColor=white)](LICENSE)
 
-![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?labelColor=26233a&logo=tauri&logoColor=24C8DB)
-![React](https://img.shields.io/badge/React-19-61DAFB?labelColor=26233a&logo=react&logoColor=61DAFB)
-![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?labelColor=26233a&logo=typescript&logoColor=white)
-![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?labelColor=26233a&logo=tailwindcss&logoColor=06B6D4)
+[![Tests](https://img.shields.io/github/actions/workflow/status/fajarwz/git-mapper/ci.yml?label=tests&logo=vitest&logoColor=white&labelColor=17151f)](https://github.com/fajarwz/git-mapper/actions/workflows/ci.yml)
+[![Release build](https://img.shields.io/github/actions/workflow/status/fajarwz/git-mapper/release.yml?label=Release%20build&logo=tauri&logoColor=24C8DB&labelColor=17151f)](https://github.com/fajarwz/git-mapper/actions/workflows/release.yml)
 
-A standalone Git history viewer for the desktop. Tauri 2, React 19, TypeScript and Tailwind CSS v4,
-reading real repositories through the `git` CLI.
+![Windows](https://img.shields.io/badge/Windows-0078D6?labelColor=17151f&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0iI2ZmZmZmZiIgZD0iTTMgM2g4LjR2OC40SDNWM3ptOS42IDBIMjF2OC40aC04LjRWM3pNMyAxMi42aDguNFYyMUgzdi04LjR6bTkuNiAwSDIxVjIxaC04LjR2LTguNHoiLz48L3N2Zz4%3D)
+![macOS](https://img.shields.io/badge/macOS-A2AAAD?labelColor=17151f&logo=apple&logoColor=white)
+![Linux](https://img.shields.io/badge/Linux-FCC624?labelColor=17151f&logo=linux&logoColor=black)
+
+![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?labelColor=17151f&logo=tauri&logoColor=24C8DB)
+![React](https://img.shields.io/badge/React-19-61DAFB?labelColor=17151f&logo=react&logoColor=61DAFB)
+![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?labelColor=17151f&logo=typescript&logoColor=white)
+![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?labelColor=17151f&logo=tailwindcss&logoColor=06B6D4)
 
 </div>
 
@@ -98,5 +100,4 @@ The only thing the app changes in a repository is a branch checkout.
 
 ## License
 
-[MIT](LICENSE). Use it, fork it, ship it, sell it — just keep the copyright notice and the license
-text with any copy you hand on. Nothing needs to be credited in the app's UI.
+[GNU General Public License v3.0 or later](LICENSE). Copyright © 2026 Fajar Windhu Zulfikar.
