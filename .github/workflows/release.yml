@@ -1,9 +1,22 @@
 name: Release
 
-# Builds the desktop bundles for all three platforms on a vX.Y.Z tag and opens a
-# draft GitHub release with the updater feed (latest.json) attached. Publish it
-# manually after checking the draft — the updater reads
-# releases/latest/download/latest.json, so a broken feed is visible the moment it ships.
+# Builds one bundle per platform on a vX.Y.Z tag and opens a draft GitHub
+# release with the updater feed (latest.json) attached. Publish it manually
+# after checking the draft — the updater reads
+# releases/latest/download/latest.json, so a broken feed is visible the moment
+# it ships.
+#
+# macOS ships a single universal binary: --target universal-apple-darwin builds
+# aarch64 + x86_64 into one bundle, and tauri-action reuses that artifact for
+# both darwin-aarch64 and darwin-x86_64 in latest.json.
+#
+# The publish job renames every artifact to a uniform versionless name
+# (Git.Mapper.dmg / _x64-setup.exe / _amd64.AppImage / .app.tar.gz): the bundler
+# stamps arch triples and versions on its outputs, which the README download
+# links and releases/latest/download/<name> would otherwise break on.
+#
+# The release ends up with three installers + the macOS updater artifact +
+# latest.json (+ the automatic source zip/tar.gz) — nothing else.
 
 on:
   push:
@@ -20,14 +33,15 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - platform: macos-latest # Apple Silicon
-            args: --target aarch64-apple-darwin
-          - platform: macos-latest # Intel, cross-compiled from an Apple Silicon runner
-            args: --target x86_64-apple-darwin
+          - platform: macos-latest
+            args: --target universal-apple-darwin
+            targets: "aarch64-apple-darwin,x86_64-apple-darwin" # rustup needs both std libs to lipo a universal binary
           - platform: ubuntu-22.04
             args: ""
+            targets: ""
           - platform: windows-latest
             args: ""
+            targets: ""
     runs-on: ${{ matrix.platform }}
     steps:
       - uses: actions/checkout@v4
@@ -39,7 +53,7 @@ jobs:
 
       - uses: dtolnay/rust-toolchain@stable
         with:
-          targets: ${{ contains(matrix.args, 'x86_64') && 'x86_64-apple-darwin' || contains(matrix.args, 'aarch64') && 'aarch64-apple-darwin' || '' }}
+          targets: ${{ matrix.targets }}
 
       - name: Rust cache
         uses: swatinem/rust-cache@v2
@@ -68,26 +82,77 @@ jobs:
           prerelease: false
           args: ${{ matrix.args }}
 
-      # The bundler names every asset productName_<version>_<arch>..., so
-      # releases/latest/download/<name> 404s the day the next version exists.
-      # Re-upload the human-downloadable installers without the version so the
-      # README links stay stable. Updater artifacts (.app.tar.gz, .sig,
-      # latest.json) keep their versioned names: latest.json embeds those exact
-      # paths, and a renamed copy would desync the updater feed.
-      - name: Upload versionless download links
-        if: startsWith(github.ref, 'refs/tags/')
-        shell: bash
+  # The bundler ships everything it makes: bundle + .sig companions +
+  # version-stamped names + versionless copies — 17 assets per tag. A release
+  # only needs three download links. This job runs once after all builds land
+  # and rewrites the asset list:
+  #
+  #   1. copy the version-stamped installers to the versionless names the
+  #      README links to (releases/latest/download/<name> would otherwise 404
+  #      the day the next version exists);
+  #   2. repoint latest.json's URLs at those versionless copies and re-upload;
+  #   3. prune the leftovers — .sig companions (the signature is a string
+  #      inside latest.json, never a downloaded file), the version-stamped
+  #      installers and dmg.
+  publish:
+    needs: build
+    if: startsWith(github.ref, 'refs/tags/')
+    runs-on: ubuntu-latest
+    steps:
+      - name: Trim the release to three download links
         env:
           GH_TOKEN: ${{ github.token }}
           VERSION: ${{ github.ref_name }}
           GH_REPO: ${{ github.repository }}
         run: |
-          version="${VERSION#v}"
+          release_id="$(gh api "repos/$GH_REPO/releases" --paginate --jq ".[] | select(.tag_name == \"${VERSION}\") | .id" | head -n 1)"
+          test -n "$release_id" || { echo "no draft release for $VERSION"; exit 1; }
+
+          asset_by_name() {
+            gh api "repos/$GH_REPO/releases/$release_id/assets" --paginate --jq ".[] | select(.name == \"$1\") | .id"
+          }
+          # grab a release asset's raw content
+          fetch() {
+            gh api "repos/$GH_REPO/releases/assets/$(asset_by_name "$1")" -H 'Accept: application/octet-stream' > "$2"
+          }
+
+          names="$(gh api "repos/$GH_REPO/releases/$release_id/assets" --paginate --jq '.[].name')"
+          exe_name="$(echo "$names" | grep -- '-setup.exe$')"
+          app_name="$(echo "$names" | grep -- '\.AppImage$')"
+          dmg_name="$(echo "$names" | grep -- '\.dmg$')"
+          tar_name="$(echo "$names" | grep -- '\.app\.tar\.gz$')"
+          test -n "$exe_name" && test -n "$app_name" && test -n "$dmg_name" && test -n "$tar_name" || {
+            echo "unexpected asset list:"; echo "$names"; exit 1
+          }
+
+          # 1. uniform human names (the ones the README links to). The bundler's
+          #    automatic names carry the arch/target triple
+          #    (Git.Mapper_<arch>-setup.exe / _<arch>.AppImage / _universal.dmg /
+          #    _universal.app.tar.gz); each is copied once under a stable name.
           mkdir aliases
-          find src-tauri/target -type f \( -name "*-setup.exe" -o -name "*.msi" -o -name "*.dmg" -o -name "*.AppImage" -o -name "*.deb" -o -name "*.rpm" \) ! -name "*.sig" | while read -r file; do
-            base="$(basename "$file")"
-            stable="$(echo "$base" | sed "s/_$version//")"
-            cp "$file" "aliases/$stable"
-            echo "$base -> $stable"
-          done
+          fetch "$exe_name" aliases/Git.Mapper_x64-setup.exe
+          fetch "$app_name" aliases/Git.Mapper_amd64.AppImage
+          fetch "$dmg_name" aliases/Git.Mapper.dmg
+          fetch "$tar_name" "aliases/Git.Mapper.app.tar.gz"
           gh release upload "$VERSION" aliases/* --clobber --repo "$GH_REPO"
+
+          # 2. latest.json: rename its URLs to the uniform names, then re-upload
+          fetch latest.json latest.json
+          sed -i "s|/$exe_name|/Git.Mapper_x64-setup.exe|g; s|/$app_name|/Git.Mapper_amd64.AppImage|g; s|/$tar_name|/Git.Mapper.app.tar.gz|g" latest.json
+          grep -o '"url": *"[^"]*"' latest.json
+          gh api -X DELETE "repos/$GH_REPO/releases/assets/$(asset_by_name latest.json)" > /dev/null || true
+          gh release upload "$VERSION" latest.json --clobber --repo "$GH_REPO"
+
+          # 3. prune everything but the three links, the macOS updater
+          #    artifact, the feed and GitHub's automatic source archives
+          gh api "repos/$GH_REPO/releases/$release_id/assets" --paginate --jq '.[] | "\(.name)\t\(.id)"' | while IFS=$'\t' read -r name id; do
+            case "$name" in
+              latest.json | Git.Mapper_x64-setup.exe | Git.Mapper_amd64.AppImage | Git.Mapper.dmg | Git.Mapper.app.tar.gz)
+                echo "keep  $name" ;;
+              *"Source code"*)
+                echo "keep  $name" ;;
+              *)
+                echo "prune $name"
+                gh api -X DELETE "repos/$GH_REPO/releases/assets/$id" > /dev/null ;;
+            esac
+          done

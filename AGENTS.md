@@ -173,7 +173,12 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
   `version` in `tauri.conf.json` (keep `package.json` and `Cargo.toml` — and `Cargo.lock` via
   `cargo update -p git-mapper` — in step), commit, then push a `v*` tag: `.github/workflows/release.yml`
   builds every platform, signs with the key stored in CI, and opens a DRAFT release with
-  `latest.json` attached. Publish the draft with real changelog notes
+  `latest.json` attached. macOS is ONE `universal-apple-darwin` build (one dmg for Apple
+  Silicon + Intel); a `publish` job then trims the draft to three versionless installers
+  (setup.exe / dmg / AppImage — the names the README links to) plus the macOS updater
+  artifact, renamed to `Git.Mapper.app.tar.gz`: it repoints `latest.json`'s URLs at those
+  uniform names and prunes every `.sig`/versioned duplicate. Publish the draft with real
+  changelog notes
   (`gh release edit v<ver> --draft=false --latest --notes "…"`) and verify the feed answers
   `HTTP 200` with the new version. The private signing key lives OUTSIDE the repo and never gets
   committed. The app checks that feed at launch when "Update

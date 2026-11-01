@@ -22,8 +22,7 @@ Grab the latest installer from [the releases page](https://github.com/fajarwz/gi
 | OS | Download |
 | --- | --- |
 | Windows | [`Git.Mapper_x64-setup.exe`](https://github.com/fajarwz/git-mapper/releases/latest/download/Git.Mapper_x64-setup.exe) |
-| macOS (Apple Silicon) | [`Git.Mapper_aarch64.dmg`](https://github.com/fajarwz/git-mapper/releases/latest/download/Git.Mapper_aarch64.dmg) |
-| macOS (Intel) | [`Git.Mapper_x64.dmg`](https://github.com/fajarwz/git-mapper/releases/latest/download/Git.Mapper_x64.dmg) |
+| macOS | [`Git.Mapper.dmg`](https://github.com/fajarwz/git-mapper/releases/latest/download/Git.Mapper.dmg) (Apple Silicon + Intel) |
 | Linux | [`Git.Mapper_amd64.AppImage`](https://github.com/fajarwz/git-mapper/releases/latest/download/Git.Mapper_amd64.AppImage) (runs without installing) |
 
 The links above always resolve to the newest release. On macOS, the first launch gets a Gatekeeper
