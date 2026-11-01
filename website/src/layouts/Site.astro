@@ -7,7 +7,7 @@ type Props = {
   ogImage?: string;
 };
 
-const { title, description, ogImage = "/og-image.png" } = Astro.props;
+const { title, description, ogImage = "/screens/og-image.png" } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site).toString();
 const ogImageAbs = new URL(ogImage, Astro.site).toString();
 

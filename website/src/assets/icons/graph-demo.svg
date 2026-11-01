@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 300 112" width="100%" height="100%" aria-hidden="true">
+  <g fill="none" stroke-linecap="round" stroke-width="2.5">
+    <path d="M24 106V16" stroke="var(--color-lane-1)"></path>
+    <path d="M24 84 C 44 84, 52 78, 56 72 M56 34 V72 M56 34 C 60 28, 20 30, 24 22" stroke="var(--color-lane-2)"></path>
+    <path d="M56 62 C 72 62, 86 58, 88 50 V36" stroke="var(--color-lane-3)"></path>
+  </g>
+  <circle cx="24" cy="106" r="5.5" fill="var(--color-lane-1)"></circle>
+  <circle cx="24" cy="84" r="5.5" fill="var(--color-lane-1)"></circle>
+  <circle cx="56" cy="72" r="5.5" fill="var(--color-lane-2)"></circle>
+  <circle cx="88" cy="36" r="5.5" fill="var(--color-lane-3)"></circle>
+  <circle cx="56" cy="34" r="5.5" fill="var(--color-lane-2)"></circle>
+  <circle cx="24" cy="22" r="5.5" fill="var(--color-lane-1)"></circle>
+</svg>

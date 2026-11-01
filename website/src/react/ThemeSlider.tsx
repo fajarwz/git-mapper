@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
+// Icons live as files under src/assets/icons (same folder the page uses).
+import iconSun from "../assets/icons/sun.svg?raw";
+import iconMoon from "../assets/icons/moon.svg?raw";
+import iconHandle from "../assets/icons/drag-handle.svg?raw";
+
 type Props = {
   lightSrc: string;
   darkSrc: string;
@@ -150,24 +155,16 @@ export default function ThemeSlider({ lightSrc, darkSrc, altLight, altDark }: Pr
         className="pointer-events-none absolute top-1/2 flex h-11 w-11 -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full border border-hairline bg-surface/90 backdrop-blur-md soft-shadow"
         style={{ left: `${pos}%` }}
       >
-        <svg viewBox="0 0 24 24" className="h-4 w-4 text-ink-soft" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
-          <path d="M9 7l-4 5 4 5" />
-          <path d="M15 7l4 5-4 5" />
-        </svg>
+        <span className="inline-block h-4 w-4 text-ink-soft" dangerouslySetInnerHTML={{ __html: iconHandle }} />
       </div>
 
       {/* Labels, visible at rest for both extremes of the drag */}
       <span className="absolute bottom-3 left-3 flex items-center gap-1.5 rounded-full border border-hairline bg-surface/85 px-2.5 py-1 text-[11px] font-semibold text-ink backdrop-blur-md">
-        <svg viewBox="0 0 24 24" className="h-3 w-3 text-warning" fill="currentColor" aria-hidden="true">
-          <circle cx="12" cy="12" r="4.5" />
-          <path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.5 1.5M17.2 17.2l1.5 1.5M18.7 5.3l-1.5 1.5M6.8 17.2l-1.5 1.5" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" />
-        </svg>
+        <span className="inline-block h-3 w-3 text-warning" dangerouslySetInnerHTML={{ __html: iconSun }} />
         Light
       </span>
       <span className="absolute bottom-3 right-3 flex items-center gap-1.5 rounded-full border border-hairline bg-surface/85 px-2.5 py-1 text-[11px] font-semibold text-ink backdrop-blur-md">
-        <svg viewBox="0 0 24 24" className="h-3 w-3 text-primary" fill="currentColor" aria-hidden="true">
-          <path d="M20.8 13.9A8.3 8.3 0 0 1 10.1 3.2a8.5 8.5 0 1 0 10.7 10.7Z" />
-        </svg>
+        <span className="inline-block h-3 w-3 text-primary" dangerouslySetInnerHTML={{ __html: iconMoon }} />
         Dark
       </span>
     </div>
