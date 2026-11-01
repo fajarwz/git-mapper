@@ -7,7 +7,7 @@ type Props = {
   ogImage?: string;
 };
 
-const { title, description, ogImage = "/screens/main-light.png" } = Astro.props;
+const { title, description, ogImage = "/og-image.png" } = Astro.props;
 const canonical = new URL(Astro.url.pathname, Astro.site).toString();
 const ogImageAbs = new URL(ogImage, Astro.site).toString();
 
@@ -43,8 +43,9 @@ const jsonLd = {
     <meta property="og:description" content={description} />
     <meta property="og:url" content={canonical} />
     <meta property="og:image" content={ogImageAbs} />
-    <meta property="og:image:width" content="2240" />
-    <meta property="og:image:height" content="1440" />
+    <meta property="og:image:width" content="1200" />
+    <meta property="og:image:height" content="630" />
+    <meta property="og:image:alt" content="Git Mapper: the frosted-glass commit feed app, with the tagline Git history worth having on screen" />
     <meta name="twitter:card" content="summary_large_image" />
     <meta name="twitter:title" content={title} />
     <meta name="twitter:description" content={description} />
