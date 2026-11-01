@@ -47,7 +47,7 @@
   --color-sheet-strong: rgb(255 255 255 / 0.85);
   --color-hover-glass: rgb(110 86 207 / 0.07);
   --color-selected-glass: rgb(110 86 207 / 0.12);
-  --color-scrim: rgb(16 12 28 / 0.35);
+  --color-scrim: rgb(16 12 28 / 0.2);
 
   /* Graph lanes: 6 distinct muted hues that stay separate against glass. */
   --color-lane-1: #6e56cf;
@@ -221,30 +221,33 @@
     text-rendering: optimizeLegibility;
   }
 
-  /* Colour fields behind the glass panels; these are what the backdrop blur picks up.
-     The linear base keeps saturation high across the whole canvas (radial spots alone
-     wash out); the radials add the aurora accents, like the reference art. */
+  /* Colour field behind the glass panels; this is what the backdrop blur picks up.
+     White canvas with soft glowing corners: quiet daylight for the glass, the
+     glows carry the colour so saturation lives at the edges, not under text. */
   body::before {
     content: "";
     position: fixed;
     inset: -12%;
     z-index: 0;
     pointer-events: none;
+    background-color: #ffffff;
     background-image:
-      radial-gradient(34rem 28rem at 88% 6%, rgb(226 168 122 / 0.55), transparent 70%),
-      radial-gradient(30rem 26rem at 76% 96%, rgb(228 141 180 / 0.5), transparent 72%),
-      radial-gradient(26rem 22rem at 28% 90%, rgb(96 148 196 / 0.5), transparent 70%),
-      radial-gradient(40rem 32rem at 8% 10%, rgb(110 82 216 / 0.75), transparent 72%),
-      linear-gradient(118deg, #8a6fe0 0%, #a795dd 36%, #d3a6c4 70%, #e2b194 100%);
-    filter: blur(18px);
+      radial-gradient(36rem 30rem at 90% 4%, rgb(71 127 184 / 0.6), transparent 68%),
+      radial-gradient(32rem 28rem at 40% 100%, rgb(207 106 146 / 0.5), transparent 70%),
+      radial-gradient(28rem 24rem at 55% -6%, rgb(47 161 134 / 0.45), transparent 68%),
+      radial-gradient(36rem 30rem at 2% 55%, rgb(110 86 207 / 0.6), transparent 70%);
+    filter: blur(24px);
   }
 
   .dark body::before {
+    /* Same glowing treatment, but the glows go white: deep dark canvas,
+       light halos breathing at the corners. */
+    background-color: transparent;
     background-image:
-      radial-gradient(38rem 30rem at 10% 12%, rgb(96 68 200 / 0.5), transparent 66%),
-      radial-gradient(34rem 28rem at 90% 4%, rgb(219 148 92 / 0.4), transparent 70%),
-      radial-gradient(30rem 26rem at 78% 96%, rgb(228 141 180 / 0.38), transparent 72%),
-      radial-gradient(26rem 22rem at 28% 90%, rgb(96 148 196 / 0.4), transparent 74%);
+      radial-gradient(36rem 30rem at 90% 4%, rgb(255 255 255 / 0.2), transparent 68%),
+      radial-gradient(32rem 28rem at 40% 100%, rgb(255 255 255 / 0.15), transparent 70%),
+      radial-gradient(28rem 24rem at 55% -6%, rgb(255 255 255 / 0.14), transparent 68%),
+      radial-gradient(36rem 30rem at 2% 55%, rgb(255 255 255 / 0.22), transparent 70%);
   }
 
   #root {
