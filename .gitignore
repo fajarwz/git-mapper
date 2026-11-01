@@ -28,3 +28,9 @@ src-tauri/target
 
 # Hermes agent scratch (plans, probes)
 .hermes/
+
+# Impeccable working artifacts (config local, decision mocks, review shots)
+.impeccable/config.local.json
+.impeccable/mocks/
+.impeccable/review/
+.impeccable/build/
