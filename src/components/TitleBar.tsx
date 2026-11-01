@@ -18,6 +18,8 @@ import type { Repository } from "../types";
 import { GLASS_CONTROL } from "../lib/ui";
 import {
   BranchIcon,
+  ArrowDownIcon,
+  ArrowUpIcon,
   BrandGlyph,
   CloseIcon,
   PlusIcon,
@@ -410,7 +412,7 @@ export function TitleBar({
             onClick={onFetch}
             disabled={fetching}
             aria-label="Fetch from remotes"
-            title={fetching ? "Fetching from the remotes…" : "Fetch all remotes (updates the ↑/↓ counters)"}
+            title={fetching ? "Fetching from the remotes…" : "Fetch all remotes (updates the behind/ahead counters)"}
             className={`${GLASS_CONTROL} grid cursor-default place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 disabled:opacity-50 size-7`}
           >
             <RemoteIcon size={13} className={fetching ? "animate-spin" : undefined} />
@@ -424,7 +426,7 @@ export function TitleBar({
               disabled={syncing}
               aria-label={`Pull ${repo.branch}`}
               title={`Pull ${repo.branch} (fast-forward only)${syncError?.op === "pull" ? ` — ${syncError.message}` : ""}`}
-              className={`${GLASS_CONTROL} grid h-7 min-w-7 place-items-center px-1.5 font-mono text-[11px] font-semibold leading-none ${
+              className={`${GLASS_CONTROL} inline-flex h-7 min-w-7 place-items-center justify-center gap-0.5 px-1.5 text-[11px] font-semibold leading-none ${
                 syncError?.op === "pull"
                   ? "text-danger"
                   : repo.behind > 0
@@ -432,7 +434,8 @@ export function TitleBar({
                     : "text-ink-dim hover:bg-sheet-strong hover:text-ink"
               } focus-visible:ring-2 focus-visible:ring-primary/70 disabled:opacity-50`}
             >
-              ↓{repo.behind > 0 ? repo.behind : ""}
+              <ArrowDownIcon size={11} />
+              {repo.behind > 0 ? repo.behind : ""}
             </button>
             <button
               type="button"
@@ -440,7 +443,7 @@ export function TitleBar({
               disabled={syncing}
               aria-label={`Push ${repo.branch}`}
               title={`Push ${repo.branch} to origin${syncError?.op === "push" ? ` — ${syncError.message}` : ""}`}
-              className={`${GLASS_CONTROL} grid h-7 min-w-7 place-items-center px-1.5 font-mono text-[11px] font-semibold leading-none ${
+              className={`${GLASS_CONTROL} inline-flex h-7 min-w-7 place-items-center justify-center gap-0.5 px-1.5 text-[11px] font-semibold leading-none ${
                 syncError?.op === "push"
                   ? "text-danger"
                   : repo.ahead > 0
@@ -448,7 +451,8 @@ export function TitleBar({
                     : "text-ink-dim hover:bg-sheet-strong hover:text-ink"
               } focus-visible:ring-2 focus-visible:ring-primary/70 disabled:opacity-50`}
             >
-              ↑{repo.ahead > 0 ? repo.ahead : ""}
+              <ArrowUpIcon size={11} />
+              {repo.ahead > 0 ? repo.ahead : ""}
             </button>
           </>
         )}

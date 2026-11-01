@@ -6,6 +6,8 @@
  */
 import type { ComponentType } from "react";
 import RawBranchIcon from "../assets/branch.svg?react";
+import RawArrowDownIcon from "../assets/arrow-down.svg?react";
+import RawArrowUpIcon from "../assets/arrow-up.svg?react";
 import RawTagIcon from "../assets/tag.svg?react";
 import RawRemoteIcon from "../assets/remote.svg?react";
 import RawStashIcon from "../assets/stash.svg?react";
@@ -35,6 +37,14 @@ function SizedIcon({ glyph, size, className }: { glyph: SvgGlyph; size: number; 
 
 export function BranchIcon({ size = 12 }: IconProps) {
   return <SizedIcon glyph={RawBranchIcon} size={size} />;
+}
+
+export function ArrowDownIcon({ size = 12 }: IconProps) {
+  return <SizedIcon glyph={RawArrowDownIcon} size={size} />;
+}
+
+export function ArrowUpIcon({ size = 12 }: IconProps) {
+  return <SizedIcon glyph={RawArrowUpIcon} size={size} />;
 }
 
 export function TagIcon({ size = 12 }: IconProps) {

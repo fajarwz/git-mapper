@@ -73,8 +73,12 @@ export function ConfirmDialog({ title, body, confirmLabel, danger = false, onCon
           <button
             type="button"
             onClick={onConfirm}
-            className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold text-white soft-shadow transition-colors hover:brightness-110 ${
-              danger ? "bg-danger" : "bg-primary"
+            className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold soft-shadow transition-colors hover:brightness-110 ${
+              danger
+                ? // A filled #d5535e fails white-on-red AA (4.02:1); the app's danger pairing
+                  // is the tinted fill with danger-ink text, which holds 4.5:1 in both themes.
+                  "border border-danger/30 bg-danger/15 text-danger-ink hover:bg-danger/25"
+                : "bg-primary text-white"
             }`}
           >
             {confirmLabel}
