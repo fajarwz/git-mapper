@@ -1,17 +1,27 @@
 import type { DiffLine, FileStatus } from "../types";
 
-const DATE_PARTS = new Intl.DateTimeFormat("en-GB", {
+const DATE_OPTIONS: Intl.DateTimeFormatOptions = {
   day: "numeric",
   month: "short",
   year: "numeric",
   hour: "2-digit",
   minute: "2-digit",
   hour12: false,
-});
+};
 
-/** "23 Oct 2026 12:09" — absolute commit timestamps, never relative offsets. */
-export function formatAbsoluteDate(isoDate: string): string {
-  const parts = DATE_PARTS.formatToParts(new Date(isoDate));
+// Commit times are shown in the viewer's own timezone, so the default formatter
+// is resolved once; a caller that needs a fixed zone (the tests) asks for one.
+const LOCAL_DATE_PARTS = new Intl.DateTimeFormat("en-GB", DATE_OPTIONS);
+
+/**
+ * "23 Oct 2026 12:09" — absolute commit timestamps, never relative offsets.
+ * `timeZone` is an IANA zone; omit it for the machine's local time.
+ */
+export function formatAbsoluteDate(isoDate: string, timeZone?: string): string {
+  const formatter = timeZone
+    ? new Intl.DateTimeFormat("en-GB", { ...DATE_OPTIONS, timeZone })
+    : LOCAL_DATE_PARTS;
+  const parts = formatter.formatToParts(new Date(isoDate));
   const get = (type: Intl.DateTimeFormatPartTypes) =>
     parts.find((part) => part.type === type)?.value ?? "";
   return `${get("day")} ${get("month")} ${get("year")} ${get("hour")}:${get("minute")}`;

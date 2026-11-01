@@ -4,13 +4,19 @@ import { test } from "vitest";
 
 import { formatAbsoluteDate, numberDiffLines, statusLetter, STATUS_LABELS } from "./format";
 
-// The formatter pins the locale, so the assertion does not move with the test machine.
+// Commit times render in the machine's own timezone, which on a CI runner is UTC
+// and not the zone a dev box runs in: pin the zone so the assertion is stable.
 test("absolute dates are printed in en-GB shape, never relative", () => {
-  assert.equal(formatAbsoluteDate("2026-10-25T12:09:00+07:00"), "25 Oct 2026 12:09");
+  assert.equal(formatAbsoluteDate("2026-10-25T12:09:00+07:00", "Asia/Jakarta"), "25 Oct 2026 12:09");
   assert.equal(
-    formatAbsoluteDate("2026-01-04T03:00:00+07:00"),
+    formatAbsoluteDate("2026-01-04T03:00:00+07:00", "Asia/Jakarta"),
     "4 Jan 2026 03:00",
     "no zero-padded day, zero-padded hour",
+  );
+  assert.equal(
+    formatAbsoluteDate("2026-10-25T12:09:00+07:00", "UTC"),
+    "25 Oct 2026 05:09",
+    "the same instant in another zone proves the offset is applied, not dropped",
   );
 });
 
