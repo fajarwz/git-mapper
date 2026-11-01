@@ -42,6 +42,7 @@ Lightweight zero-config viewer that runs real `git` for its data but looks like 
 - Name: **Git Mapper** (crate `git_mapper_lib`, id `com.fajarwz.git-mapper`).
 - Logo: `docs/logo.svg`; app icon regenerates from `src-tauri/icons/app-icon.svg` and must stay in sync with the title-bar BrandMark.
 - Aesthetic: frosted-glass commit feed, violet/rose/warm palette — and the full design-system rules in **AGENTS.md** (tokens only, custom shadow utilities, pill language, chrome backing) are binding. No further explicit commitments.
+- Voice: **lightweight and clean**. Copy states what it does in plain words (lightweight, zero-config, no account); proof beats adjectives, facts over flexes. The glass look is demonstrated by imagery, not claimed in headlines.
 
 ## Evidence on Hand
 
