@@ -182,6 +182,46 @@ test("the all-files scope stacks every file under its own sticky header", () => 
   assert.ok(header.includes("−1"));
 });
 
+test("picking a file in the jump list scrolls that file's own section flush to the top", () => {
+  // The sections are not scroll-margin-offset on purpose: with a gap, the PREVIOUS file's
+  // sticky header stays pinned over the seam and the jump reads as "landed one file too high".
+  const scrolled: Element[] = [];
+  const original = Element.prototype.scrollIntoView;
+  Element.prototype.scrollIntoView = function (this: Element) {
+    scrolled.push(this);
+  };
+  try {
+    const { container, rerender } = render(
+      <DiffViewer
+        files={[sampleFile, secondFile]}
+        file={sampleFile}
+        scope="all"
+        onScopeChange={() => {}}
+        scheme="app"
+      />,
+    );
+    rerender(
+      <DiffViewer
+        files={[sampleFile, secondFile]}
+        file={secondFile}
+        scope="all"
+        onScopeChange={() => {}}
+        scheme="app"
+      />,
+    );
+
+    const sections = [...container.querySelectorAll("[data-diff-file]")];
+    assert.ok(
+      !sections[1].className.includes("scroll-mt"),
+      "the target section leaves no gap above it for the previous file's sticky header",
+    );
+    assert.ok(scrolled.includes(sections[1]), "the clicked file's own section is the scroll target");
+  } finally {
+    if (original) Element.prototype.scrollIntoView = original;
+    else delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+  }
+});
+
 test("the scope toggle reports the clicked side and marks the active one", () => {
   const picked: string[] = [];
   const { container } = render(

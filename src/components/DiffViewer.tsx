@@ -462,7 +462,10 @@ export function DiffViewer({
   );
 
   // In "all" scope the file list on the left is a jump list: selecting a file scrolls its
-  // section into view. jsdom has no scrollIntoView, so the call is guarded, not assumed.
+  // section into view. jsdom has no scrollIntoView, so the call is guarded, not assumed. The
+  // section scrolls flush to the top on purpose (no scroll-margin): a gap there left the
+  // PREVIOUS file's sticky header pinned over the seam, so the jump looked like it landed one
+  // file too high.
   const sections = useRef(new Map<string, HTMLElement>());
   const target = file?.path ?? null;
   useEffect(() => {
@@ -517,7 +520,6 @@ export function DiffViewer({
                   if (node) sections.current.set(item.path, node);
                   else sections.current.delete(item.path);
                 }}
-                className="scroll-mt-8"
               >
                 <FileHeader file={item} />
                 <div className="pt-1">
