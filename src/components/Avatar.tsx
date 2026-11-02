@@ -32,6 +32,10 @@ interface AvatarProps {
 }
 
 export function Avatar({ name, email, photos = false }: AvatarProps) {
+  // A row with no author has nobody to picture: the uncommitted-changes row carries an empty
+  // name and email, and an empty tinted circle there read as a broken image. Hooks below still
+  // run unconditionally, so switching the selected commit never changes hook order.
+  const anonymous = name.trim() === "" && email.trim() === "";
   // Mixed into the lane colour so both themes carry it and neighbouring authors mostly differ.
   const tone = `var(--color-lane-${avatarColorIndex(email) + 1})`;
   const tint = { backgroundColor: `color-mix(in oklab, ${tone} 22%, transparent)`, color: tone };
@@ -43,7 +47,7 @@ export function Avatar({ name, email, photos = false }: AvatarProps) {
   const wantedRef = useRef("");
 
   useEffect(() => {
-    if (!photos) return;
+    if (anonymous || !photos) return;
     const wanted = email;
     wantedRef.current = wanted;
     void gravatarPhotoUrl(email).then((url) => {
@@ -54,6 +58,8 @@ export function Avatar({ name, email, photos = false }: AvatarProps) {
   }, [photos, email]);
 
   const activePhoto = resolved?.email === email ? resolved : null;
+
+  if (anonymous) return null;
 
   return (
     <span

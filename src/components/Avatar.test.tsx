@@ -22,6 +22,13 @@ test("the colour slot is a stable function of the email", () => {
   assert.notEqual(avatarColorIndex("fajarwz@example.com"), avatarColorIndex("someone-else@example.com"), "different authors mostly differ");
 });
 
+test("an avatar with no author renders nothing", () => {
+  // The uncommitted-changes row carries an empty name and email: an empty tinted circle there
+  // read as a broken picture beside a blank author.
+  const { container } = render(<Avatar name="" email="" photos />);
+  assert.equal(container.firstElementChild, null, "nobody to picture, nothing rendered");
+});
+
 test("the avatar renders the initial and its email tint", () => {
   const { container } = render(<Avatar name="fajarwz" email="fajarwz@example.com" />);
   const chip = container.firstElementChild as HTMLElement;
