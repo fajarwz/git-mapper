@@ -310,10 +310,12 @@ function RenameScore({ file }: { file: ChangedFile }) {
   );
 }
 
-/** One file's header: path, status, line counts. Sticky, for the stacked "all files" view. */
+/** One file's header: path, status, line counts. Sticky, for the stacked "all files" view.
+ *  The band is a tinted strip in light theme: white-on-white left the boundary between two
+ *  files invisible, so the only cue was a 8%-ink hairline. */
 function FileHeader({ file }: { file: ChangedFile }) {
   return (
-    <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-rule bg-sheet-strong px-3.5 py-2 backdrop-blur-md">
+    <div className="sticky top-0 z-10 flex items-center gap-2.5 border-b border-hairline bg-sheet-band px-3.5 py-2 backdrop-blur-md">
       <FilePath file={file} />
       <span className={`shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-semibold ${STATUS_TONES[file.status]}`}>
         {STATUS_LABELS[file.status]}
@@ -471,7 +473,7 @@ export function DiffViewer({
 
   return (
     <div data-diff data-syntax={scheme} className="flex min-h-0 min-w-0 flex-col bg-sheet">
-      <div className="flex shrink-0 items-center gap-2.5 border-b border-rule px-3.5 py-2">
+      <div className="flex shrink-0 items-center gap-2.5 border-b border-hairline bg-sheet-band px-3.5 py-2">
         {scope === "all" ? (
           <span className="min-w-0 truncate font-mono text-[11.5px] font-medium text-ink">
             {files.length} file{files.length === 1 ? "" : "s"} changed

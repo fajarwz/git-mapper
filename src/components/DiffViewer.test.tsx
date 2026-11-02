@@ -171,6 +171,10 @@ test("the all-files scope stacks every file under its own sticky header", () => 
     sections[0].firstElementChild?.className.includes("sticky"),
     "each file header sticks while its lines scroll past",
   );
+  assert.ok(
+    sections[0].firstElementChild?.className.includes("bg-sheet-band"),
+    "the file divider is a banded strip, not a white one lost on the white page",
+  );
 
   const header = container.querySelector("[data-diff] > div")?.textContent ?? "";
   assert.ok(header.includes("2 files changed"));

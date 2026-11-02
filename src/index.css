@@ -45,6 +45,9 @@
   --color-hairline: rgb(23 21 31 / 0.14);
   --color-sheet: rgb(255 255 255 / 0.5);
   --color-sheet-strong: rgb(255 255 255 / 0.85);
+  /* Header band over a file's diff. Light needs an actual shade off the canvas: a white band on
+     a white page left the boundary between two stacked files invisible. */
+  --color-sheet-band: #f2f0f8;
   --color-hover-glass: rgb(110 86 207 / 0.07);
   --color-selected-glass: rgb(110 86 207 / 0.16);
   --color-scrim: rgb(16 12 28 / 0.2);
@@ -99,6 +102,7 @@
   --color-hairline: rgb(255 255 255 / 0.15);
   --color-sheet: rgb(12 17 27 / 0.55);
   --color-sheet-strong: rgb(26 34 50 / 0.92);
+  --color-sheet-band: rgb(26 34 50 / 0.94);
   --color-hover-glass: rgb(150 124 240 / 0.12);
   --color-selected-glass: rgb(123 97 255 / 0.24);
   --color-scrim: rgb(0 0 0 / 0.55);
