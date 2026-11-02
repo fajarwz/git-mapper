@@ -10,6 +10,10 @@ import fs from "node:fs";
 import path from "node:path";
 import { execFileSync } from "node:child_process";
 const host = process.env.TAURI_DEV_HOST;
+// `tauri dev` hard-wires its devUrl to port 1420, so under the Tauri CLI the port must stay
+// fixed: drifting to 1421 would leave the window loading whatever else answers 1420. A plain
+// `npm run dev` (browser work, headless probes) may step to the next free port instead.
+const underTauriCli = process.env.TAURI_ENV_PLATFORM !== undefined;
 
 /** FNV-1a: the stamps below are only compared for equality between two reads. */
 function digest(text: string): string {
@@ -381,10 +385,11 @@ export default defineConfig(() => ({
   //
   // 1. prevent Vite from obscuring rust errors
   clearScreen: false,
-  // 2. tauri expects a fixed port, fail if that port is not available
+  // 2. tauri's window loads http://localhost:1420, so under `tauri dev` fail rather than drift
+  //    to another port and quietly show a different server
   server: {
     port: 1420,
-    strictPort: true,
+    strictPort: underTauriCli,
     host: host || false,
     hmr: host
       ? {
