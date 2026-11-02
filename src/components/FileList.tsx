@@ -227,7 +227,7 @@ export function FileList({
 
   return (
     <div className="flex min-h-0 flex-1 flex-col">
-      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-rule px-3.5 py-2 text-[11px] font-semibold text-ink-dim">
+      <div className="flex shrink-0 items-center justify-between gap-2 border-b border-hairline bg-sheet-band px-3.5 py-2 text-[11px] font-semibold text-ink-dim">
         <span className="flex min-w-0 items-center gap-1">
           <button
             type="button"
