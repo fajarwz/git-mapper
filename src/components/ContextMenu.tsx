@@ -164,12 +164,14 @@ export function ContextMenu({ target, onCheckout, onCheckoutCommit, onStashActio
           </button>
         </>
       )}
-      <button type="button" role="menuitem" className={ITEM}
-        title="The short hash shown in the list"
-        onClick={() => copy("hash", target.commit.hash)}
-      >
-        {copiedKey === "hash" ? "Copied!" : "Copy commit hash"}
-      </button>
+      {target.commit.hash !== UNCOMMITTED_HASH && (
+        <button type="button" role="menuitem" className={ITEM}
+          title="The short hash shown in the list"
+          onClick={() => copy("hash", target.commit.hash)}
+        >
+          {copiedKey === "hash" ? "Copied!" : "Copy commit hash"}
+        </button>
+      )}
       {activeRef && (
         <button type="button" role="menuitem" className={ITEM}
           onClick={() => copy("ref", activeRef.name)}

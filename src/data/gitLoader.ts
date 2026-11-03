@@ -7,6 +7,7 @@ import { layoutGraph } from "../lib/graphLanes";
 import { parseCommitFiles } from "../lib/gitDiffParser";
 import { parseLog, parseStashes } from "../lib/gitLogParser";
 import type { LogStash } from "../lib/gitLogParser";
+import { shapeWorktreeFiles, type WorktreeFile } from "../lib/staging";
 
 const LOG_LIMIT = 500;
 
@@ -558,6 +559,57 @@ export async function fetchRemote(dir: string): Promise<void> {
 export async function pushBranch(dir: string): Promise<string> {
   return call("push_branch", { dir }, (raw) => raw as string);
 }
+
+interface WorktreeEntryRaw {
+  key: string;
+  path: string;
+  old_path?: string | null;
+  status: string;
+  staged: boolean;
+  untracked: boolean;
+  additions: number;
+  deletions: number;
+}
+
+/**
+ * The staging rail's reads: one command returns every staged/unstaged row (including a file
+ * staged then edited again, which lists twice — index copy and worktree remainder, distinct
+ * keys) with per-copy line counts, shaped for the panel.
+ */
+export async function loadWorktree(dir: string): Promise<WorktreeFile[]> {
+  const snapshot = await call(
+    "read_worktree_files",
+    { dir },
+    (raw) => raw as { entries: WorktreeEntryRaw[] },
+  );
+  return shapeWorktreeFiles(snapshot.entries ?? []);
+}
+
+/** `git add --` the given paths (untracked files included). */
+export async function stagePaths(dir: string, paths: string[]): Promise<void> {
+  await call("stage_files", { dir, paths }, (raw) => raw as void);
+}
+
+/** `git restore --staged --`; a staged rename walks its file back to the source name. */
+export async function unstagePaths(dir: string, paths: string[]): Promise<void> {
+  await call("unstage_files", { dir, paths }, (raw) => raw as void);
+}
+
+/** Per-path discard; the backend classifies from a fresh status (untracked, staged, tracked). */
+export async function discardPaths(dir: string, paths: string[]): Promise<void> {
+  await call("discard_files", { dir, paths }, (raw) => raw as void);
+}
+
+/** Panel-wide discard: tracked changes reset, untracked files (and dirs) are removed. */
+export async function discardEverything(dir: string): Promise<void> {
+  await call("discard_all", { dir }, (raw) => raw as void);
+}
+
+/** Commits the current index with `-m`; a message is required and pre-trimmed. */
+export async function commitStaged(dir: string, message: string): Promise<void> {
+  await call("commit_staged", { dir, message }, (raw) => raw as void);
+}
+
 
 export async function loadCommitFiles(repoPath: string, hash: string): Promise<ChangedFile[]> {
   const payload = await call<RawFilePayload>(

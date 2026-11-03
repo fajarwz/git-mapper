@@ -41,6 +41,9 @@ interface DetailsPanelProps {
   syntaxScheme: SyntaxScheme;
   /** The avatar toggle in settings: initials + gravatar photo beside the author here too. */
   showAvatars: boolean;
+  /** True when the commit is the uncommitted row: the rail owns the file list, so this panel
+   * drops its sidebar and the diff takes the pane — the rail click's full view. */
+  isWorktree?: boolean;
   onClose: () => void;
   onHeightChange: (height: number) => void;
 }
@@ -60,6 +63,7 @@ export function DetailsPanel({
   onDiffWrapChange,
   syntaxScheme,
   showAvatars,
+  isWorktree = false,
   onClose,
   onHeightChange,
 }: DetailsPanelProps) {
@@ -104,139 +108,170 @@ export function DetailsPanel({
         ].join(" ");
   const summaryStyle: CSSProperties | undefined = pinned ? { height: `${summaryHeight}px` } : undefined;
 
+  // The uncommitted context: the rail owns the file list, so this panel drops its sidebar
+  // entirely and the diff takes the whole pane — the full-view click, without a duplicate
+  // list to maintain next to the staging rail.
+  const showSidebar = !isWorktree;
+  const diffViewer = (
+    <DiffViewer
+      files={files}
+      file={selectedFile}
+      scope={diffScope}
+      onScopeChange={onDiffScopeChange}
+      layout={diffLayout}
+      onLayoutChange={onDiffLayoutChange}
+      wrap={diffWrap}
+      onWrapChange={onDiffWrapChange}
+      scheme={syntaxScheme}
+      repoPath={repoPath}
+      commitHash={commit.hash}
+    />
+  );
+
   return (
     <section
       ref={sectionRef}
       data-details
-      className={`${PANEL} relative grid min-h-0 grid-cols-[var(--sidebar-width)_minmax(0,1fr)] overflow-hidden`}
-      style={layout}
-      aria-label="Commit details"
+      className={
+        showSidebar
+          ? `${PANEL} relative grid min-h-0 grid-cols-[var(--sidebar-width)_minmax(0,1fr)] overflow-hidden`
+          : `${PANEL} relative flex min-h-0 flex-col overflow-hidden`
+      }
+      style={showSidebar ? layout : undefined}
+      aria-label={showSidebar ? "Commit details" : "Uncommitted diff"}
     >
-      <div
-        ref={sidebarRef}
-        data-details-sidebar
-        className="flex min-h-0 flex-col border-r border-rule bg-glass-soft"
-      >
-        <div ref={summaryRef} className={summaryClasses} style={summaryStyle}>
-          <div className="flex min-w-0 shrink-0 items-center gap-1.5 border-b border-hairline bg-sheet-band px-3.5 py-2">
-            <button
-              type="button"
-              onClick={() => setSummaryCollapsed((collapsed) => !collapsed)}
-              aria-expanded={!summaryCollapsed}
-              title={summaryCollapsed ? "Expand commit details" : "Collapse commit details"}
-              className="grid shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-6"
-            >
-              <ChevronDownIcon className={summaryCollapsed ? "-rotate-90" : ""} />
-            </button>
-            {/* The subject IS the panel title, so it survives a collapse (the hash lives in the
-                meta block below). Expanded it wraps fully; collapsed it stays a one-line row. */}
-            <span
-              className={`min-w-0 flex-1 text-[12.5px] font-bold text-ink ${
-                summaryCollapsed ? "truncate" : "wrap-break-word leading-snug"
-              }`}
-            >
-              {commit.subject}
-            </span>
-            {commit.parents.length > 1 && (
-              <span className="shrink-0 rounded-full bg-warning/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-warning-ink">
-                merge
-              </span>
+      {showSidebar ? (
+        <>
+          <div
+            ref={sidebarRef}
+            data-details-sidebar
+            className="flex min-h-0 flex-col border-r border-rule bg-glass-soft"
+          >
+            <div ref={summaryRef} className={summaryClasses} style={summaryStyle}>
+              <div className="flex min-w-0 shrink-0 items-center gap-1.5 border-b border-hairline bg-sheet-band px-3.5 py-2">
+                <button
+                  type="button"
+                  onClick={() => setSummaryCollapsed((collapsed) => !collapsed)}
+                  aria-expanded={!summaryCollapsed}
+                  title={summaryCollapsed ? "Expand commit details" : "Collapse commit details"}
+                  className="grid shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-6"
+                >
+                  <ChevronDownIcon className={summaryCollapsed ? "-rotate-90" : ""} />
+                </button>
+                {/* The subject IS the panel title, so it survives a collapse (the hash lives in the
+                    meta block below). Expanded it wraps fully; collapsed it stays a one-line row. */}
+                <span
+                  className={`min-w-0 flex-1 text-[12.5px] font-bold text-ink ${
+                    summaryCollapsed ? "truncate" : "wrap-break-word leading-snug"
+                  }`}
+                >
+                  {commit.subject}
+                </span>
+                {commit.parents.length > 1 && (
+                  <span className="shrink-0 rounded-full bg-warning/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-warning-ink">
+                    merge
+                  </span>
+                )}
+                {commit.stashIndex !== undefined && (
+                  <span className="shrink-0 rounded-full bg-secondary/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-secondary">
+                    stash
+                  </span>
+                )}
+                <button
+                  type="button"
+                  onClick={onClose}
+                  title="Hide details panel"
+                  aria-label="Hide details panel"
+                  className="ml-auto grid shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-6"
+                >
+                  <CloseIcon />
+                </button>
+              </div>
+
+              {!summaryCollapsed && (
+                <div className="flex min-w-0 flex-col gap-1.5 px-3.5 pb-3 pt-2">
+                  <div className="flex min-w-0 flex-col gap-0.5 text-[12px] text-ink-dim">
+                    <button
+                      type="button"
+                      onClick={copyHash}
+                      title="Copy commit hash"
+                      className="-mx-1 flex w-fit cursor-default items-center rounded px-1 font-mono text-[10.5px] text-ink-soft hover:bg-hover-glass"
+                    >
+                      {hashCopied ? "Copied!" : commit.hash}
+                    </button>
+                    <span className="flex w-fit items-center gap-1.5">
+                      {showAvatars && <Avatar name={commit.author} email={commit.authorEmail} photos />}
+                      <span className="text-[12.5px] font-semibold text-ink-soft">{commit.author}</span>
+                    </span>
+                    <span className="truncate">{commit.authorEmail}</span>
+                    <span>{formatAbsoluteDate(commit.date)}</span>
+                    {commit.parents.length > 0 && (
+                      <span className="wrap-break-word font-mono text-[10.5px]">
+                        {commit.parents.length > 1 ? "parents" : "parent"}: {commit.parents.join(", ")}
+                      </span>
+                    )}
+                  </div>
+
+                  {commit.body && (
+                    <p className="mb-0 mt-0.5 whitespace-pre-wrap wrap-break-word text-[12.5px] leading-relaxed text-ink-soft">
+                      {commit.body}
+                    </p>
+                  )}
+                </div>
+              )}
+            </div>
+
+            {/* Zero-height anchor on the summary/files boundary; the splitter straddles it. */}
+            {!summaryCollapsed && !filesCollapsed && (
+              <div className="relative h-0 shrink-0">
+                <ResizeHandle
+                  orientation="horizontal"
+                  invert
+                  label="Resize commit summary height"
+                  className="left-0 top-0"
+                  min={88}
+                  max={Math.max(300, (sidebarRef.current?.clientHeight ?? 560) - 220)}
+                  measure={() => summaryRef.current?.getBoundingClientRect().height ?? 0}
+                  onResize={setSummaryHeight}
+                  onReset={() => setSummaryHeight(null)}
+                />
+              </div>
             )}
-            {commit.stashIndex !== undefined && (
-              <span className="shrink-0 rounded-full bg-secondary/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-secondary">
-                stash
-              </span>
-            )}
+
+            <FileList
+              files={files}
+              loading={filesLoading}
+              selectedPath={selectedFile?.path ?? null}
+              onSelect={onSelectFile}
+              collapsed={filesCollapsed}
+              onToggleCollapse={() => setFilesCollapsed((collapsed) => !collapsed)}
+              view={fileView}
+              onViewChange={setFileView}
+            />
+          </div>
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">{diffViewer}</div>
+        </>
+      ) : (
+        <>
+          <div className="relative flex h-8 shrink-0 items-center gap-2 border-b border-hairline bg-sheet-band pl-4 pr-1.5 text-[11.5px] font-semibold text-ink-dim">
+            <span className="truncate">Uncommitted changes</span>
             <button
               type="button"
               onClick={onClose}
-              title="Hide details panel"
-              aria-label="Hide details panel"
-              className="ml-auto grid shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-6"
+              aria-label="Hide the uncommitted diff"
+              title="Hide the uncommitted diff"
+              className="ml-auto grid size-7 shrink-0 cursor-default place-items-center rounded-full text-ink-dim transition-colors hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60"
             >
-              <CloseIcon />
+              <CloseIcon size={10} />
             </button>
           </div>
-
-          {!summaryCollapsed && (
-            <div className="flex min-w-0 flex-col gap-1.5 px-3.5 pb-3 pt-2">
-              <div className="flex min-w-0 flex-col gap-0.5 text-[12px] text-ink-dim">
-                <button
-                  type="button"
-                  onClick={copyHash}
-                  title="Copy commit hash"
-                  className="-mx-1 flex w-fit cursor-default items-center rounded px-1 font-mono text-[10.5px] text-ink-soft hover:bg-hover-glass"
-                >
-                  {hashCopied ? "Copied!" : commit.hash}
-                </button>
-                <span className="flex w-fit items-center gap-1.5">
-                  {showAvatars && <Avatar name={commit.author} email={commit.authorEmail} photos />}
-                  <span className="text-[12.5px] font-semibold text-ink-soft">{commit.author}</span>
-                </span>
-                <span className="truncate">{commit.authorEmail}</span>
-                <span>{formatAbsoluteDate(commit.date)}</span>
-                {commit.parents.length > 0 && (
-                  <span className="wrap-break-word font-mono text-[10.5px]">
-                    {commit.parents.length > 1 ? "parents" : "parent"}: {commit.parents.join(", ")}
-                  </span>
-                )}
-              </div>
-
-              {commit.body && (
-                <p className="mb-0 mt-0.5 whitespace-pre-wrap wrap-break-word text-[12.5px] leading-relaxed text-ink-soft">
-                  {commit.body}
-                </p>
-              )}
-            </div>
-          )}
-        </div>
-
-        {/* Zero-height anchor on the summary/files boundary; the splitter straddles it. */}
-        {!summaryCollapsed && !filesCollapsed && (
-          <div className="relative h-0 shrink-0">
-            <ResizeHandle
-              orientation="horizontal"
-              invert
-              label="Resize commit summary height"
-              className="left-0 top-0"
-              min={88}
-              max={Math.max(300, (sidebarRef.current?.clientHeight ?? 560) - 220)}
-              measure={() => summaryRef.current?.getBoundingClientRect().height ?? 0}
-              onResize={setSummaryHeight}
-              onReset={() => setSummaryHeight(null)}
-            />
-          </div>
-        )}
-
-        <FileList
-          files={files}
-          loading={filesLoading}
-          selectedPath={selectedFile?.path ?? null}
-          onSelect={onSelectFile}
-          collapsed={filesCollapsed}
-          onToggleCollapse={() => setFilesCollapsed((collapsed) => !collapsed)}
-          view={fileView}
-          onViewChange={setFileView}
-        />
-      </div>
-
-      <DiffViewer
-        files={files}
-        file={selectedFile}
-        scope={diffScope}
-        onScopeChange={onDiffScopeChange}
-        layout={diffLayout}
-        onLayoutChange={onDiffLayoutChange}
-        wrap={diffWrap}
-        onWrapChange={onDiffWrapChange}
-        scheme={syntaxScheme}
-        repoPath={repoPath}
-        commitHash={commit.hash}
-      />
+          <div className="flex min-h-0 min-w-0 flex-1 flex-col">{diffViewer}</div>
+        </>
+      )}
 
       <ResizeHandle
         orientation="horizontal"
-        label="Resize commit details height"
+        label={showSidebar ? "Resize commit details height" : "Resize uncommitted diff height"}
         className="top-0"
         min={MIN_DETAILS_HEIGHT}
         max={MAX_DETAILS_HEIGHT}
@@ -247,16 +282,18 @@ export function DetailsPanel({
         onReset={() => onHeightChange(DEFAULT_DETAILS_HEIGHT)}
       />
 
-      <ResizeHandle
-        label="Resize commit details column"
-        className="left-(--sidebar-width)"
-        min={MIN_SIDEBAR_WIDTH}
-        max={MAX_SIDEBAR_WIDTH}
-        value={sidebarWidth}
-        measure={() => sidebarRef.current?.getBoundingClientRect().width ?? sidebarWidth}
-        onResize={setSidebarWidth}
-        onReset={() => setSidebarWidth(DEFAULT_SIDEBAR_WIDTH)}
-      />
+      {showSidebar && (
+        <ResizeHandle
+          label="Resize commit details column"
+          className="left-(--sidebar-width)"
+          min={MIN_SIDEBAR_WIDTH}
+          max={MAX_SIDEBAR_WIDTH}
+          value={sidebarWidth}
+          measure={() => sidebarRef.current?.getBoundingClientRect().width ?? sidebarWidth}
+          onResize={setSidebarWidth}
+          onReset={() => setSidebarWidth(DEFAULT_SIDEBAR_WIDTH)}
+        />
+      )}
     </section>
   );
 }

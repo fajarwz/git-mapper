@@ -16,14 +16,22 @@ interface ResizeHandleProps {
   orientation?: Orientation;
   /** "splitter" spans a panel edge, "column" sits in a table header cell. */
   variant?: "splitter" | "column";
+  /**
+   * Vertical splitters that ride a rounded panel's own edge set this: the visible rule stops
+   * `after:inset-y-4`, clear of the corner curves, while the grab area keeps its full height.
+   */
+  edgeRule?: boolean;
   /** Horizontal draggables only: true = pointer down grows the pane above (bottom-edge grab). */
   invert?: boolean;
   className?: string;
 }
 
-const VERTICAL_SPLITTER = [
+const VERTICAL_SPLITTER = (ruleInset: boolean): string => [
   "w-[11px] -translate-x-1/2",
-  "after:absolute after:inset-y-0 after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-rule after:transition-all",
+  // A splitter that rides a panel's own edge (the rail is the only one) stops the visible rule
+  // short of the corner curves — an inset equal to the 16px radius, so the line never floats
+  // past the glass onto the canvas. The hit area stays full-height.
+  `after:absolute ${ruleInset ? "after:inset-y-4" : "after:inset-y-0"} after:left-1/2 after:w-px after:-translate-x-1/2 after:bg-rule after:transition-all`,
   "hover:after:w-0.5 hover:after:bg-primary focus-visible:after:w-0.5 focus-visible:after:bg-primary",
   "data-[dragging=true]:after:w-0.5 data-[dragging=true]:after:bg-primary",
   "before:pointer-events-none before:absolute before:left-1/2 before:top-1/2 before:h-[26px] before:w-[7px] before:-translate-x-1/2 before:-translate-y-1/2 before:rounded-full before:bg-primary before:opacity-0 before:transition-opacity",
@@ -56,6 +64,7 @@ export function ResizeHandle({
   onReset,
   orientation = "vertical",
   variant = "splitter",
+  edgeRule = false,
   invert = false,
   className = "",
 }: ResizeHandleProps) {
@@ -111,7 +120,11 @@ export function ResizeHandle({
   }
 
   const visuals =
-    variant === "column" ? COLUMN_VISUALS : isVertical ? VERTICAL_SPLITTER : HORIZONTAL_SPLITTER;
+    variant === "column"
+      ? COLUMN_VISUALS
+      : isVertical
+        ? VERTICAL_SPLITTER(edgeRule)
+        : HORIZONTAL_SPLITTER;
 
   return (
     <div

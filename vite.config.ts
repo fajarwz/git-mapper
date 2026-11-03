@@ -83,6 +83,156 @@ function untrackedEntry(
   };
 }
 
+// ---------------------------------------------------------------------------
+// Staging-rail plumbing: a TS port of git.rs's porcelain v2 reader. The record grammar is
+// `1 <XY> <sub> <mH> <mI> <mW> <hH> <hI> <path>` (renames: `2 … <score> <path>` + the source
+// as the next NUL token; untracked: `? <path>`, no XY at all), and numstat -z reports renames
+// as separate delete + add records — the destination path is the direct key.
+
+type StatusVisit = (x: string, y: string, path: string, orig: string | null) => void;
+
+function eachStatusV2(raw: string, visit: StatusVisit): void {
+  let cursor = 0;
+  while (cursor < raw.length) {
+    const relEnd = raw.indexOf("\0", cursor);
+    if (relEnd === -1) break;
+    const record = raw.slice(cursor, relEnd).trimEnd();
+    cursor = relEnd + 1;
+    if (record === "") continue; // rename records are `path\0orig\0`; the empty gap is a terminator
+    const kindEnd = record.indexOf(" ");
+    if (kindEnd === -1) continue;
+    const kind = record.slice(0, kindEnd);
+    const rest = record.slice(kindEnd + 1);
+    if (kind === "u") continue; // unmerged: outside the viewer's scope
+    if (kind === "?") {
+      visit("?", "?", rest, null);
+      continue;
+    }
+    if (kind !== "1" && kind !== "2" || rest.length < 2) continue;
+    const x = rest[0];
+    const y = rest[1];
+    const tail = rest.slice(2);
+    const headers = kind === "2" ? 8 : 7; // header separators, incl. the one after the XY pair
+    let seen = 0;
+    let pathAt = -1;
+    for (let offset = 0; offset < tail.length; offset += 1) {
+      if (tail.charAt(offset) === " ") {
+        seen += 1;
+        if (seen === headers) {
+          pathAt = offset + 1;
+          break;
+        }
+      }
+    }
+    if (pathAt === -1) continue;
+    const entryPath = tail.slice(pathAt).trimEnd();
+    let orig: string | null = null;
+    if (x === "R" || x === "C" || y === "R" || y === "C") {
+      const relOrig = raw.indexOf("\0", cursor);
+      if (relOrig === -1) break;
+      orig = raw.slice(cursor, relOrig);
+      cursor = relOrig + 1;
+    }
+    visit(x, y, entryPath, orig);
+  }
+}
+
+function statusKind(letter: string): string {
+  switch (letter) {
+    case "A": return "added";
+    case "D": return "deleted";
+    case "R":
+    case "C": return "renamed";
+    // M plus T (typechange); the panel has no typechange voice, modified tells the story.
+    default: return "modified";
+  }
+}
+
+function numstatMap(raw: string): Map<string, [number, number]> {
+  const map = new Map<string, [number, number]>();
+  for (const token of raw.split("\0")) {
+    if (token.trim() === "") continue;
+    const fields = token.split("\t");
+    if (fields.length < 3) continue;
+    const add = /^\d+$/.test(fields[0].trim()) ? Number(fields[0]) : 0;
+    const del = /^\d+$/.test(fields[1].trim()) ? Number(fields[1]) : 0;
+    map.set(fields[2], [add, del]);
+  }
+  return map;
+}
+
+/** Line count of an untracked file, mirroring git.rs's binary/size guard. */
+function untrackedCounts(dir: string, file: string): [number, number] {
+  try {
+    const bytes = fs.readFileSync(path.join(dir, file));
+    if (bytes.length > 2 * 1024 * 1024 || bytes.includes(0)) return [0, 0];
+    return [bytes.toString("utf8").split("\n").length - (bytes.toString("utf8").endsWith("\n") ? 1 : 0), 0];
+  } catch {
+    return [0, 0];
+  }
+}
+
+function runGitRaw(dir: string, args: string[]): string {
+  return execFileSync("git", args, { cwd: dir, encoding: "utf8" });
+}
+
+function statusRaw(dir: string): string {
+  try {
+    return runGitRaw(dir, ["status", "--porcelain=v2", "--untracked-files=all", "-z"]);
+  } catch {
+    return "";
+  }
+}
+
+function runWith(dir: string, args: string[]): string {
+  return runGitRaw(dir, args);
+}
+
+function readWorktreeFiles(dir: string): { entries: unknown[] } {
+  const [statusOut, stagedOut, worktreeOut] = [
+    statusRaw(dir),
+    runWith(dir, ["diff", "--numstat", "-z", "--cached"]),
+    runWith(dir, ["diff", "--numstat", "-z"]),
+  ];
+  const stagedMap = numstatMap(stagedOut);
+  const worktreeMap = numstatMap(worktreeOut);
+  const entries: Array<Record<string, unknown>> = [];
+  const push = (prefix: string, entryPath: string, oldPath: string | null, letter: string, untracked: boolean, counts: [number, number]) => {
+    entries.push({
+      key: `${prefix}:${entryPath}`,
+      path: entryPath,
+      old_path: oldPath,
+      status: statusKind(letter),
+      staged: prefix === "index",
+      untracked,
+      additions: counts[0],
+      deletions: counts[1],
+    });
+  };
+  eachStatusV2(statusOut, (x, y, entryPath, orig) => {
+    if (x !== "." && x !== "?") {
+      push("index", entryPath, orig, x, false, stagedMap.get(entryPath) ?? [0, 0]);
+    }
+    if (y === "?") {
+      push("worktree", entryPath, null, "A", true, untrackedCounts(dir, entryPath));
+    } else if (y !== ".") {
+      push("worktree", entryPath, orig, y, false, worktreeMap.get(entryPath) ?? [0, 0]);
+    }
+  });
+  entries.sort((a, b) => String(a.path).localeCompare(String(b.path)));
+  entries.sort((a, b) => Number(b.staged) - Number(a.staged));
+  return { entries };
+}
+
+function stagedRenames(dir: string): Array<[string, string]> {
+  const pairs: Array<[string, string]> = [];
+  const raw = statusRaw(dir);
+  eachStatusV2(raw, (x, _y, entryPath, orig) => {
+    if (x === "R" && orig) pairs.push([entryPath, orig]);
+  });
+  return pairs;
+}
+
 // Browser-tab fallback for the Git plumbing: same command names as
 // src-tauri/src/git.rs, run directly by the dev server. Dev-only.
 function gitDevApi(): Plugin {
@@ -204,6 +354,79 @@ function gitDevApi(): Plugin {
       run(String(dir), ["pull", "--ff-only", "--no-edit"]),
     push_branch: ({ dir }) =>
       run(String(dir), ["push", "-u", "origin", "HEAD"]),
+    read_worktree_files: ({ dir }) => readWorktreeFiles(String(dir)),
+    stage_files: ({ dir, paths }) => {
+      const list = (paths as string[]) ?? [];
+      if (list.length === 0) return null;
+      run(String(dir), ["add", "--", ...list]);
+      return null;
+    },
+    unstage_files: ({ dir, paths }) => {
+      const list = (paths as string[]) ?? [];
+      if (list.length === 0) return null;
+      run(String(dir), ["restore", "--staged", "--", ...list]);
+      // A staged rename is delete-source + add-destination in the index: restore both, and
+      // walk the file back to the source's name so the rename vanishes cleanly.
+      const renames = stagedRenames(dir).filter(([dest]) => list.includes(dest));
+      for (const [dest, source] of renames) {
+        run(String(dir), ["restore", "--staged", "--", source]);
+        try {
+          fs.renameSync(path.join(String(dir), dest), path.join(String(dir), source));
+        } catch {
+          // A partial move is still better than leaving a phantom deletion behind.
+        }
+      }
+      return null;
+    },
+    discard_files: ({ dir, paths }) => {
+      const dirPath = String(dir);
+      const wanted = new Set((paths as string[]) ?? []);
+      if (wanted.size === 0) return null;
+      // Classification mirrors git.rs: untracked → clean -f, index-changed → worktree from
+      // index, tracked → checkout -f HEAD, intent-to-add → delete from disk. Empty groups
+      // NEVER run: `checkout -f HEAD --` without paths resets the whole tree.
+      const cleanPaths: string[] = [];
+      const fromIndex: string[] = [];
+      const fromHead: string[] = [];
+      const fromDisk: string[] = [];
+      const headSet = new Set(
+        runWith(dirPath, ["ls-tree", "--name-only", "-z", "HEAD"]).split("\0").filter(Boolean),
+      );
+      eachStatusV2(statusRaw(dirPath), (x, y, entryPath) => {
+        if (!wanted.has(entryPath)) return;
+        if (y === "?") cleanPaths.push(entryPath);
+        else if (x !== ".") fromIndex.push(entryPath);
+        else if (headSet.has(entryPath)) fromHead.push(entryPath);
+        else fromDisk.push(entryPath);
+      });
+      if (cleanPaths.length > 0) run(dirPath, ["clean", "-qf", "--", ...cleanPaths]);
+      if (fromIndex.length > 0) run(dirPath, ["checkout", "--", ...fromIndex]);
+      if (fromHead.length > 0) run(dirPath, ["checkout", "-f", "HEAD", "--", ...fromHead]);
+      for (const p of fromDisk) fsSync.rmSync(path.join(dirPath, p), { force: true });
+      return null;
+    },
+    discard_all: ({ dir }) => {
+      const dirPath = String(dir);
+      try {
+        run(dirPath, ["rev-parse", "--verify", "HEAD"]);
+        run(dirPath, ["reset", "--hard", "-q"]);
+      } catch {
+        // Unborn branch: only the clean applies.
+      }
+      run(dirPath, ["clean", "-qfd"]);
+      return null;
+    },
+    commit_staged: ({ dir, message }) => {
+      const dirPath = String(dir);
+      const msg = String(message ?? "").trim();
+      if (msg === "") throw new Error("the commit message is empty");
+      const staged = runWith(dirPath, ["diff", "--cached", "--name-only", "-z"]);
+      if (!staged.includes("\0") && staged.trim() === "") {
+        throw new Error("nothing is staged to commit");
+      }
+      run(dirPath, ["commit", "-q", "-m", msg]);
+      return null;
+    },
     read_commit_files: ({ dir, hash }) => {
       const h = String(hash);
       if (h === "wip") {

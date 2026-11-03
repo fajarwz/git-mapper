@@ -173,6 +173,20 @@ test("the uncommitted row offers no commit checkout", () => {
   assert.equal(queryByRole("menuitem", { name: /check out commit/i }), null);
 });
 
+test("the uncommitted row offers no commit-hash copy — the pseudo hash is not a commit", () => {
+  const { queryByRole } = render(
+    <ContextMenu
+      target={target({ commit: commit({ hash: "wip", subject: "Uncommitted changes" }) })}
+      onCheckout={vi.fn()}
+      onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
+      head={HEAD}
+      onClose={vi.fn()}
+    />,
+  );
+  assert.equal(queryByRole("menuitem", { name: /copy commit hash/i }), null);
+});
+
 test("a stash row offers no commit checkout", () => {
   const { queryByRole } = render(
     <ContextMenu

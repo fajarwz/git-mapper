@@ -26,8 +26,7 @@ import {
 } from "./lib/updater";
 import { applyTheme, initialTheme, storeTheme } from "./lib/theme";
 import type { Theme } from "./lib/theme";
-import {
-  checkoutBranch,
+import { checkoutBranch,
   checkoutCommit,
   fetchRemote,
   loadCommitFiles,
@@ -44,7 +43,21 @@ import {
   SLEEP_AFTER_MS,
   SLEEP_TICK_MS,
   storePaths,
+  commitStaged,
+  discardEverything,
+  discardPaths,
+  loadWorktree,
+  stagePaths,
+  unstagePaths,
 } from "./data/gitLoader";
+import {
+  DEFAULT_STAGE_WIDTH,
+  MAX_STAGE_WIDTH,
+  MIN_STAGE_WIDTH,
+  StagePanel,
+} from "./components/StagePanel";
+import { ResizeHandle } from "./components/ResizeHandle";
+import type { WorktreeFile } from "./lib/staging";
 import type { Repository } from "./types";
 
 /**
@@ -119,6 +132,20 @@ function App() {
   const [updateMode, setUpdateMode] = usePersistedState<UpdateMode>(STORAGE_KEYS.updateMode, "auto");
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>(updateStatusSnapshot());
   const [appVersion, setAppVersion] = useState("");
+
+  // The staging rail, wired to real git: the rows are a read of the worktree reload on every
+  // digest move, and per-repo map persists which tab has the rail docked open. Unset + dirty
+  // means open by default — a launch into work starts at the work.
+  const [worktreeFiles, setWorktreeFiles] = useState<WorktreeFile[]>([]);
+  const [stageDrawerByRepo, setStageDrawerByRepo] = usePersistedState<Record<string, boolean>>(
+    STORAGE_KEYS.stageDrawer,
+    {},
+  );
+  // True while one of the rail's git writes is in flight; the panel's buttons all wait.
+  const [stagingBusy, setStagingBusy] = useState(false);
+  // Rail width: a pinned px value survives restarts (like the details height); null stays on
+  // the tuned default. The drag pinning an ABSOLUTE width matters here too — never an offset.
+  const [stageWidth, setStageWidth] = usePersistedState<number | null>(STORAGE_KEYS.stageWidth, null);
 
   // Rows a refresh just added or re-pilled, highlighted for a moment then forgotten.
   const [flashHashes, setFlashHashes] = useState<string[]>([]);
@@ -230,6 +257,21 @@ function App() {
     [repos, activeRepoId],
   );
   const activeRepoPath = repo?.path ?? null;
+
+  // The staging rail's dock state: per-repo persisted, falling back to open while the
+  // worktree has changes (a repo opened dirty starts with its rail up).
+  const stageOpen = repo ? (stageDrawerByRepo[repo.id] ?? worktreeFiles.length > 0) : false;
+  const setStageOpen = useCallback(
+    (open: boolean) => {
+      if (!activeRepoId) return;
+      setStageDrawerByRepo((previous) => ({ ...previous, [activeRepoId]: open }));
+    },
+    [activeRepoId, setStageDrawerByRepo],
+  );
+
+  // Docking is owned by the handlers (a commit or a discard-all close the burst) and the
+  // user's exits (×, Esc, swipe) — no auto-dock on "empty": the worktree read is async, and a
+  // record written while the rows are still loading would wedge the rail shut on dirty repos.
 
   const selectedCommit = repo
     ? (repo.commits.find(
@@ -377,7 +419,25 @@ function App() {
     setSelectedFileByRepo((previous) => ({ ...previous, [activeRepoId]: null }));
     // Picking a commit is a request to read it, so bring the details panel back if it was closed.
     setDetailsOpen(true);
-  }, [activeRepoId, setDetailsOpen, setSelectedCommitByRepo, setSelectedFileByRepo]);
+    // The uncommitted row is the rail's second door: it summons the staging state together
+    // with its diff; a real commit dock it away — the rail is burst work, not a fixture.
+    setStageOpen(hash === UNCOMMITTED_HASH);
+    }, [activeRepoId, setDetailsOpen, setSelectedCommitByRepo, setSelectedFileByRepo, setStageOpen]);
+
+    // A rail-row click reads that file: the uncommitted row is selected (without flipping the
+    // rail's own dock state — the click came from inside it), the file is pinned in the diff
+    // pane at file scope (the row is the navigation; the stacked "all" header would repeat it),
+    // and the details panel rises.
+    const handleRailSelectFile = useCallback(
+      (file: WorktreeFile) => {
+        if (!activeRepoId) return;
+        setSelectedCommitByRepo((previous) => ({ ...previous, [activeRepoId]: UNCOMMITTED_HASH }));
+        setSelectedFileByRepo((previous) => ({ ...previous, [activeRepoId]: file.path }));
+        setDiffScope("file");
+        setDetailsOpen(true);
+      },
+      [activeRepoId, setSelectedCommitByRepo, setSelectedFileByRepo, setDiffScope, setDetailsOpen],
+    );
 
   const handleSelectFile = useCallback((path: string) => {
     if (!activeRepoId) return;
@@ -776,6 +836,103 @@ function App() {
       : "minmax(0, 1fr)",
   } as CSSProperties;
 
+  // A commit conflates TWO digest moves (HEAD through the ref digest, the index through the
+  // worktree digest); everything else the rail does — stage, unstage, discard — moves only
+  // the worktree digest. Any rail action force-refreshes, and the surgical refresh handles
+  // whatever its digests notice: history splices in, uncommitted row rebuilds, rail rows
+  // reload through this effect (one read, shared with what the refresh already paid for).
+  const worktreeDigestRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (!repo || repo.sleeping) return;
+    if (repo.worktree === worktreeDigestRef.current) return;
+    worktreeDigestRef.current = repo.worktree;
+    let cancelled = false;
+    loadWorktree(repo.path)
+      .then((rows) => {
+        if (!cancelled) setWorktreeFiles(rows);
+      })
+      .catch((error) => {
+        console.error("Could not read the worktree for the staging rail", error);
+        if (!cancelled) setWorktreeFiles([]);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [repo]);
+
+  // One dispatcher for the rail's git writes: the action runs, the repo force-refreshes, and
+  // a failure speaks (the rows stay exactly as they were — git refused, nothing half-ran).
+  const runStaging = useCallback(
+    async (working: (dir: string) => Promise<void>) => {
+      if (!repo || !activeRepoPath || stagingBusy) return;
+      setStagingBusy(true);
+      try {
+        await working(activeRepoPath);
+        const refreshed = await refreshRepository(repo, true);
+        if (refreshed) {
+          setRepos((previous) =>
+            previous.map((item) => (item.id === refreshed.repo.id ? refreshed.repo : item)),
+          );
+          showFlash(refreshed.touched);
+        }
+      } catch (stagingError) {
+        setNotice({
+          title: "Staging action failed",
+          detail:
+            stagingError instanceof Error ? stagingError.message : String(stagingError),
+          id: Date.now(),
+        });
+      } finally {
+        setStagingBusy(false);
+      }
+    },
+    [repo, activeRepoPath, stagingBusy, showFlash],
+  );
+
+  const handleStage = useCallback(
+    (paths: string[]) => void runStaging((dir) => stagePaths(dir, paths)),
+    [runStaging],
+  );
+  const handleUnstage = useCallback(
+    (paths: string[]) => void runStaging((dir) => unstagePaths(dir, paths)),
+    [runStaging],
+  );
+  const handleDiscard = useCallback(
+    (paths: string[]) => void runStaging((dir) => discardPaths(dir, paths)),
+    [runStaging],
+  );
+  const handleDiscardAll = useCallback(
+    () => void runStaging((dir) => discardEverything(dir)),
+    [runStaging],
+  );
+
+  // A commit succeeds → the rail docks: the burst it serves is over (and the new commit row,
+  // spliced by the same refresh, flashes, so the work's landing place is visible).
+  const handleStageCommit = useCallback(
+    (message: string) => {
+      setStageOpen(false);
+      void runStaging(async (dir) => {
+        await commitStaged(dir, message);
+      });
+    },
+    [setStageOpen, runStaging],
+  );
+
+  // The badge in the title bar is the rail's always-visible door.
+  const handleToggleStage = useCallback(() => {
+    setStageOpen(!stageOpen);
+  }, [setStageOpen, stageOpen]);
+
+  // Swipe-to-dock: dragging the rail under the collapse threshold docks it just like the ×;
+  // anything above stays as a pinned px width between MIN and MAX.
+  const handleStageResize = useCallback(
+    (width: number) => {
+      if (width < MIN_STAGE_WIDTH) setStageOpen(false);
+      else setStageWidth(width);
+    },
+    [setStageOpen, setStageWidth],
+  );
+
   const noRepo = repo === null;
 
   return (
@@ -801,6 +958,9 @@ function App() {
         onPush={handlePush}
         syncing={syncing}
         syncError={syncError}
+        stageCount={worktreeFiles.length}
+        stageOpen={stageOpen}
+        onToggleStage={handleToggleStage}
       />
 
       <div className="flex min-h-0 flex-1 flex-col px-2.5 pb-2.5 pt-1">
@@ -811,8 +971,46 @@ function App() {
             <EmptyState onOpen={handleAdd} loading={opening} repos={repos} />
           )
         ) : (
-          <div className="relative grid min-h-0 flex-1 gap-2.5" style={workspaceStyle}>
-            <CommitList
+          <div className="flex min-h-0 flex-1 gap-2.5">
+            {stageOpen && (
+              // The relatively positioned wrapper is what the splitter straddles: it sits on
+              // the flex row (never clipped by the panel's overflow-hidden) and carries the
+              // pinned width; double-click or Home resets it to the tuned default.
+              <div
+                className="relative shrink-0"
+                style={{ width: stageWidth ?? DEFAULT_STAGE_WIDTH }}
+                data-stage-rail
+              >
+                <StagePanel
+                  branch={repo.branch}
+                  files={worktreeFiles}
+                  busy={stagingBusy}
+                  onStage={handleStage}
+                  onUnstage={handleUnstage}
+                  onDiscard={handleDiscard}
+                  onDiscardAll={handleDiscardAll}
+                  onCommit={handleStageCommit}
+                  onSelectRow={handleRailSelectFile}
+                  onClose={() => setStageOpen(false)}
+                />
+                <ResizeHandle
+                  label="Resize staging rail width"
+                  edgeRule
+                  // left-full: the handle box starts at the wrapper's right edge, and the
+                  // splitter's own -translate-x-1/2 then centers its rule on the boundary —
+                  // right-0 parked it half the handle inside the glass.
+                  className="left-full"
+                  min={MIN_STAGE_WIDTH - 60}
+                  max={MAX_STAGE_WIDTH}
+                  value={stageWidth ?? DEFAULT_STAGE_WIDTH}
+                  measure={() => stageWidth ?? DEFAULT_STAGE_WIDTH}
+                  onResize={handleStageResize}
+                  onReset={() => setStageWidth(null)}
+                />
+              </div>
+            )}
+            <div className="relative grid min-h-0 flex-1 gap-2.5" style={workspaceStyle}>
+              <CommitList
               repo={repo}
               commits={visibleCommits}
               query={query}
@@ -824,7 +1022,12 @@ function App() {
               showAvatars={showAvatars}
               onNearBottom={handleNearBottom}
               onCheckoutBranch={handleCheckoutBranch}
-              onContextMenu={(commit, ref, x, y) => setContextMenu({ commit, ref, x, y })}
+              onContextMenu={(commit, ref, x, y) => {
+                // The uncommitted row owns no menu (empty pseudo hash, no refs): a right-click
+                // there would only ever draw an empty box, so it draws nothing.
+                if (commit.hash === UNCOMMITTED_HASH) return;
+                setContextMenu({ commit, ref, x, y });
+              }}
             />
             {detailsOpen && selectedCommit !== null && (
               <DetailsPanel
@@ -842,10 +1045,12 @@ function App() {
                 onDiffWrapChange={setDiffWrap}
                 syntaxScheme={syntaxScheme}
                 showAvatars={showAvatars}
+                isWorktree={selectedCommit.hash === UNCOMMITTED_HASH}
                 onClose={() => setDetailsOpen(false)}
                 onHeightChange={setDetailsHeight}
               />
             )}
+            </div>
           </div>
         )}
       </div>

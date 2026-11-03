@@ -18,7 +18,9 @@ import RawCloseIcon from "../assets/close.svg?react";
 import RawSettingsIcon from "../assets/settings.svg?react";
 import RawCheckIcon from "../assets/check.svg?react";
 import RawSearchIcon from "../assets/search.svg?react";
-
+import RawChangesIcon from "../assets/changes.svg?react";
+import RawMinusIcon from "../assets/minus.svg?react";
+import RawUndoIcon from "../assets/undo.svg?react";
 interface IconProps {
   size?: number;
 }
@@ -85,6 +87,18 @@ export function CheckIcon({ size = 12, className = "" }: GlyphProps) {
 
 export function SearchIcon({ size = 13, className = "" }: GlyphProps) {
   return <SizedIcon glyph={RawSearchIcon} size={size} className={className} />;
+}
+
+export function ChangesIcon({ size = 13 }: IconProps) {
+  return <SizedIcon glyph={RawChangesIcon} size={size} />;
+}
+
+export function MinusIcon({ size = 12 }: IconProps) {
+  return <SizedIcon glyph={RawMinusIcon} size={size} />;
+}
+
+export function TrashIcon({ size = 12 }: IconProps) {
+  return <SizedIcon glyph={RawUndoIcon} size={size} />;
 }
 
 /* Fixed-size glyphs re-exported as-is; their dimensions live in the SVG files. */

@@ -28,6 +28,7 @@ import {
   RepoIcon,
   SearchIcon,
   SettingsIcon,
+  ChangesIcon,
   WindowCloseIcon,
   WindowMaximizeIcon,
   WindowMinimizeIcon,
@@ -109,6 +110,11 @@ interface TitleBarProps {
   syncing: boolean;
   /** The failed op and git's message, shown on the button that failed until the timeout. */
   syncError: { op: "pull" | "push"; message: string } | null;
+  /** Uncommitted-change count in the drawer (sample data for now); 0 = nothing to show. */
+  stageCount: number;
+  /** Whether the staging rail is open; the toggle carries a pressed state. */
+  stageOpen: boolean;
+  onToggleStage: () => void;
 }
 
 interface SortableTabProps {
@@ -205,6 +211,9 @@ export function TitleBar({
   onPush,
   syncing,
   syncError,
+  stageCount,
+  stageOpen,
+  onToggleStage,
 }: TitleBarProps) {
   const [maximized, setMaximized] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -405,6 +414,37 @@ export function TitleBar({
             <BranchIcon size={11} />
             <span className="truncate">{repo.branch}</span>
           </span>
+        )}
+        {repo && (
+          // The staging rail's summon: a badge-toggle, visible at rest whenever the repo has
+          // uncommitted changes. When the rail is open it carries a pressed (filled) state.
+          <button
+            type="button"
+            onClick={onToggleStage}
+            disabled={stageCount === 0 && !stageOpen}
+            aria-pressed={stageOpen}
+            aria-label={stageOpen ? "Hide uncommitted changes" : "Show uncommitted changes"}
+            title={
+              stageCount === 0
+                ? "No uncommitted changes"
+                : stageOpen
+                  ? `Hide uncommitted changes (${stageCount})`
+                  : `Show uncommitted changes (${stageCount})`
+            }
+            className={`${GLASS_CONTROL} relative grid cursor-default place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-7 disabled:opacity-50 ${
+              stageOpen ? "border-primary-ink/40 bg-glass-strong text-ink soft-shadow" : ""
+            }`}
+          >
+            <ChangesIcon size={13} />
+            {stageCount > 0 && (
+              <span
+                aria-hidden="true"
+                className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-primary font-mono text-[9px] font-bold leading-none text-white soft-shadow"
+              >
+                {stageCount > 9 ? "9+" : stageCount}
+              </span>
+            )}
+          </button>
         )}
         {repo && (
           <button
