@@ -49,8 +49,12 @@ export function CommitGraph({ commits, layout, selectedHash }: CommitGraphProps)
         const y = rowY(index);
         const selected = commit.hash === selectedHash;
         const checkedOut = commit.refs.some((ref) => ref.isCurrent);
-        // The dot takes its branch colour; uncommitted changes render in gray.
-        const color = commit.hash === "wip" ? UNCOMMITTED_COLOR : branchColor(layout.branchColors[index] ?? 0);
+        // The dot takes its branch colour; uncommitted changes and stash entries (system-made
+        // rows, not branch history) render in gray, like Git Graph's stash/reflog commits.
+        const color =
+          commit.hash === "wip" || commit.stashIndex !== undefined
+            ? UNCOMMITTED_COLOR
+            : branchColor(layout.branchColors[index] ?? 0);
 
         return (
           <g key={commit.hash}>
