@@ -50,7 +50,7 @@
   --color-sheet-band: #f2f0f8;
   --color-hover-glass: rgb(110 86 207 / 0.07);
   --color-selected-glass: rgb(110 86 207 / 0.16);
-  --color-scrim: rgb(16 12 28 / 0.2);
+  --color-scrim: rgb(255 255 255 / 0.55);
 
   /* Graph lanes: 6 distinct muted hues that stay separate against glass. */
   --color-lane-1: #6e56cf;
@@ -344,8 +344,24 @@
   [data-syntax="app"] .hljs-name,
   [data-syntax="app"] .hljs-type,
   [data-syntax="app"] .hljs-symbol {
+    color: var(--color-primary);
+    font-weight: 600;
+  }
+  /* Secondary keeps its token job in chrome; in the diff it read as near-black on the most
+     visible tokens (function names), and GitHub's own scheme ships saturated titles. */
+  [data-syntax="app"] .hljs-attr,
+  [data-syntax="app"] .hljs-section {
     color: var(--color-secondary);
     font-weight: 600;
+  }
+  [data-syntax="app"] .hljs-selector-tag,
+  [data-syntax="app"] .hljs-selector-id,
+  [data-syntax="app"] .hljs-selector-class,
+  [data-syntax="app"] .hljs-selector-attr,
+  [data-syntax="app"] .hljs-selector-pseudo,
+  [data-syntax="app"] .hljs-meta,
+  [data-syntax="app"] .hljs-doctag {
+    color: var(--color-primary-ink);
   }
   [data-syntax="app"] .hljs-tag {
     color: var(--color-danger-ink);

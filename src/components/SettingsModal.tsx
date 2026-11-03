@@ -167,7 +167,7 @@ export function SettingsModal({
 
   return (
     <div
-      className="fixed inset-0 z-40 grid place-items-center bg-scrim p-6 backdrop-blur-sm"
+      className="fixed inset-0 z-40 grid place-items-center bg-scrim p-6 backdrop-blur-md"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}

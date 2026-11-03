@@ -25,7 +25,7 @@ colors:
   sheet-strong: "rgb(255 255 255 / 0.85)"
   hover-glass: "rgb(110 86 207 / 0.07)"
   selected-glass: "rgb(110 86 207 / 0.16)"
-  scrim: "rgb(16 12 28 / 0.2)"
+  scrim: "rgb(255 255 255 / 0.55)"
   glow-1: "rgb(71 127 184 / 0.6)"
   glow-2: "rgb(207 106 146 / 0.5)"
   glow-3: "rgb(47 161 134 / 0.45)"
@@ -131,11 +131,10 @@ A muted violet world with dusty steel/rose/teal/amber satellites — saturated e
 
 ### Primary
 - **Dusty Iris** (`#6e56cf`): the one voice of the system. Filled invariants only: the checked-out branch pill, the primary button, selection tints (`hover-glass` / `selected-glass` at 7–12% alpha), focus rings, the BrandMark tile.
-- **Iris Deep** (`#563d9a`, dark: `#b4a2f5`): the *ink* companion — keywords in syntax highlighting and readable text drawn from the primary on small surfaces.
+- **Iris Deep** (`#563d9a`, dark: `#b4a2f5`): the *ink* companion — keywords in syntax highlighting (function names themselves carry full primary) and readable text drawn from the primary on small surfaces.
 
 ### Secondary
-- **Slate Plum** (`#57536e`, dark: `#b1abc9`): names and types in code, structural secondary text.
-
+- **Slate Plum** (`#57536e`, dark: `#b1abc9`): structural secondary text in chrome; in code it colours attribute names and markdown sections (it read as near-black on the diff's most visible tokens — function names — so they moved to primary).
 ### Tertiary
 - **Success Green** (`#30a46c` / ink `#218358`): ahead counters, pushed-north arrows, strings in code.
 - **Warning Amber** (`#e0a24b` / ink `#8a5a11`): sprite-dot tint on the settings gear, behind counters, and the only colour allowed to flash a row (`row-flash`).
@@ -149,7 +148,7 @@ A muted violet world with dusty steel/rose/teal/amber satellites — saturated e
 - **Ink Dim** (`#544f68`, dark `#99a1b4`) — tertiary/metadata text, gutters, muted icons. The faintest text still fronting the glow canvas.
 - **Rule** (`rgb(23 21 31 / 0.08)`, dark `rgb(255 255 255 / 0.1)`) — internal 1px separators.
 - **Glass stack** — `glass .76 / glass-strong .88 / glass-soft .55 / sheet .5 / sheet-strong .85 / hairline .14 ink` (light; the hairline is neutral ink since the white canvas swap — white-on-white edges were invisible, so edges lean on ink): the panel/control hierarchy itself. In dark these become smoked `rgb(18 24 37 / …)` equivalents, hairline back to `rgb(255 255 255 / 0.15)`.
-- **Scrim** (`rgb(16 12 28 / .2)` since the white canvas — dark stays focused but light no longer turns muddy; dark `.55`): behind modals.
+- **Scrim** (`rgb(255 255 255 / 0.55)` — a light frost, not a dark wash: the backdrop is a second frosted pane over the glow field, so modals dim by blurring out, never by muddying the canvas; the ink hairline + `panel-shadow` keep the fire visible on the white-on-white. Dark stays `rgb(0 0 0 / .55)`): behind modals, plus a `backdrop-blur-md` frost.
 - **Glow field tokens** (`--color-glow-1..4`, dark re-points each to white at halved strength): the four corner glows behind the glass — steel blue top-right, rose bottom centre-left, teal top centre, Dusty Iris left mid. They live in `body::before` only; retuning the mood touches four lines per theme, never the positioned gradients. `hover-glass` stays at 7% on purpose: its white composite still reads (Δ≈19 on the red channel) as a whisper, which is what hover must be to keep `selected-glass` at 16% the clearly stronger state.
 
 ### Named Rules

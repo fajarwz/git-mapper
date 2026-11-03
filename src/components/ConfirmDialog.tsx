@@ -1,4 +1,5 @@
 import { useEffect, useRef, type ReactNode } from "react";
+import { createPortal } from "react-dom";
 import { PANEL } from "../lib/ui";
 
 interface ConfirmDialogProps {
@@ -41,9 +42,12 @@ export function ConfirmDialog({ title, body, confirmLabel, danger = false, onCon
     return () => document.removeEventListener("keydown", handleKeyDown);
   }, [onClose]);
 
-  return (
+  // Portaled to <body>: `fixed` would otherwise be trapped by the nearest glass ancestor
+  // (backdrop-filter makes it the containing block), and the discard confirm rendered inside
+  // the staging rail scrolled its scrim down to the rail alone instead of the window.
+  return createPortal(
     <div
-      className="fixed inset-0 z-40 grid place-items-center bg-scrim p-6 backdrop-blur-sm"
+      className="fixed inset-0 z-40 grid place-items-center bg-scrim p-6 backdrop-blur-md"
       onMouseDown={(event) => {
         if (event.target === event.currentTarget) onClose();
       }}
@@ -85,6 +89,7 @@ export function ConfirmDialog({ title, body, confirmLabel, danger = false, onCon
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body,
   );
 }
