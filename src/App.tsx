@@ -469,19 +469,16 @@ function App() {
     setStageOpen(hash === UNCOMMITTED_HASH);
     }, [activeRepoId, setDetailsOpen, setSelectedCommitByRepo, setSelectedFileByRepo, setStageOpen]);
 
-    // A rail-row click reads that file: the uncommitted row is selected (without flipping the
-    // rail's own dock state — the click came from inside it), the file is pinned in the diff
-    // pane at file scope (the row is the navigation; the stacked "all" header would repeat it),
-    // and the details panel rises.
+    // A rail-row click reads that file: the uncommitted row is selected and the details panel
+    // rises. The diff scope stays — the reader's preference; the stacked view scrolls to it.
     const handleRailSelectFile = useCallback(
       (file: WorktreeFile) => {
         if (!activeRepoId) return;
         setSelectedCommitByRepo((previous) => ({ ...previous, [activeRepoId]: UNCOMMITTED_HASH }));
         setSelectedFileByRepo((previous) => ({ ...previous, [activeRepoId]: file.path }));
-        setDiffScope("file");
         setDetailsOpen(true);
       },
-      [activeRepoId, setSelectedCommitByRepo, setSelectedFileByRepo, setDiffScope, setDetailsOpen],
+      [activeRepoId, setSelectedCommitByRepo, setSelectedFileByRepo, setDetailsOpen],
     );
 
   const handleSelectFile = useCallback((path: string) => {
