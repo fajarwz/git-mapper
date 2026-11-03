@@ -17,6 +17,8 @@ import { PANEL } from "../lib/ui";
 import { Avatar } from "./Avatar";
 import { DiffViewer, type DiffLayout, type DiffScope } from "./DiffViewer";
 import { FileList, type FileView } from "./FileList";
+import { RefPill } from "./RefPill";
+import type { CommitRef } from "../types";
 import { ResizeHandle } from "./ResizeHandle";
 import { ChevronDownIcon, CloseIcon } from "./icons";
 
@@ -41,6 +43,10 @@ interface DetailsPanelProps {
   syntaxScheme: SyntaxScheme;
   /** The avatar toggle in settings: initials + gravatar photo beside the author here too. */
   showAvatars: boolean;
+  /** Double-clicking a branch pill here checks the branch out, same as in the commit list. */
+  onCheckoutBranch?: (branch: string) => void;
+  /** Right-clicking a pill opens the same ref menu as the commit list's pills. */
+  onRefContextMenu?: (ref: CommitRef, x: number, y: number) => void;
   /** True when the commit is the uncommitted row: the rail owns the file list, so this panel
    * drops its sidebar and the diff takes the pane — the rail click's full view. */
   isWorktree?: boolean;
@@ -63,6 +69,8 @@ export function DetailsPanel({
   onDiffWrapChange,
   syntaxScheme,
   showAvatars,
+  onCheckoutBranch,
+  onRefContextMenu,
   isWorktree = false,
   onClose,
   onHeightChange,
@@ -189,26 +197,48 @@ export function DetailsPanel({
               </div>
 
               {!summaryCollapsed && (
-                <div className="flex min-w-0 flex-col gap-1.5 px-3.5 pb-3 pt-2">
-                  <div className="flex min-w-0 flex-col gap-0.5 text-[12px] text-ink-dim">
+                <div className="flex min-w-0 flex-col gap-2.5 px-3.5 pb-3 pt-2.5">
+                  <div className="flex min-w-0 items-start gap-2">
+                    {showAvatars && <Avatar name={commit.author} email={commit.authorEmail} photos />}
+                    <div className="flex min-w-0 flex-1 flex-col gap-0">
+                      <span className="min-w-0 truncate text-[12.5px] font-semibold text-ink">
+                        {commit.author}
+                      </span>
+                      <span className="min-w-0 truncate text-[11px] text-ink-dim">
+                        {commit.authorEmail}
+                      </span>
+                    </div>
+                    <time
+                      dateTime={commit.date}
+                      title={formatAbsoluteDate(commit.date)}
+                      className="shrink-0 whitespace-nowrap text-[11px] tabular-nums text-ink-dim"
+                    >
+                      {formatAbsoluteDate(commit.date)}
+                    </time>
+                  </div>
+
+                  <div className="flex min-w-0 items-center gap-1.5 justify-between">
                     <button
                       type="button"
                       onClick={copyHash}
-                      title="Copy commit hash"
-                      className="-mx-1 flex w-fit cursor-default items-center rounded px-1 font-mono text-[10.5px] text-ink-soft hover:bg-hover-glass"
+                      title={hashCopied ? undefined : "Copy full commit hash"}
+                      className="w-fit cursor-default rounded font-mono text-[11px] text-ink-soft hover:bg-hover-glass"
                     >
-                      {hashCopied ? "Copied!" : commit.hash}
+                      {hashCopied ? "Copied!" : commit.hash.slice(0, 10)}
                     </button>
-                    <span className="flex w-fit items-center gap-1.5">
-                      {showAvatars && <Avatar name={commit.author} email={commit.authorEmail} photos />}
-                      <span className="text-[12.5px] font-semibold text-ink-soft">{commit.author}</span>
-                    </span>
-                    <span className="truncate">{commit.authorEmail}</span>
-                    <span>{formatAbsoluteDate(commit.date)}</span>
-                    {commit.parents.length > 0 && (
-                      <span className="wrap-break-word font-mono text-[10.5px]">
-                        {commit.parents.length > 1 ? "parents" : "parent"}: {commit.parents.join(", ")}
-                      </span>
+
+                    {commit.refs.length > 0 && (
+                      <div className="flex flex-wrap justify-end gap-1.5">
+                        {commit.refs.map((pillRef) => (
+                          <RefPill
+                            key={`${pillRef.type}:${pillRef.name}`}
+                            ref={pillRef}
+                            color={commit.branchColor}
+                            onCheckout={onCheckoutBranch}
+                            onContextMenu={onRefContextMenu}
+                          />
+                        ))}
+                      </div>
                     )}
                   </div>
 

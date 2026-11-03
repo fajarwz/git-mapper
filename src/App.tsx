@@ -1045,6 +1045,11 @@ function App() {
                 onDiffWrapChange={setDiffWrap}
                 syntaxScheme={syntaxScheme}
                 showAvatars={showAvatars}
+                onCheckoutBranch={handleCheckoutBranch}
+                onRefContextMenu={(ref, x, y) => {
+                  // The wip row never reaches here (no sidebar), so no empty-menu guard needed.
+                  setContextMenu({ commit: selectedCommit, ref, x, y });
+                }}
                 isWorktree={selectedCommit.hash === UNCOMMITTED_HASH}
                 onClose={() => setDetailsOpen(false)}
                 onHeightChange={setDetailsHeight}
