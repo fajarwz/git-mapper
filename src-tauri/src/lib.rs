@@ -14,6 +14,12 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             git::open_repository,
             git::read_status,
+            git::read_worktree_files,
+            git::stage_files,
+            git::unstage_files,
+            git::discard_files,
+            git::discard_all,
+            git::commit_staged,
             git::pull_branch,
             git::push_branch,
             git::read_log,
