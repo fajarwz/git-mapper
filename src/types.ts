@@ -48,6 +48,11 @@ export interface Commit {
   parents: string[];
   refs: CommitRef[];
   /**
+   * The uncommitted row's dirty-path count: its rows speak through an amber pill, not a
+   * hash, so the count rides along with the row that shows it.
+   */
+  changedCount?: number;
+  /**
    * Set on the row built for a stash entry: `stash@{stashIndex}`. Synthetic rows like this (and
    * the uncommitted one) are not part of the log, so refresh/load-more keep them apart.
    */

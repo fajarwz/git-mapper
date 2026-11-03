@@ -228,7 +228,7 @@ function uncommittedCommit(commits: Commit[], changed: number): Commit {
   const head = commits[0];
   return {
     hash: UNCOMMITTED_HASH,
-    subject: changed > 0 ? `Uncommitted changes (${changed})` : "Uncommitted changes",
+    subject: "Uncommitted changes",
     author: "",
     authorEmail: "",
     date: new Date().toISOString(),
@@ -236,6 +236,7 @@ function uncommittedCommit(commits: Commit[], changed: number): Commit {
     branchColor: 0,
     parents: [head.hash],
     refs: [],
+    changedCount: changed,
   };
 }
 

@@ -150,7 +150,9 @@ test("loading a repository files stashes by date under the wip row and pairs the
 
   assert.deepEqual(hashesOf(repo).slice(0, 4), ["wip", "H1", "H2", "sss000"],
     "wip row on top, then history; the stash files by its date, not pinned above");
-  assert.equal(repo.commits[0].subject, "Uncommitted changes (2)");
+  assert.equal(repo.commits[0].subject, "Uncommitted changes");
+  assert.equal(repo.commits[0].changedCount, 2,
+    "the count rides the row, not the subject text");
   assert.deepEqual(repo.commits[0].parents, ["H1"]);
   assert.deepEqual(repo.commits[3].refs.map((r) => r.name), ["stash@{0}"]);
   assert.deepEqual(repo.commits[3].parents, ["H1"], "stash rows hang off their base commit only");
