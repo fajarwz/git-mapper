@@ -86,8 +86,14 @@ export const CommitRow = memo(function CommitRow({
       </span>
 
       <span className={`flex min-w-0 items-center gap-1.5 text-[12px] text-ink-dim ${weight}`}>
-        {showAvatar && <Avatar name={commit.author} email={commit.authorEmail} photos />}
-        <span className="truncate">{commit.author}</span>
+        {isWorktreeRow ? (
+          <span>—</span>
+        ) : (
+          <>
+            {showAvatar && <Avatar name={commit.author} email={commit.authorEmail} photos />}
+            <span className="truncate">{commit.author}</span>
+          </>
+        )}
       </span>
 
       <time
