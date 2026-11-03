@@ -836,7 +836,6 @@ function App() {
       if (!target) return;
       const label = `stash@{${index}}`;
       const runStash = async () => {
-        setPendingConfirm(null);
         try {
           await stashAction(target.path, index, action);
           // The stash digest notices a drop, the worktree digest notices an apply, and a
@@ -1209,7 +1208,12 @@ function App() {
           body={pendingConfirm.body}
           confirmLabel={pendingConfirm.confirmLabel}
           danger={pendingConfirm.danger}
-          onConfirm={() => void pendingConfirm.run()}
+          // Confirming is one gesture: the dialog always closes, and the run's failures
+          // surface as the toast — never as a dialog that outstays its welcome.
+          onConfirm={() => {
+            setPendingConfirm(null);
+            void pendingConfirm.run();
+          }}
           onClose={() => setPendingConfirm(null)}
         />
       )}
