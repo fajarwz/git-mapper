@@ -84,6 +84,13 @@ class FakeGit {
         return Promise.resolve("");
       case "read_commit_files":
         return Promise.resolve(this.files);
+      case "read_file_patch":
+        return Promise.resolve(
+          "diff --git" +
+            (this.files.diff.split("diff --git").find((part) =>
+              part.includes(`+++ b/${String(args.path)}`),
+            ) ?? ""),
+        );
       default:
         throw new Error(`FakeGit does not implement ${op}`);
     }

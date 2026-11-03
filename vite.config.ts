@@ -427,7 +427,22 @@ function gitDevApi(): Plugin {
       run(dirPath, ["commit", "-q", "-m", msg]);
       return null;
     },
-    read_commit_files: ({ dir, hash }) => {
+    // The rail's commit in reverse: the tip's tree returns to the index (staged). Same guards
+    // as git.rs's undo_commit_in — root and merge tips are refused, not half-explained.
+    undo_commit: ({ dir }) => {
+      const dirPath = String(dir);
+      const parentCount = run(dirPath, ["rev-list", "--parents", "-1", "HEAD"]).trim().split(/\s+/).length - 1;
+      if (parentCount <= 0) {
+        throw new Error("the tip is the repository's root commit — there is nothing to undo onto");
+      }
+      if (parentCount > 1) {
+        throw new Error("the tip is a merge commit — its undo is not a soft reset");
+      }
+      run(dirPath, ["reset", "--soft", "HEAD~1"]);
+      return null;
+    },
+    read_commit_files: ({ dir, hash, withPatch }) => {
+      const with_patch = withPatch !== false;
       const h = String(hash);
       if (h === "wip") {
         const safe = (args: string[]) => {
@@ -439,14 +454,14 @@ function gitDevApi(): Plugin {
         };
         let numstat = safe(["diff", "--numstat", "--no-color", "HEAD"]);
         let name_status = safe(["diff", "--name-status", "--no-color", "HEAD"]);
-        let diff = safe(["diff", "--no-color", "HEAD"]);
+        let diff = with_patch ? safe(["diff", "--no-color", "HEAD"]) : "";
         // Untracked files are invisible to `git diff`; add them the way git prints a new file.
         for (const file of safe(["ls-files", "--others", "--exclude-standard", "-z"]).split("\0")) {
           if (!file) continue;
           const entry = untrackedEntry(String(dir), file);
           numstat += entry.numstat;
           name_status += entry.nameStatus;
-          diff += entry.patch;
+          if (with_patch) diff += entry.patch;
         }
         return { numstat, name_status, diff };
       }
@@ -465,7 +480,7 @@ function gitDevApi(): Plugin {
       const payload = {
         numstat: runVariant("--numstat"),
         name_status: runVariant("--name-status"),
-        diff: runVariant(""),
+        diff: with_patch ? runVariant("") : "",
       };
       // `git stash -u` parks untracked files in a third parent: a parentless commit holding
       // only those files, so `git show` prints them as additions. Mirrors the `^3` branch in
@@ -486,9 +501,38 @@ function gitDevApi(): Plugin {
         };
         payload.numstat += extra("--numstat");
         payload.name_status += extra("--name-status");
-        payload.diff += extra("");
+        if (with_patch) payload.diff += extra("");
       }
       return payload;
+    },
+    // One file's patch — the lazy tail of read_commit_files (mirrors git.rs).
+    read_file_patch: ({ dir, hash, path: filePath }) => {
+      const repoDir = String(dir);
+      const h = String(hash);
+      const p = String(filePath);
+      if (h === "wip") {
+        let tracked = "";
+        try {
+          tracked = run(repoDir, ["diff", "--no-color", "HEAD", "--", p]);
+        } catch {
+          tracked = "";
+        }
+        return tracked !== "" ? tracked : untrackedEntry(repoDir, p).patch;
+      }
+      let parents: string[];
+      try {
+        parents = run(repoDir, ["rev-list", "--parents", "-1", h]).trim().split(/\s+/).slice(1);
+      } catch {
+        throw new Error(`"${h}" is not a commit`);
+      }
+      let patch =
+        parents.length === 0
+          ? run(repoDir, ["show", "--root", "--format=", "--no-color", h, "--", p])
+          : run(repoDir, ["diff", "--no-color", parents[0]!, h, "--", p]);
+      if (patch === "" && parents.length >= 3) {
+        patch = run(repoDir, ["show", "--no-color", "--format=", parents[2]!, "--", p]);
+      }
+      return patch;
     },
     // Mirrors read_image_versions in src-tauri/src/git.rs: blob bytes → base64 data URLs.
     read_image_versions: ({ dir, hash, path: filePath }) => {

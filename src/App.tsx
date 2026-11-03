@@ -30,6 +30,7 @@ import { checkoutBranch,
   checkoutCommit,
   fetchRemote,
   loadCommitFiles,
+  loadFilePatch,
   loadMoreCommits,
   loadRepository,
   pickAndLoadRepository,
@@ -59,7 +60,7 @@ import {
 } from "./components/StagePanel";
 import { ResizeHandle } from "./components/ResizeHandle";
 import type { WorktreeFile } from "./lib/staging";
-import type { Repository } from "./types";
+import type { DiffLine, Repository } from "./types";
 
 /**
  * Key for the loaded-files cache. It has to include the repo: the uncommitted row uses the same
@@ -315,14 +316,14 @@ function App() {
     });
   }, []);
 
-  // Real diffs load per selected commit; files stay out of the commit list on purpose.
+  // Files load per selected commit — false = without the patch body (patches are lazy).
   useEffect(() => {
     if (!repo || !selectedCommit || !selectedFilesKey) return;
     if (filesByCommitHash[selectedFilesKey]) return;
     const cacheKey = selectedFilesKey;
     let cancelled = false;
     setFilesLoading(true);
-    loadCommitFiles(repo.path, selectedCommit.hash)
+    loadCommitFiles(repo.path, selectedCommit.hash, false)
       .then((loaded) => {
         if (!cancelled) storeFiles(cacheKey, loaded);
       })
@@ -339,6 +340,49 @@ function App() {
       cancelled = true;
     };
   }, [repo, selectedCommit, selectedFilesKey, filesByCommitHash, storeFiles]);
+
+  // In-flight reads are stamped per "<filesKey>:<path>"; a failed one stores [] so a vanished
+  // file cannot retry-loop.
+  const patchesFetching = useRef(new Set<string>());
+  const mergePatch = useCallback((cacheKey: string, path: string, patch: DiffLine[]) => {
+    const order = filesCacheOrder.current.filter((entry) => entry !== cacheKey);
+    order.push(cacheKey);
+    filesCacheOrder.current = order;
+    setFilesByCommitHash((previous) => {
+      const listed = previous[cacheKey];
+      if (!listed) return previous;
+      return {
+        ...previous,
+        [cacheKey]: listed.map((file) =>
+          file.path === path ? { ...file, diff: patch } : file,
+        ),
+      };
+    });
+  }, []);
+  const filesCacheRef = useRef(filesByCommitHash);
+  filesCacheRef.current = filesByCommitHash;
+  const handlePatchNeeded = useCallback(
+    (path: string) => {
+      const source = repo;
+      const commit = selectedCommit;
+      const cacheKey = selectedFilesKey;
+      if (!source || !commit || !cacheKey) return;
+      const stamp = `${cacheKey}:${path}`;
+      if (patchesFetching.current.has(stamp)) return;
+      const listed = filesCacheRef.current[cacheKey];
+      const entry = listed?.find((file) => file.path === path);
+      if (!entry || entry.diff !== null) return;
+      patchesFetching.current.add(stamp);
+      loadFilePatch(source.path, commit.hash, path)
+        .then((patch) => mergePatch(cacheKey, path, patch))
+        .catch((patchError) => {
+          console.error("Could not read the file patch", patchError);
+          mergePatch(cacheKey, path, []);
+        })
+        .finally(() => patchesFetching.current.delete(stamp));
+    },
+    [repo, selectedCommit, selectedFilesKey, mergePatch],
+  );
 
   const handleSelectRepo = useCallback(
     (id: string) => {
@@ -1077,6 +1121,7 @@ function App() {
                 filesLoading={filesLoading}
                 selectedFile={selectedFile}
                 onSelectFile={handleSelectFile}
+                onPatchNeeded={handlePatchNeeded}
                 diffScope={diffScope}
                 onDiffScopeChange={setDiffScope}
                 diffLayout={diffLayout}

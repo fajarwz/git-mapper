@@ -50,6 +50,8 @@ interface DetailsPanelProps {
   /** True when the commit is the uncommitted row: the rail owns the file list, so this panel
    * drops its sidebar and the diff takes the pane — the rail click's full view. */
   isWorktree?: boolean;
+  /** Asks App for one file's patch (patches are lazy; the file list arrives without them). */
+  onPatchNeeded?: (path: string) => void;
   onClose: () => void;
   onHeightChange: (height: number) => void;
 }
@@ -72,6 +74,7 @@ export function DetailsPanel({
   onCheckoutBranch,
   onRefContextMenu,
   isWorktree = false,
+  onPatchNeeded,
   onClose,
   onHeightChange,
 }: DetailsPanelProps) {
@@ -133,6 +136,7 @@ export function DetailsPanel({
       scheme={syntaxScheme}
       repoPath={repoPath}
       commitHash={commit.hash}
+      onPatchNeeded={onPatchNeeded}
     />
   );
 

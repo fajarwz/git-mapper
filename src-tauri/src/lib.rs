@@ -29,6 +29,7 @@ pub fn run() {
             git::read_refs,
             git::read_stashes,
             git::read_commit_files,
+            git::read_file_patch,
             git::read_image_versions,
             git::checkout_branch,
             git::checkout_commit,

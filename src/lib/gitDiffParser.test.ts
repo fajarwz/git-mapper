@@ -9,6 +9,20 @@ import { parseLog, parseRefs } from "./gitLogParser";
 
 const T = (type, text) => ({ type, text });
 
+test("withPatch false leaves every diff null — the list read, before the lazy patch", () => {
+  const files = parseCommitFiles(
+    {
+      numstat: "2\t0\tnew.txt\n1\t1\tsecond.txt\n",
+      name_status: "A\tnew.txt\nM\tsecond.txt\n",
+      diff: "",
+    },
+    false,
+  );
+  for (const file of files) {
+    assert.equal(file.diff, null, "the patch arrives per file through read_file_patch");
+  }
+});
+
 test("name-status letters become statuses, renames carry the live path", () => {
   const files = parseCommitFiles({
     numstat: "",

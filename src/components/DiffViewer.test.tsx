@@ -55,6 +55,39 @@ test("DiffViewer without a file asks for a selection", () => {
   assert.ok(within(container).getByText("Select a changed file to see its diff."));
 });
 
+test("a file whose patch has not landed shows the loading row and asks for it", () => {
+  const wanted: string[] = [];
+  const lazyFile: ChangedFile = { ...sampleFile, diff: null };
+  const { container } = render(
+    <DiffViewer
+      files={[lazyFile]}
+      file={lazyFile}
+      scope="file"
+      onScopeChange={() => {}}
+      scheme="app"
+      onPatchNeeded={(path) => wanted.push(path)}
+    />,
+  );
+  assert.ok(container.querySelector("[data-diff-loading='src/app.tsx']"), "the body does not render yet");
+  assert.deepEqual(wanted, ["src/app.tsx"], "the pane asks App for the patch");
+});
+
+test("a file whose patch landed renders its lines without asking again", () => {
+  const wanted: string[] = [];
+  const { container } = render(
+    <DiffViewer
+      files={[sampleFile]}
+      file={sampleFile}
+      scope="file"
+      onScopeChange={() => {}}
+      scheme="app"
+      onPatchNeeded={(path) => wanted.push(path)}
+    />,
+  );
+  assert.ok(within(container).getByText("came"));
+  assert.deepEqual(wanted, [], "no patch read for a file that already carries its diff");
+});
+
 test("DiffViewer renders bare text with the sign in its own cell", () => {
   const { container } = render(
     <DiffViewer

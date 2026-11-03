@@ -46,6 +46,7 @@ pub struct StatusInfo {
 pub struct FilePayload {
     pub numstat: String,
     pub name_status: String,
+    /// Empty when with_patch is false; per-file patches come from read_file_patch.
     pub diff: String,
 }
 
@@ -929,22 +930,29 @@ fn parallel_git<'a>(
 
 /// Files of one commit. "wip" means the uncommitted working tree vs HEAD.
 /// Otherwise: diff against the first parent; root commits use the --root forms.
+/// with_patch=false skips the patch reads (the heavy part); read_file_patch fetches one.
 #[tauri::command]
-pub async fn read_commit_files(dir: String, hash: String) -> Result<FilePayload, String> {
-    run_blocking("commit files read", move || read_commit_files_in(&dir, &hash)).await
+pub async fn read_commit_files(dir: String, hash: String, with_patch: bool) -> Result<FilePayload, String> {
+    run_blocking("commit files read", move || read_commit_files_in(&dir, &hash, with_patch)).await
 }
 
-fn read_commit_files_in(dir: &str, hash: &str) -> Result<FilePayload, String> {
+fn read_commit_files_in(dir: &str, hash: &str, with_patch: bool) -> Result<FilePayload, String> {
     if hash == "wip" {
-        // The three diff flavours are independent reads; a fourth one lists untracked
-        // paths, whose numstat / name-status / patch entries are appended right after.
-        // All four stat the worktree, so they run lock-free (see run_git_no_locks).
-        let out = parallel_git(vec![
+        // The diff flavours are independent reads; a fourth lists untracked paths, whose
+        // numstat / name-status entries are appended right after. Lock-free: run_git_no_locks.
+        let mut reads: Vec<Box<dyn FnOnce() -> Result<String, String> + Send + '_>> = vec![
             Box::new(|| run_git_no_locks(dir, &["diff", "--numstat", "--no-color", "HEAD"])),
             Box::new(|| run_git_no_locks(dir, &["diff", "--name-status", "--no-color", "HEAD"])),
-            Box::new(|| run_git_no_locks(dir, &["diff", "--no-color", "HEAD"])),
+            Box::new(|| {
+                if with_patch {
+                    run_git_no_locks(dir, &["diff", "--no-color", "HEAD"])
+                } else {
+                    Ok(String::new())
+                }
+            }),
             Box::new(|| run_git_no_locks(dir, &["ls-files", "--others", "--exclude-standard", "-z"])),
-        ]);
+        ];
+        let out = parallel_git(reads);
         let mut payload = FilePayload {
             numstat: out[0].clone().unwrap_or_default(),
             name_status: out[1].clone().unwrap_or_default(),
@@ -958,7 +966,9 @@ fn read_commit_files_in(dir: &str, hash: &str) -> Result<FilePayload, String> {
             let (num, status, patch) = untracked_entry(dir, path);
             payload.numstat.push_str(&num);
             payload.name_status.push_str(&status);
-            payload.diff.push_str(&patch);
+            if with_patch {
+                payload.diff.push_str(&patch);
+            }
         }
         return Ok(payload);
     }
@@ -1012,12 +1022,25 @@ fn read_commit_files_in(dir: &str, hash: &str) -> Result<FilePayload, String> {
     let mut reads: Vec<Box<dyn FnOnce() -> Result<String, String> + Send + '_>> = vec![
         Box::new(|| run_git(dir, &args(&numstat_args))),
         Box::new(|| run_git(dir, &args(&name_status_args))),
-        Box::new(|| run_git(dir, &args(&base))),
+        // The heavy read; without with_patch the slot stays empty.
+        Box::new(move || {
+            if with_patch {
+                run_git(dir, &args(&base))
+            } else {
+                Ok(String::new())
+            }
+        }),
     ];
     if let Some([s_numstat, s_status, s_diff]) = stash_args.as_deref() {
         reads.push(Box::new(|| run_git(dir, &args(s_numstat))));
         reads.push(Box::new(|| run_git(dir, &args(s_status))));
-        reads.push(Box::new(|| run_git(dir, &args(s_diff))));
+        reads.push(Box::new(move || {
+            if with_patch {
+                run_git(dir, &args(s_diff))
+            } else {
+                Ok(String::new())
+            }
+        }));
     }
     let out = parallel_git(reads);
     let mut payload = FilePayload {
@@ -1031,6 +1054,35 @@ fn read_commit_files_in(dir: &str, hash: &str) -> Result<FilePayload, String> {
         payload.diff.push_str(&out[5].clone()?);
     }
     Ok(payload)
+}
+
+/// One file's patch ("wip" = worktree vs HEAD). The lazy tail of read_commit_files.
+#[tauri::command]
+pub async fn read_file_patch(dir: String, hash: String, path: String) -> Result<String, String> {
+    run_blocking("file patch read", move || read_file_patch_in(&dir, &hash, &path)).await
+}
+
+fn read_file_patch_in(dir: &str, hash: &str, path: &str) -> Result<String, String> {
+    if hash == "wip" {
+        let tracked = run_git_no_locks(dir, &["diff", "--no-color", "HEAD", "--", path])
+            .unwrap_or_default();
+        if !tracked.is_empty() {
+            return Ok(tracked);
+        }
+        let (_, _, patch) = untracked_entry(dir, path);
+        return Ok(patch);
+    }
+
+    let line = run_git(dir, &["rev-list", "--parents", "-1", hash])?;
+    let parents: Vec<String> = line.split_whitespace().skip(1).map(String::from).collect();
+    let mut patch = match parents.first() {
+        Some(parent) => run_git(dir, &["diff", "--no-color", parent, hash, "--", path])?,
+        None => run_git(dir, &["show", "--root", "--format=", "--no-color", hash, "--", path])?,
+    };
+    if patch.is_empty() && parents.len() >= 3 {
+        patch = run_git(dir, &["show", "--no-color", "--format=", &parents[2], "--", path])?;
+    }
+    Ok(patch)
 }
 
 fn args(v: &[String]) -> Vec<&str> {
@@ -1572,13 +1624,51 @@ mod tests {
         std::fs::write(repo.0.join("new.txt"), "l1\nl2\n").expect("untracked text");
         std::fs::write(repo.0.join("blob.bin"), [0u8, 1, 255, 9, 0]).expect("untracked binary");
 
-        let payload = read_commit_files_in(repo.path(), "wip").expect("wip payload");
+        let payload = read_commit_files_in(repo.path(), "wip", true).expect("wip payload");
         assert!(payload.name_status.contains("M\ttracked.txt"));
         assert!(payload.numstat.contains("2\t0\tnew.txt"));
         assert!(payload.name_status.contains("A\tnew.txt"), "`git diff` alone never lists untracked paths");
         assert!(payload.diff.contains("+++ b/new.txt"));
         assert!(payload.numstat.contains("-\t-\tblob.bin"));
         assert!(payload.diff.contains("@@ Binary file, not shown @@"), "the panel needs a reason for an empty patch");
+    }
+
+    #[test]
+    fn file_patch_reads_one_path_and_strips_from_the_list_read() {
+        let repo = TempRepo::new("lazy");
+        repo.commit("one.txt", "one\n", "first");
+        std::fs::write(repo.0.join("two.txt"), "t\n").expect("file");
+        git(&repo.0, &["add", "."]);
+        git(&repo.0, &["commit", "-q", "-m", "second"]);
+        let second = run_git(repo.path(), &["rev-parse", "--verify", "HEAD"]).expect("rev-parse");
+        let second = second.trim().to_string();
+
+        let stripped = read_commit_files_in(repo.path(), &second, false).expect("stripped");
+        assert_eq!(stripped.diff, "", "no patch body rides on the list read");
+        assert!(stripped.numstat.contains("1\t0\ttwo.txt"));
+        assert!(stripped.name_status.contains("A\ttwo.txt"));
+
+        let history = read_file_patch_in(repo.path(), &second, "two.txt").expect("history patch");
+        assert!(history.contains("+++ b/two.txt"), "got: {history}");
+        assert!(!history.contains("one.txt"), "a single-path read stays single-path: {history}");
+        assert_eq!(
+            history,
+            read_commit_files_in(repo.path(), &second, true)
+                .expect("full")
+                .diff
+                .split("diff --git")
+                .find(|part| part.contains("+++ b/two.txt"))
+                .map(|part| format!("diff --git{part}"))
+                .expect("the full payload shows two.txt"),
+            "the lazy patch is the same lines the full read carried"
+        );
+
+        std::fs::write(repo.0.join("new.txt"), "l1\n").expect("untracked written");
+        let wip_untracked = read_file_patch_in(repo.path(), "wip", "new.txt").expect("untracked patch");
+        assert!(wip_untracked.contains("+++ b/new.txt"), "got: {wip_untracked}");
+        std::fs::write(repo.0.join("one.txt"), "one\ntwo\n").expect("tracked edited");
+        let wip_tracked = read_file_patch_in(repo.path(), "wip", "one.txt").expect("tracked patch");
+        assert!(wip_tracked.contains("@@"), "got: {wip_tracked}");
     }
 
     #[test]
@@ -1595,10 +1685,10 @@ mod tests {
         let second_hash = second_hash.trim().to_string();
 
         // Root commits diff against the empty tree; the `^1` of a root resolves to nothing.
-        let root_files = read_commit_files_in(repo.path(), &root_hash).expect("root files");
+        let root_files = read_commit_files_in(repo.path(), &root_hash, true).expect("root files");
         assert!(root_files.numstat.contains("1\t0\troot.txt"), "got: {}", root_files.numstat);
 
-        let files = read_commit_files_in(repo.path(), &second_hash).expect("parent diff");
+        let files = read_commit_files_in(repo.path(), &second_hash, true).expect("parent diff");
         assert!(files.name_status.contains("A\tother.txt"));
 
         // git mv keeps the rename visible.
@@ -1606,7 +1696,7 @@ mod tests {
         git(&repo.0, &["commit", "-q", "-m", "renamed"]);
         let renamed_hash = run_git(repo.path(), &["rev-parse", "HEAD"]).expect("rev-parse");
         let renamed_hash = renamed_hash.trim().to_string();
-        let renamed = read_commit_files_in(repo.path(), &renamed_hash).expect("renamed files");
+        let renamed = read_commit_files_in(repo.path(), &renamed_hash, true).expect("renamed files");
         assert!(renamed.name_status.contains("R100\troot.txt\trenamed.txt"), "got: {}", renamed.name_status);
     }
 
@@ -1689,7 +1779,7 @@ mod tests {
             3
         );
 
-        let files = read_commit_files_in(repo.path(), merge_hash.trim()).expect("merge files");
+        let files = read_commit_files_in(repo.path(), merge_hash.trim(), true).expect("merge files");
         assert!(
             files.name_status.contains("A\tside.txt"),
             "the first-parent diff carries the merged branch's change: {}",

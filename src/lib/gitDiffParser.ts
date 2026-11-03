@@ -1,5 +1,6 @@
 import type { ChangedFile, DiffLine, FileStatus } from "../types";
 
+/** The raw `read_commit_files` payload (snake_case, straight off git). */
 export interface RawCommitFiles {
   numstat: string;
   name_status: string;
@@ -178,7 +179,8 @@ export function splitDiffRows(lines: DiffLine[]): DiffSplitRow[] {
   return rows;
 }
 
-export function parseCommitFiles(payload: RawCommitFiles): ChangedFile[] {
+/** `withPatch` false leaves every diff null — the list read; patches fill in per file. */
+export function parseCommitFiles(payload: RawCommitFiles, withPatch = true): ChangedFile[] {
   const sections = parseDiffSections(payload.diff);
   const counts = parseNumstat(payload.numstat);
 
@@ -191,7 +193,7 @@ export function parseCommitFiles(payload: RawCommitFiles): ChangedFile[] {
       status: entry.status,
       additions: count.additions,
       deletions: count.deletions,
-      diff: sections.get(entry.path) ?? [],
+      diff: withPatch ? sections.get(entry.path) ?? [] : null,
     };
   });
 }

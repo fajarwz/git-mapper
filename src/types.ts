@@ -28,7 +28,8 @@ export interface ChangedFile {
   status: FileStatus;
   additions: number;
   deletions: number;
-  diff: DiffLine[];
+  /** Unified lines, or null until the lazy patch read lands (gitLoader.loadFilePatch). */
+  diff: DiffLine[] | null;
 }
 
 export interface Commit {

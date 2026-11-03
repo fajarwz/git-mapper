@@ -1,10 +1,10 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open as pickDirectory } from "@tauri-apps/plugin-dialog";
-import type { ChangedFile, Commit, CommitRef, Repository } from "../types";
+import type { ChangedFile, Commit, CommitRef, DiffLine, Repository } from "../types";
 import { STORAGE_KEYS } from "../lib/persisted";
 import { orderRefs } from "../lib/refOrder";
 import { layoutGraph } from "../lib/graphLanes";
-import { parseCommitFiles } from "../lib/gitDiffParser";
+import { parseCommitFiles, parseDiffSections } from "../lib/gitDiffParser";
 import { parseLog, parseStashes } from "../lib/gitLogParser";
 import type { LogStash } from "../lib/gitLogParser";
 import { shapeWorktreeFiles, type WorktreeFile } from "../lib/staging";
@@ -611,14 +611,41 @@ export async function commitStaged(dir: string, message: string): Promise<void> 
   await call("commit_staged", { dir, message }, (raw) => raw as void);
 }
 
+/** Takes the tip commit back one step (`reset --soft`): its tree returns staged, nothing lost. */
+export async function undoCommit(dir: string): Promise<void> {
+  await call("undo_commit", { dir }, (raw) => raw as void);
+}
 
-export async function loadCommitFiles(repoPath: string, hash: string): Promise<ChangedFile[]> {
+
+/**
+ * The changed files of one commit ("wip" = the working tree). withPatch=false skips the
+ * patch body; each file's diff arrives lazily through loadFilePatch.
+ */
+export async function loadCommitFiles(
+  repoPath: string,
+  hash: string,
+  withPatch: boolean,
+): Promise<ChangedFile[]> {
   const payload = await call<RawFilePayload>(
     "read_commit_files",
-    { dir: repoPath, hash },
+    { dir: repoPath, hash, withPatch },
     (raw) => raw as RawFilePayload,
   );
-  return parseCommitFiles(payload);
+  return parseCommitFiles(payload, withPatch);
+}
+
+/** One file's unified diff lines, parsed from its own patch (`read_file_patch`). */
+export async function loadFilePatch(
+  repoPath: string,
+  hash: string,
+  path: string,
+): Promise<DiffLine[]> {
+  const raw = await call<string>(
+    "read_file_patch",
+    { dir: repoPath, hash, path },
+    (response) => response as string,
+  );
+  return parseDiffSections(raw).get(path) ?? [];
 }
 
 interface RawImageVersion {

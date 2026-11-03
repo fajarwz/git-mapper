@@ -33,6 +33,11 @@ interface DiffViewerProps {
   /** Where the image diff fetches its blobs: the repo path and the selected commit's hash. */
   repoPath?: string;
   commitHash?: string;
+  /**
+   * Asks App to read one file's lazy patch — the file list arrives without patches; the
+   * selected file asks at mount, stacked sections ask on scroll-in (240px margin).
+   */
+  onPatchNeeded?: (path: string) => void;
 }
 
 const PREFIX = {
@@ -89,7 +94,7 @@ function useHighlightedLines(file: ChangedFile, lines: NumberedDiffLine[]) {
  * until the new grammar resolved — the preview read as the other file.
  */
 function DiffBody({ file, wrap }: { file: ChangedFile; wrap: boolean }) {
-  const lines = useMemo(() => numberDiffLines(file.diff), [file]);
+  const lines = useMemo(() => numberDiffLines(file.diff ?? []), [file]);
   const highlighted = useHighlightedLines(file, lines);
   // Wrap mode gives up max-content width: rows fill the pane and long lines soft-wrap.
   const rowSpace = wrap ? "min-w-full" : "w-max min-w-full";
@@ -161,6 +166,10 @@ function DiffSection({
 }) {
   return isImageFile(file.path) ? (
     <ImageDiff key={file.path} file={file} repoPath={repoPath} commitHash={commitHash} />
+  ) : file.diff === null ? (
+    <p data-diff-loading={file.path} className="m-0 px-3.5 py-3 font-sans text-[12px] text-ink-dim">
+      Loading diff…
+    </p>
   ) : layout === "split" ? (
     <SplitDiffBody key={file.path} file={file} wrap={wrap} />
   ) : (
@@ -236,7 +245,7 @@ function SplitCells({
  * and per-file mount as the unified body.
  */
 function SplitDiffBody({ file, wrap }: { file: ChangedFile; wrap: boolean }) {
-  const lines = useMemo(() => numberDiffLines(file.diff), [file]);
+  const lines = useMemo(() => numberDiffLines(file.diff ?? []), [file]);
   const rows = useMemo(() => splitDiffRows(lines), [lines]);
   const highlighted = useHighlightedLines(file, lines);
 
@@ -448,6 +457,7 @@ export function DiffViewer({
   scheme = "app",
   repoPath,
   commitHash,
+  onPatchNeeded,
 }: DiffViewerProps) {
   const totals = useMemo(
     () =>
@@ -473,6 +483,40 @@ export function DiffViewer({
     const node = sections.current.get(target);
     if (node && typeof node.scrollIntoView === "function") node.scrollIntoView({ block: "start" });
   }, [scope, target, files]);
+
+  // Patches are lazy: the selected file asks immediately, stacked sections on scroll-in
+  // (240px margin). Image files skip (ImageDiff fetches its blobs); without IntersectionObserver
+  // the stacked scope loads everything at once.
+  const listed = useMemo(() => new Map(files.map((item) => [item.path, item])), [files]);
+  useEffect(() => {
+    if (!onPatchNeeded) return;
+    if (scope === "file") {
+      const selected = file;
+      if (selected && selected.diff === null && !isImageFile(selected.path)) {
+        onPatchNeeded(selected.path);
+      }
+      return;
+    }
+    if (typeof IntersectionObserver === "undefined") {
+      for (const item of files) {
+        if (item.diff === null && !isImageFile(item.path)) onPatchNeeded(item.path);
+      }
+      return;
+    }
+    const observer = new IntersectionObserver(
+      (entries) => {
+        for (const entry of entries) {
+          if (!entry.isIntersecting) continue;
+          const path = entry.target.getAttribute("data-diff-file");
+          const item = path ? listed.get(path) : undefined;
+          if (item && item.diff === null && !isImageFile(item.path)) onPatchNeeded(item.path);
+        }
+      },
+      { rootMargin: "240px" }, // Start reading slightly before the section scrolls in.
+    );
+    for (const node of sections.current.values()) observer.observe(node);
+    return () => observer.disconnect();
+  }, [scope, file, files, listed, onPatchNeeded]);
 
   return (
     <div data-diff data-syntax={scheme} className="flex min-h-0 min-w-0 flex-col bg-sheet">
