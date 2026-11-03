@@ -352,6 +352,30 @@ test("saved tabs that no longer open are announced instead of vanishing", async 
   assert.ok(toast?.textContent?.includes("C:/repos/gone"));
 });
 
+test("Esc closes the details panel from a commit row; a text field keeps its own Esc", async () => {
+  localStorage.setItem(STORAGE_KEYS.repos, JSON.stringify(["C:/repos/demo"]));
+  const { container } = render(<App />);
+  await waitFor(() => {
+    assert.ok(container.querySelector("[data-commit-row]"));
+  });
+  assert.ok(container.querySelector("[data-details]"), "the details panel is open by default");
+
+  fireEvent.keyDown(container.querySelector("[data-commit-row]") as Element, { key: "Escape" });
+  assert.equal(container.querySelector("[data-details]"), null, "Esc on a row closes the panel");
+
+  fireEvent.click(container.querySelector("[data-commit-row]") as Element);
+  await waitFor(() => {
+    assert.ok(container.querySelector("[data-details]"), "a row click summons it back");
+  });
+  fireEvent.keyDown(within(container).getByRole("textbox", { name: "Search history" }), {
+    key: "Escape",
+  });
+  assert.ok(
+    container.querySelector("[data-details]"),
+    "the search box's Esc clears the query, it never closes a panel",
+  );
+});
+
 test("an inactive tab sleeps after five minutes and reloads when clicked", async () => {
   localStorage.setItem(STORAGE_KEYS.repos, JSON.stringify(["C:/repos/demo", "C:/repos/other"]));
   // Fake timers go up BEFORE render: the sleep interval arms at mount, so it must be created

@@ -770,6 +770,26 @@ function App() {
     run: () => Promise<void> | void;
   }
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
+
+  // Esc closes the details panel — from a commit row (Esc undoes the summons) or inside it.
+  // Top layers (menu, modal, confirm) close themselves; the rail's Esc docks the drawer; a
+  // text field's Esc keeps its own story.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      if (contextMenu || settingsOpen || pendingConfirm || !detailsOpen) return;
+      if (!(event.target instanceof Node)) return;
+      const host = event.target as Element;
+      if (!host.closest) return;
+      if (host.closest("[data-stage-rail]")) return;
+      if (host.closest("input, textarea, [contenteditable]")) return;
+      event.stopPropagation();
+      setDetailsOpen(false);
+    }
+    window.addEventListener("keydown", onKeyDown, true);
+    return () => window.removeEventListener("keydown", onKeyDown, true);
+  }, [contextMenu, settingsOpen, pendingConfirm, detailsOpen, setDetailsOpen]);
+
   const handleMenuCheckoutCommit = useCallback(
     (hash: string) => {
       closeContextMenu();

@@ -258,6 +258,7 @@ export function StagePanel({
   return (
     <section
       ref={sectionRef}
+      data-stage-rail
       className={`${PANEL} relative flex size-full flex-col overflow-hidden`}
       aria-label="Uncommitted changes"
     >
