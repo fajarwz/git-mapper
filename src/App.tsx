@@ -38,6 +38,7 @@ import { checkoutBranch,
   readStoredPaths,
   refreshRepository,
   stashAction,
+  undoCommit,
   UNCOMMITTED_HASH,
   FILES_CACHE_CAP,
   SLEEP_AFTER_MS,
@@ -817,6 +818,45 @@ function App() {
     [repos, activeRepoId, showFlash],
   );
 
+  // Undoing the tip is the rail's commit in reverse: the dialog says it plainly (staged, not
+  // deleted), and a force-refresh re-lands the wip row and the stepped-back history at once.
+  const handleMenuUndoCommit = useCallback(
+    (hash: string) => {
+      const target = repos.find((item) => item.id === activeRepoId);
+      if (!target) return;
+      setPendingConfirm({
+        title: `Undo commit ${hash.slice(0, 8)}?`,
+        body: (
+          <>
+            <p>HEAD steps back one commit and its files return to the working tree, already staged.</p>
+            <p>Nothing is deleted — you are back to just before the commit.</p>
+          </>
+        ),
+        confirmLabel: "Undo commit",
+        run: async () => {
+          setPendingConfirm(null);
+          try {
+            await undoCommit(target.path);
+            const refreshed = await refreshRepository(target, true);
+            if (refreshed) {
+              setRepos((previous) =>
+                previous.map((item) => (item.id === refreshed.repo.id ? refreshed.repo : item)),
+              );
+              showFlash(refreshed.touched);
+            }
+          } catch (undoError) {
+            setNotice({
+              title: "Could not undo the commit",
+              detail: undoError instanceof Error ? undoError.message : String(undoError),
+              id: Date.now(),
+            });
+          }
+        },
+      });
+    },
+    [repos, activeRepoId, showFlash],
+  );
+
   // The search filters the loaded window only — the visible rows AND the lanes/graph re-layout
   // over the subset. Searching unpaginated history stays out until the deep-search slice.
   const visibleCommits = useMemo(
@@ -1085,6 +1125,17 @@ function App() {
           onCheckout={handleMenuCheckout}
           onCheckoutCommit={handleMenuCheckoutCommit}
           onStashAction={handleMenuStashAction}
+          // The offer exists only on the checked-out tip itself, only while it is unpushed
+          // (ahead of the tracking refs) and only when the tip is a plain (non-merge) commit;
+          // a pushed tip would need a force-push to land, so it never reads one here.
+          undoable={
+            repo !== null &&
+            contextMenu.commit.hash === repo.head &&
+            repo.ahead >= 1 &&
+            contextMenu.commit.parents.length === 1 &&
+            contextMenu.commit.stashIndex === undefined
+          }
+          onUndoCommit={() => handleMenuUndoCommit(contextMenu.commit.hash)}
           head={repo?.head ?? ""}
           onClose={closeContextMenu}
         />

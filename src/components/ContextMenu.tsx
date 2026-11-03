@@ -20,6 +20,10 @@ interface ContextMenuProps {
   onCheckout: (branch: string) => void;
   onCheckoutCommit: (hash: string) => void;
   onStashAction: (index: number, action: StashAction) => void;
+  /** Undoing the tip commit: the menu entry exists only when the target IS the tip, the
+   * branch is ahead of its remote, and the tip is a plain (non-merge) commit. */
+  undoable?: boolean;
+  onUndoCommit?: () => void;
   /** Full sha of HEAD at the last read: the row that is HEAD gets no checkout entry. */
   head: string;
   onClose: () => void;
@@ -41,7 +45,16 @@ const COPY_LABELS: Record<CommitRef["type"], string> = {
  * local branch that is not the checked-out one; the copy entries always match their target.
  * Copying keeps the menu up for a beat with a "Copied!" marker so the action reads, then closes.
  */
-export function ContextMenu({ target, onCheckout, onCheckoutCommit, onStashAction, head, onClose }: ContextMenuProps) {
+export function ContextMenu({
+  target,
+  onCheckout,
+  onCheckoutCommit,
+  onStashAction,
+  undoable = false,
+  onUndoCommit,
+  head,
+  onClose,
+}: ContextMenuProps) {
   // The entry that just copied shows "Copied!" for a beat; the others keep their labels.
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -92,6 +105,7 @@ export function ContextMenu({ target, onCheckout, onCheckoutCommit, onStashActio
   const entries =
     (checkoutable ? 1 : 0) +
     (commitCheckoutable ? 1 : 0) +
+    (undoable ? 1 : 0) +
     (stashIndex !== undefined ? 3 : 0) +
     1 + 1 + (activeRef ? 1 : 0); // two copy entries always: hash + (ref or none)
   const top = Math.max(4, Math.min(target.y, window.innerHeight - entries * 32 - 20));
@@ -131,6 +145,17 @@ export function ContextMenu({ target, onCheckout, onCheckoutCommit, onStashActio
         >
           {/* The menu is a fixed 240px: the label reads the short hash, like the list. */}
           Check out commit {target.commit.hash.slice(0, 8)}
+        </button>
+      )}
+      {undoable && onUndoCommit && (
+        <button type="button" role="menuitem" className={ITEM}
+          title="Puts the tip commit's files back as staged, uncommitted work — a confirm shows first"
+          onClick={() => {
+            onClose();
+            onUndoCommit();
+          }}
+        >
+          Undo commit {target.commit.hash.slice(0, 8)}
         </button>
       )}
       {stashIndex !== undefined && (

@@ -20,6 +20,7 @@ pub fn run() {
             git::discard_files,
             git::discard_all,
             git::commit_staged,
+            git::undo_commit,
             git::pull_branch,
             git::push_branch,
             git::read_log,

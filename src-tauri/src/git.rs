@@ -821,6 +821,32 @@ fn stash_action_in(dir: &str, index: u32, action: &str) -> Result<(), String> {
     run_git(dir, &["stash", verb, &format!("stash@{{{index}}}")]).map(|_| ())
 }
 
+/// Takes the checked-out tip back one commit: `reset --soft HEAD~1` returns the tip's tree
+/// to the index, so the work comes back staged and the next refresh re-lands the uncommitted
+/// row. Nothing is deleted — the Git Mapper twin of the staging rail's commit. The UI only
+/// offers this on the unpushed, non-merge tip; the guards below keep the command honest even
+/// when it arrives through a stale or future UI.
+#[tauri::command]
+pub async fn undo_commit(dir: String) -> Result<(), String> {
+    run_blocking("undo commit", move || undo_commit_in(&dir)).await
+}
+
+fn undo_commit_in(dir: &str) -> Result<(), String> {
+    // `rev-list --parents -1 HEAD` answers both guards in one spawn: the parent count.
+    // Zero parents = the root commit (nothing to undo ONTO: deleting history is not this
+    // command's business), several = a merge, where `HEAD~1` is first-parent shorthand and
+    // a reset there strands the merged branch behind.
+    let heads = run_git(dir, &["rev-list", "--parents", "-1", "HEAD"])?;
+    let parent_count = heads.split_whitespace().count() - 1;
+    if parent_count == 0 {
+        return Err("the tip is the repository's root commit — there is nothing to undo onto".into());
+    }
+    if parent_count > 1 {
+        return Err("the tip is a merge commit — its undo is not a soft reset".into());
+    }
+    run_git(dir, &["reset", "--soft", "HEAD~1"]).map(|_| ())
+}
+
 /// Pulls every remote into the local tracking refs (`fetch --all --prune`). Ahead/behind are
 /// counts against the tracking refs, so they only tell the whole story after a quiet fetch —
 /// the app runs this on open and on window focus (throttled), and tolerates failures offline.
@@ -1294,6 +1320,58 @@ mod tests {
         assert!(err.contains("is not a stash action"), "got: {err}");
         let err = stash_action_in(repo.path(), 5, "apply").unwrap_err();
         assert!(!err.is_empty(), "an absent entry errors, not panics");
+    }
+
+    #[test]
+    fn undo_commit_returns_the_tip_to_the_index() {
+        let repo = TempRepo::new("undo-commit");
+        repo.commit("a.txt", "a\n", "first");
+        repo.commit("b.txt", "b\n", "second");
+        let tip = git_out(&repo.0, &["rev-parse", "HEAD"]);
+
+        undo_commit_in(repo.path()).expect("the undo ran");
+
+        // HEAD stepped back and the tip left HEAD's history entirely…
+        assert_ne!(git_out(&repo.0, &["rev-parse", "HEAD"]), tip, "HEAD moved back");
+        assert!(
+            !git_out(&repo.0, &["rev-list", "HEAD"]).contains(&tip),
+            "the tip is no longer in HEAD's history"
+        );
+        // …but nothing was lost: the tip's file is back STAGED (index has it, HEAD does not,
+        // the worktree still matches the index).
+        assert_eq!(
+            git_out(&repo.0, &["diff", "--cached", "--name-only"]),
+            "b.txt",
+            "the tip's file came back staged"
+        );
+        assert!(
+            git_out(&repo.0, &["diff", "--name-only"]).trim().is_empty(),
+            "the worktree matches the index — no unstaged fallout"
+        );
+        assert_eq!(std::fs::read_to_string(repo.0.join("b.txt")).expect("file"), "b\n");
+    }
+
+    #[test]
+    fn undo_commit_refuses_root_and_merge_tips() {
+        // The root commit has nothing to undo ONTO; a soft reset there is undefined.
+        let root = TempRepo::new("undo-root");
+        root.commit("a.txt", "a\n", "only");
+        let err = undo_commit_in(root.path()).unwrap_err();
+        assert!(err.contains("root"), "got: {err}");
+
+        // A merge tip has two parents: `HEAD~1` (first parent) would strand the merged
+        // branch behind, so the command refuses rather than half-explaining the undo.
+        let repo = TempRepo::new("undo-merge");
+        repo.commit("a.txt", "a\n", "base");
+        git(&repo.0, &["checkout", "-q", "-b", "side"]);
+        std::fs::write(repo.0.join("side.txt"), "s\n").expect("side file");
+        git(&repo.0, &["add", "side.txt"]);
+        git(&repo.0, &["commit", "-q", "-m", "side work"]);
+        git(&repo.0, &["checkout", "-q", "main"]);
+        repo.commit("b.txt", "b\n", "main work");
+        git(&repo.0, &["merge", "-q", "--no-ff", "side", "-m", "merge"]);
+        let err = undo_commit_in(repo.path()).unwrap_err();
+        assert!(err.contains("merge"), "got: {err}");
     }
 
     #[test]
