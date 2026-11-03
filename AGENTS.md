@@ -124,7 +124,9 @@ and the README's Tests badge points at it.
   for 700ms, then the menu closes. A stash row additionally offers `Apply stash` (no confirm —
   git refuses an apply that would conflict and keeps the entry) plus `Pop stash…` / `Drop stash…`
   (red danger confirm via `ConfirmDialog`; the command is `stash_action` with a typed index and
-  verb whitelist). Dismisses on outside pointerdown, Escape, scroll (capture) and
+  verb whitelist). The checked-out tip offers `Undo commit …` when the repo is ahead and the tip
+  is a plain (non-merge) commit — `undo_commit`, a soft reset that returns the tip's files
+  staged, behind a plain (non-danger) confirm. Dismisses on outside pointerdown, Escape, scroll (capture) and
   resize. Clipboard goes through `src/lib/clipboard.ts` `copyText`, which falls back to a hidden
   textarea because WebView2 can deny the async clipboard API per-origin.
 - `src/lib/ui.ts` — `PANEL` and `GLASS_CONTROL` class strings; every panel/button picks these up.
@@ -152,6 +154,9 @@ and the README's Tests badge points at it.
    there measures ~2.8:1 (`text-ink-soft` over the gradient). Anything interactive or readable in the
    bar gets `bg-glass-soft` + `backdrop-blur-md`; contrast after: brand 9.9, tabs 6.1, add button 7.0.
    `BrandMark` is the one solid control: `bg-primary` with a white glyph, so it reads in both themes.
+6. **Comments are scarce.** A comment exists only for what the code cannot say — a git quirk, a
+   non-obvious invariant, a why. One to two lines; trivial restatements are deleted, not written.
+   When touching existing code, trim verbose comments instead of adding to them.
 
 ## Known pitfalls
 
