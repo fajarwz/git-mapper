@@ -189,10 +189,10 @@ pub fn status_kind(letter: char) -> &'static str {
 }
 
 /// Walks `status --porcelain=v2 -z` records. Every entry begins with a record kind — `1`
-/// (tracked), `2` (renamed/copied), `?` (untracked, carries no XY at all: `? <path>`) — then
-/// the XY pair, header hashes, and (for renames) `<origPath><NUL>` right after the path.
-/// Conflicts (`u` records) are skipped: a viewer without a merge editor cannot act on them
-/// and staging refuses quietly.
+/// (tracked), `2` (renamed/copied), `?` (untracked, carries no XY at all: `? <path>`), `u`
+/// (unmerged) — then the XY pair, header hashes, and (for renames) `<origPath><NUL>` right
+/// after the path. Unmerged records keep their real XY (`UU` both-modified, `AU`/`UD` the
+/// add/delete pairs): the resolver needs to know which side carries a stage.
 pub fn for_each_status_v2(raw: &str, mut visit: impl FnMut(char, char, String, Option<String>)) {
     let mut cursor = 0usize;
     while cursor < raw.len() {
@@ -209,7 +209,10 @@ pub fn for_each_status_v2(raw: &str, mut visit: impl FnMut(char, char, String, O
         };
         let (kind, rest) = (&record[..kind_end], &record[kind_end + 1..]);
         if kind == "u" {
-            continue; // unmerged: outside the viewer's scope
+            // `u XY sub m1 m2 m3 mW h1 h2 h3 <path>`: nine header fields, then the path
+            // (NUL-terminated like the other kinds). No orig path even for renames.
+            for_each_unmerged(rest, &mut visit);
+            continue;
         }
         if kind == "?" {
             // `? <path>`, NUL-terminated: the rest is the whole path, spaces included.
@@ -281,6 +284,32 @@ pub fn numstat_map(raw: &str) -> std::collections::HashMap<String, (u32, u32)> {
         map.insert(path.to_string(), counts);
     }
     map
+}
+
+/// An unmerged record: `XY` (ASCII by grammar) then nine space-separated header fields
+/// (sub, m1, m2, m3, mW, h1, h2, h3) before the path — spaces included.
+fn for_each_unmerged(rest: &str, visit: &mut impl FnMut(char, char, String, Option<String>)) {
+    if rest.len() < 2 {
+        return;
+    }
+    let x = rest.as_bytes()[0] as char;
+    let y = rest.as_bytes()[1] as char;
+    let tail = &rest[2..];
+    let mut seen = 0usize;
+    let mut path_at = None;
+    for (offset, c) in tail.char_indices() {
+        if c == ' ' {
+            seen += 1;
+            if seen == 9 {
+                path_at = Some(offset + 1);
+                break;
+            }
+        }
+    }
+    let Some(at) = path_at else {
+        return;
+    };
+    visit(x, y, tail[at..].trim_end().to_string(), None);
 }
 
 /// A dirty-looking rename destination whose numstat came back keyed the old way (`a\tb\t{old => new}`):

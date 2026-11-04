@@ -81,6 +81,61 @@ fn git_out(dir: &Path, args: &[&str]) -> String {
 }
 
 #[test]
+fn status_scanner_yields_unmerged_paths() {
+    // A merge with an edit conflict leaves porcelain v2 `u` records in the status output;
+    // the scanner must hand them to the visitor — the staging rail resolves them, so the
+    // old "outside the viewer's scope" skip hid the whole merge state.
+    let repo = TempRepo::new("conflict-scan");
+    repo.commit("a.txt", "base\n", "base");
+    git(&repo.0, &["checkout", "-q", "-b", "side"]);
+    repo.commit("a.txt", "side\n", "side edit");
+    git(&repo.0, &["checkout", "-q", "main"]);
+    repo.commit("a.txt", "main\n", "main edit");
+
+    let merged = Command::new("git")
+        .args(["merge", "side", "--no-edit"])
+        .current_dir(&repo.0)
+        .output()
+        .expect("merge ran");
+    assert!(!merged.status.success(), "the merge must conflict");
+
+    let raw = run_git(
+        repo.path(),
+        &["status", "--porcelain=v2", "--untracked-files=all", "-z"],
+    )
+    .expect("status read");
+    assert!(raw.starts_with("u "), "the fixture must hold a u record");
+
+    let mut unmerged: Vec<(char, char, String)> = Vec::new();
+    for_each_status_v2(&raw, |x, y, path, _orig| {
+        if x == 'U' || y == 'U' {
+            unmerged.push((x, y, path));
+        }
+    });
+    assert_eq!(
+        unmerged,
+        vec![('U', 'U', "a.txt".to_string())],
+        "the conflicted path arrives with its both-modified pair"
+    );
+
+    // A sane base case in the same test: the visitor on a finished merge (abort) yields
+    // nothing unmerged again.
+    git(&repo.0, &["merge", "--abort"]);
+    let raw = run_git(
+        repo.path(),
+        &["status", "--porcelain=v2", "--untracked-files=all", "-z"],
+    )
+    .expect("status read");
+    let mut again: Vec<String> = Vec::new();
+    for_each_status_v2(&raw, |x, y, path, _orig| {
+        if x == 'U' || y == 'U' {
+            again.push(path);
+        }
+    });
+    assert!(again.is_empty(), "an aborted merge carries no unmerged paths");
+}
+
+#[test]
 fn fetch_remote_tracks_the_upstream_and_skips_remoless_repos() {
     // The remote repository's history grows after the origin link is made; the fetch must
     // pull that growth into the local tracking refs.
@@ -190,6 +245,38 @@ fn undo_commit_returns_the_tip_to_the_index() {
         std::fs::read_to_string(repo.0.join("b.txt")).expect("file"),
         "b\n"
     );
+}
+
+/// A repository with a two-side edit conflict on `a.txt`, merge in progress.
+fn conflicting_repo(label: &str) -> TempRepo {
+    let repo = TempRepo::new(label);
+    repo.commit("a.txt", "base\n", "base");
+    git(&repo.0, &["checkout", "-q", "-b", "side"]);
+    repo.commit("a.txt", "side\n", "side edit");
+    git(&repo.0, &["checkout", "-q", "main"]);
+    repo.commit("a.txt", "main\n", "main edit");
+    let merged = Command::new("git")
+        .args(["merge", "side", "--no-edit"])
+        .current_dir(&repo.0)
+        .output()
+        .expect("merge ran");
+    assert!(!merged.status.success(), "the merge must conflict");
+    repo
+}
+
+#[test]
+fn discard_refuses_unmerged_paths() {
+    let repo = conflicting_repo("discard-conflict");
+    let err = discard_files_in(repo.path(), &["a.txt".to_string()]).unwrap_err();
+    assert!(err.contains("unmerged"), "got: {err}");
+    // Nothing was acted on: the file still reads as conflicted afterwards.
+    assert!(gs_v2(repo.path()).contains("u "));
+}
+
+/// Fresh porcelain v2 status text (NUL-separated), straight from git.
+fn gs_v2(dir: &str) -> String {
+    run_git(dir, &["status", "--porcelain=v2", "--untracked-files=all", "-z"])
+        .unwrap_or_default()
 }
 
 #[test]
