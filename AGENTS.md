@@ -157,6 +157,10 @@ and the README's Tests badge points at it.
 6. **Comments are scarce.** A comment exists only for what the code cannot say — a git quirk, a
    non-obvious invariant, a why. One to two lines; trivial restatements are deleted, not written.
    When touching existing code, trim verbose comments instead of adding to them.
+7. **No god files.** `App.tsx` stays a composition shell; state and effects for one domain live
+   in a dedicated hook (`src/hooks/<domain>.ts`), pure logic in `src/lib/`, the backend surface
+   in `src/data/`. Same rule for tests: they follow the module they exercise. A file beyond
+   ~300 lines or mixing domains splits the next time work touches it — not "someday".
 
 ## Known pitfalls
 
