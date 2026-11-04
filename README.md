@@ -11,6 +11,7 @@ diffs and stashes on a clean pane — no account, no setup.
 
 [![Release](https://img.shields.io/github/v/release/fajarwz/git-mapper?logo=github&labelColor=17151f&color=6e56cf)](https://github.com/fajarwz/git-mapper/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/fajarwz/git-mapper/total?labelColor=17151f&color=6e56cf&logo=github)](https://github.com/fajarwz/git-mapper/releases)
+[![Sponsor](https://img.shields.io/badge/Sponsor-GitHub-ea4aaa?labelColor=17151f&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/fajarwz)
 [![License: GPL v3](https://img.shields.io/badge/license-GPL--3.0--or--later-6e56cf.svg?labelColor=17151f&logo=gnu&logoColor=white)](LICENSE)
 
 [![Tests](https://img.shields.io/github/actions/workflow/status/fajarwz/git-mapper/ci.yml?label=tests&logo=vitest&logoColor=white&labelColor=17151f)](https://github.com/fajarwz/git-mapper/actions/workflows/ci.yml)
@@ -18,7 +19,7 @@ diffs and stashes on a clean pane — no account, no setup.
 
 ![Windows](https://img.shields.io/badge/Windows-0078D6?labelColor=17151f&logo=data%3Aimage%2Fsvg%2Bxml%3Bbase64%2CPHN2ZyB4bWxucz0iaHR0cDovL3d3dy53My5vcmcvMjAwMC9zdmciIHZpZXdCb3g9IjAgMCAyNCAyNCI%2BPHBhdGggZmlsbD0iI2ZmZmZmZiIgZD0iTTMgM2g4LjR2OC40SDNWM3ptOS42IDBIMjF2OC40aC04LjRWM3pNMyAxMi42aDguNFYyMUgzdi04LjR6bTkuNiAwSDIxVjIxaC04LjR2LTguNHoiLz48L3N2Zz4%3D)
 ![macOS](https://img.shields.io/badge/macOS-A2AAAD?labelColor=17151f&logo=apple&logoColor=white)
-![Linux](https://img.shields.io/badge/Linux-FCC624?labelColor=17151f&logo=linux&logoColor=black)
+![Linux](https://img.shields.io/badge/Linux-FCC624?labelColor=17151f&logo=linux&logoColor=white)
 
 ![Tauri](https://img.shields.io/badge/Tauri-2-24C8DB?labelColor=17151f&logo=tauri&logoColor=24C8DB)
 ![React](https://img.shields.io/badge/React-19-61DAFB?labelColor=17151f&logo=react&logoColor=61DAFB)
@@ -57,6 +58,9 @@ warning because the app isn't notarized — right-click the app and pick **Open*
   lines soft-wrap by default with a toggle to scroll instead.
 - An `Uncommitted changes` row on top while the working tree is dirty: staged, unstaged and
   untracked files, diffed against `HEAD`.
+- A staging rail for that dirty tree: stage, unstage and discard by file, type the message and
+  commit without leaving the window. The toolbar fetches the remotes and pulls or pushes the
+  checked-out branch.
 - Refresh on window focus (only the commits that are new get read) or from the toolbar button.
   Rows a refresh touched flash amber.
 - Light and dark glass themes, remembered across restarts together with the window size and
@@ -91,12 +95,23 @@ The Rust side (`src-tauri/src/git.rs`) runs `git` and returns its porcelain outp
 `src/data/gitLoader.ts`, so components never invoke the backend themselves. `npm run dev` serves
 the same commands at `POST /api/git`, which is why the app also runs in a plain browser.
 
-The only thing the app changes in a repository is a branch checkout.
+The app writes to a repository on purpose, not by accident: it stages, unstages and discards
+changes, commits, stashes, checks out branches and commits, and pushes or pulls the checked-out
+branch. Everything else it does is a read.
 
 ## Not there yet
 
 - Searching history beyond the loaded 500-commit window.
-- Staging, committing, merging, rebasing.
+- Merging, rebasing, resolving conflicts.
+
+## Support
+
+Git Mapper is free and GPL, and it stays free. If it saves you time, you can
+[sponsor the project on GitHub](https://github.com/sponsors/fajarwz). Nothing in the app is locked
+behind it, and the best thing you can give me instead is a good bug report.
+
+Contributions are welcome, and [CONTRIBUTING.md](CONTRIBUTING.md) says how: I read every issue and
+pull request myself.
 
 ## License
 
