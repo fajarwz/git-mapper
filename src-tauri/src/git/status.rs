@@ -16,6 +16,10 @@ pub struct StatusInfo {
     pub behind: u32,
     /// True when the working tree has any change (staged, unstaged or untracked).
     pub dirty: bool,
+    /// True while `MERGE_HEAD` exists — the merge resolution slice's banner state.
+    pub merging: bool,
+    /// Unmerged paths from the same status read; `AA`/`DD` conflict without a `U` side.
+    pub conflicts: Vec<String>,
     /// Changed paths in the working tree, untracked files counted individually.
     pub changed: u32,
     /// Current HEAD commit; empty on an unborn branch. Lets the UI detect work done elsewhere.
@@ -103,10 +107,20 @@ pub fn read_status_in(dir: &str) -> Result<StatusInfo, String> {
         let tracked_patch = scope.spawn(|| run_git(dir, &["diff", "--no-color", "HEAD"]).ok());
         // -uall so untracked files are counted one by one instead of per directory.
         let out = run_git(dir, &["status", "-sb", "--untracked-files=all"])?;
-        let changed = out
-            .lines()
-            .filter(|l| !l.trim().is_empty() && !l.starts_with("## "))
-            .count() as u32;
+        let mut changed = 0u32;
+        let mut conflicts: Vec<String> = Vec::new();
+        for line in out.lines() {
+            if line.trim().is_empty() || line.starts_with("## ") {
+                continue;
+            }
+            changed += 1;
+            // A conflict pair carries no resolved voice: a `U` side, or both-added /
+            // both-deleted (no U anywhere). The rail will offer sides for each path.
+            let xy = &line[..2.min(line.len())];
+            if xy.contains('U') || xy == "AA" || xy == "DD" {
+                conflicts.push(line[3..].trim_end().to_string());
+            }
+        }
         let worktree = worktree_stamp(dir, &out, changed, || tracked_patch.join().ok().flatten());
         // First line: "## main...origin/main [ahead 1, behind 2]" with any piece optional.
         let head = run_git(dir, &["rev-parse", "--verify", "HEAD"])
@@ -117,6 +131,8 @@ pub fn read_status_in(dir: &str) -> Result<StatusInfo, String> {
             ahead: 0,
             behind: 0,
             dirty: changed > 0,
+            merging: run_git(dir, &["rev-parse", "-q", "--verify", "MERGE_HEAD"]).is_ok(),
+            conflicts,
             changed,
             head,
             worktree,

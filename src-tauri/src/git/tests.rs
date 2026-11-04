@@ -136,6 +136,22 @@ fn status_scanner_yields_unmerged_paths() {
 }
 
 #[test]
+fn read_status_reports_a_merge_and_its_conflicts() {
+    let repo = conflicting_repo("status-conflict");
+    let info = read_status_in(repo.path()).expect("status read");
+    assert!(info.merging, "MERGE_HEAD sits unresolved");
+    assert_eq!(info.conflicts, vec!["a.txt".to_string()]);
+    assert!(info.dirty);
+
+    // After the abort both pieces drop together.
+    git(&repo.0, &["merge", "--abort"]);
+    let info = read_status_in(repo.path()).expect("status read");
+    assert!(!info.merging);
+    assert!(info.conflicts.is_empty());
+    assert!(!info.dirty);
+}
+
+#[test]
 fn fetch_remote_tracks_the_upstream_and_skips_remoless_repos() {
     // The remote repository's history grows after the origin link is made; the fetch must
     // pull that growth into the local tracking refs.
