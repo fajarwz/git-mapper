@@ -1,7 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { CSSProperties } from "react";
 import { getVersion } from "@tauri-apps/api/app";
-import type { ChangedFile } from "./types";
 import { BootScreen } from "./components/BootScreen";
 import { CommitList } from "./components/CommitList";
 import { ContextMenu, type ContextMenuTarget, type StashAction } from "./components/ContextMenu";
@@ -29,8 +28,6 @@ import type { Theme } from "./lib/theme";
 import { checkoutBranch,
   checkoutCommit,
   fetchRemote,
-  loadCommitFiles,
-  loadFilePatch,
   loadMoreCommits,
   loadRepository,
   pickAndLoadRepository,
@@ -41,7 +38,6 @@ import { checkoutBranch,
   stashAction,
   undoCommit,
   UNCOMMITTED_HASH,
-  FILES_CACHE_CAP,
   SLEEP_AFTER_MS,
   SLEEP_TICK_MS,
   storePaths,
@@ -60,17 +56,8 @@ import {
 } from "./components/StagePanel";
 import { ResizeHandle } from "./components/ResizeHandle";
 import type { WorktreeFile } from "./lib/staging";
-import type { DiffLine, Repository } from "./types";
-
-/**
- * Key for the loaded-files cache. It has to include the repo: the uncommitted row uses the same
- * pseudo hash ("wip") in every repository, so a hash-only key showed one repo's working-tree
- * changes in another. The uncommitted entry is keyed by the working-tree digest instead of the
- * hash, so a save (or a new untracked file) refetches the list and the patch.
- */
-function filesKey(repoPath: string, hash: string, worktree: string): string {
-  return hash === UNCOMMITTED_HASH ? `${repoPath}::~wip:${worktree}` : `${repoPath}::${hash}`;
-}
+import type { Repository } from "./types";
+import { useCommitFiles } from "./hooks/useCommitFiles";
 
 /** Auto-fetch window on refocus — often enough to notice a push, rare enough to stay quiet. */
 const FETCH_ON_FOCUS_MS = 180_000;
@@ -93,13 +80,8 @@ function App() {
     STORAGE_KEYS.selectedFiles,
     {},
   );
-  const [filesByCommitHash, setFilesByCommitHash] = useState<Record<string, ChangedFile[]>>({});
-  // Insert order of the cache keys, newest last: the cap drops from the front (least recently
-  // used). Full patch text per commit adds up fast, and nothing ever read it back before.
-  const filesCacheOrder = useRef<string[]>([]);
   const [loadingMoreByRepo, setLoadingMoreByRepo] = useState<Record<string, boolean>>({});
   const [allLoadedByRepo, setAllLoadedByRepo] = useState<Record<string, boolean>>({});
-  const [filesLoading, setFilesLoading] = useState(false);
   const [opening, setOpening] = useState(false);
   // The sleeping tab being reloaded right now (its history was dropped; see the sleep timer).
   const [wakingId, setWakingId] = useState<string | null>(null);
@@ -271,118 +253,23 @@ function App() {
     [activeRepoId, setStageDrawerByRepo],
   );
 
-  // Docking is owned by the handlers (a commit or a discard-all close the burst) and the
-  // user's exits (×, Esc, swipe) — no auto-dock on "empty": the worktree read is async, and a
-  // record written while the rows are still loading would wedge the rail shut on dirty repos.
-
+  // The commit whose payload the details panel reads (persisted per repo, default HEAD).
   const selectedCommit = repo
     ? (repo.commits.find(
         (commit) => commit.hash === (selectedCommitByRepo[repo.id] ?? repo.defaultCommitHash),
       ) ?? repo.commits[0] ?? null)
     : null;
-  const selectedFilesKey =
-    repo && selectedCommit
-      ? filesKey(repo.path, selectedCommit.hash, repo.worktree)
-      : null;
-  const files = selectedFilesKey ? (filesByCommitHash[selectedFilesKey] ?? []) : [];
-  const selectedFile =
-    files.find((file) => file.path === (selectedFileByRepo[repo?.id ?? ""] ?? null)) ??
-    files[0] ??
-    null;
 
-  const storeFiles = useCallback((key: string, files: ChangedFile[]) => {
-    const order = filesCacheOrder.current.filter((cached) => cached !== key);
-    order.push(key);
-    const evicted = order.length > FILES_CACHE_CAP ? order.splice(0, order.length - FILES_CACHE_CAP) : [];
-    filesCacheOrder.current = order;
-    setFilesByCommitHash((previous) => {
-      if (evicted.length === 0) return { ...previous, [key]: files };
-      const next = { ...previous, [key]: files };
-      for (const dropped of evicted) delete next[dropped];
-      return next;
-    });
-  }, []);
-
-  // Drops every cached payload of one repository: when its tab closes, and when the tab sleeps.
-  const evictRepoFiles = useCallback((repoPath: string) => {
-    const prefix = `${repoPath}::`;
-    const kept = filesCacheOrder.current.filter((key) => !key.startsWith(prefix));
-    if (kept.length === filesCacheOrder.current.length) return;
-    filesCacheOrder.current = kept;
-    setFilesByCommitHash((previous) => {
-      const next: Record<string, ChangedFile[]> = {};
-      for (const key of kept) next[key] = previous[key];
-      return next;
-    });
-  }, []);
-
-  // Files load per selected commit — false = without the patch body (patches are lazy).
-  useEffect(() => {
-    if (!repo || !selectedCommit || !selectedFilesKey) return;
-    if (filesByCommitHash[selectedFilesKey]) return;
-    const cacheKey = selectedFilesKey;
-    let cancelled = false;
-    setFilesLoading(true);
-    loadCommitFiles(repo.path, selectedCommit.hash, false)
-      .then((loaded) => {
-        if (!cancelled) storeFiles(cacheKey, loaded);
-      })
-      .catch((loadError) => {
-        if (!cancelled) {
-          console.error("Could not read changed files", loadError);
-          storeFiles(cacheKey, []);
-        }
-      })
-      .finally(() => {
-        if (!cancelled) setFilesLoading(false);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [repo, selectedCommit, selectedFilesKey, filesByCommitHash, storeFiles]);
-
-  // In-flight reads are stamped per "<filesKey>:<path>"; a failed one stores [] so a vanished
-  // file cannot retry-loop.
-  const patchesFetching = useRef(new Set<string>());
-  const mergePatch = useCallback((cacheKey: string, path: string, patch: DiffLine[]) => {
-    const order = filesCacheOrder.current.filter((entry) => entry !== cacheKey);
-    order.push(cacheKey);
-    filesCacheOrder.current = order;
-    setFilesByCommitHash((previous) => {
-      const listed = previous[cacheKey];
-      if (!listed) return previous;
-      return {
-        ...previous,
-        [cacheKey]: listed.map((file) =>
-          file.path === path ? { ...file, diff: patch } : file,
-        ),
-      };
-    });
-  }, []);
-  const filesCacheRef = useRef(filesByCommitHash);
-  filesCacheRef.current = filesByCommitHash;
-  const handlePatchNeeded = useCallback(
-    (path: string) => {
-      const source = repo;
-      const commit = selectedCommit;
-      const cacheKey = selectedFilesKey;
-      if (!source || !commit || !cacheKey) return;
-      const stamp = `${cacheKey}:${path}`;
-      if (patchesFetching.current.has(stamp)) return;
-      const listed = filesCacheRef.current[cacheKey];
-      const entry = listed?.find((file) => file.path === path);
-      if (!entry || entry.diff !== null) return;
-      patchesFetching.current.add(stamp);
-      loadFilePatch(source.path, commit.hash, path)
-        .then((patch) => mergePatch(cacheKey, path, patch))
-        .catch((patchError) => {
-          console.error("Could not read the file patch", patchError);
-          mergePatch(cacheKey, path, []);
-        })
-        .finally(() => patchesFetching.current.delete(stamp));
-    },
-    [repo, selectedCommit, selectedFilesKey, mergePatch],
-  );
+  // Docking is owned by the handlers (a commit or a discard-all close the burst), the user's
+  // exits (×, Esc, swipe), and the emptied-transition below the staging dispatcher.
+  const selectedFilePath = selectedFileByRepo[repo?.id ?? ""] ?? null;
+  const {
+    files,
+    selectedFile,
+    filesLoading,
+    handlePatchNeeded,
+    evictRepoFiles,
+  } = useCommitFiles({ repo, selectedCommit, selectedFilePath });
 
   const handleSelectRepo = useCallback(
     (id: string) => {
