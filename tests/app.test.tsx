@@ -32,6 +32,18 @@ class FakeGit {
     { deco: "", hash: "H2", parents: "", subject: "feat: two" },
   ];
   stashes = "";
+  worktreeRows = [
+    {
+      key: "worktree:dirty.txt",
+      path: "dirty.txt",
+      old_path: null,
+      status: "modified",
+      staged: false,
+      untracked: false,
+      additions: 1,
+      deletions: 0,
+    },
+  ];
   files = {
     numstat: "2\t0\tnew.txt\n1\t1\tsecond.txt\n",
     name_status: "A\tnew.txt\nM\tsecond.txt\n",
@@ -76,6 +88,8 @@ class FakeGit {
         return Promise.resolve("H1\trefs/heads/main\nH1\trefs/remotes/origin/main\n");
       case "read_stashes":
         return Promise.resolve(this.stashes);
+      case "read_worktree_files":
+        return Promise.resolve({ entries: this.worktreeRows });
       case "pull_branch":
         this.calls.push("pull_branch:ran");
         return Promise.resolve("");
@@ -374,6 +388,30 @@ test("Esc closes the details panel from a commit row; a text field keeps its own
     container.querySelector("[data-details]"),
     "the search box's Esc clears the query, it never closes a panel",
   );
+});
+
+test("the staging rail docks itself once the working tree goes clean", async () => {
+  localStorage.setItem(STORAGE_KEYS.repos, JSON.stringify(["C:/repos/demo"]));
+  const { container } = render(<App />);
+  await waitFor(() => {
+    assert.ok(container.querySelector("[data-stage-rail]"), "a dirty repo opens with its rail up");
+  });
+
+  // The work settles elsewhere (a commit or the rail's own actions), and a focus probe
+  // notices: zero rows left, so the empty rail docks without a click.
+  fake.worktreeRows = [];
+  fake.worktree = "wt-2";
+  fireEvent(window, new Event("focus"));
+  const deadline = Date.now() + 4000;
+  let docked = false;
+  while (Date.now() < deadline) {
+    if (container.querySelector("[data-stage-rail]") === null) {
+      docked = true;
+      break;
+    }
+    await new Promise((resolve) => setTimeout(resolve, 50));
+  }
+  assert.ok(docked, "the empty rail docks");
 });
 
 test("an inactive tab sleeps after five minutes and reloads when clicked", async () => {

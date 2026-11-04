@@ -989,6 +989,19 @@ function App() {
     [repo, activeRepoPath, stagingBusy, showFlash],
   );
 
+  // The rail emptied while docked — commit or discard consumed its rows — so it docks too.
+  // Only a same-repo counts-to-zero transition reacts: opening the rail on a deliberately
+  // clean repo (to start work) is a stable choice, not something the next read undoes.
+  const railFlow = useRef<{ id: string | null; count: number }>({ id: null, count: 0 });
+  useEffect(() => {
+    if (!repo) return;
+    const flow = railFlow.current;
+    railFlow.current = { id: repo.id, count: worktreeFiles.length };
+    if (flow.id === repo.id && flow.count > 0 && worktreeFiles.length === 0) {
+      setStageOpen(false);
+    }
+  }, [repo, worktreeFiles, setStageOpen]);
+
   const handleStage = useCallback(
     (paths: string[]) => void runStaging((dir) => stagePaths(dir, paths)),
     [runStaging],
