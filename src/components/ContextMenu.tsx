@@ -30,7 +30,7 @@ interface ContextMenuProps {
 }
 
 const ITEM =
-  "flex w-full cursor-default items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] text-ink hover:bg-hover-glass";
+  "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] text-ink hover:bg-hover-glass";
 
 const COPY_LABELS: Record<CommitRef["type"], string> = {
   branch: "Copy branch name",

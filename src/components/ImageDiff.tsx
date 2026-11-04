@@ -185,7 +185,7 @@ export function ImageDiff({ file, repoPath, commitHash }: ImageDiffProps) {
             aria-pressed={mode === entry.value}
             title={entry.title}
             onClick={() => setMode(entry.value)}
-            className={`h-5.5 cursor-default rounded-full px-2.5 text-[11px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 ${
+            className={`h-5.5 rounded-full px-2.5 text-[11px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 ${
               mode === entry.value
                 ? "bg-primary text-white"
                 : "text-ink-dim hover:bg-hover-glass hover:text-ink"
@@ -318,7 +318,7 @@ export function ImageDiff({ file, repoPath, commitHash }: ImageDiffProps) {
             }}
             onClick={() => setFraction(50)}
             title="Drag on the image; arrow keys also move the divider"
-            className="h-6 cursor-default rounded-full border border-hairline bg-glass-soft px-2.5 text-[11px] font-semibold text-ink-dim backdrop-blur-md hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60"
+            className="h-6 rounded-full border border-hairline bg-glass-soft px-2.5 text-[11px] font-semibold text-ink-dim backdrop-blur-md hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60"
           >
             {Math.round(fraction)}%
           </button>

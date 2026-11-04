@@ -182,7 +182,7 @@ function SortableTab({ item, active, suppressed, onSelect, onClose }: SortableTa
         }}
         aria-label={`Close ${item.name}`}
         title={`Close ${item.name}`}
-        className="mr-1 grid shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink size-4.5"
+        className="mr-1 grid shrink-0 place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink size-4.5"
       >
         <CloseIcon size={8} />
       </button>
@@ -344,7 +344,7 @@ export function TitleBar({
               disabled={adding}
               aria-label="Open repository"
               title="Open a repository folder"
-              className="grid shrink-0 cursor-default place-items-center rounded-lg border border-dashed border-rule bg-glass-soft text-ink-soft backdrop-blur-md hover:bg-glass-strong hover:text-ink disabled:opacity-60 size-7"
+              className="grid shrink-0 place-items-center rounded-lg border border-dashed border-rule bg-glass-soft text-ink-soft backdrop-blur-md hover:bg-glass-strong hover:text-ink disabled:opacity-60 size-7"
             >
               <PlusIcon />
             </button>
@@ -400,7 +400,7 @@ export function TitleBar({
                 }}
                 aria-label="Clear search"
                 title="Clear search"
-                className="absolute right-1 grid cursor-default place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink size-5"
+                className="absolute right-1 grid place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink size-5"
               >
                 <CloseIcon size={9} />
               </button>
@@ -431,7 +431,7 @@ export function TitleBar({
                   ? `Hide uncommitted changes (${stageCount})`
                   : `Show uncommitted changes (${stageCount})`
             }
-            className={`${GLASS_CONTROL} relative grid cursor-default place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-7 disabled:opacity-50 ${
+            className={`${GLASS_CONTROL} relative grid place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-7 disabled:opacity-50 ${
               stageOpen ? "border-primary-ink/40 bg-glass-strong text-ink soft-shadow" : ""
             }`}
           >
@@ -453,7 +453,7 @@ export function TitleBar({
             disabled={fetching}
             aria-label="Fetch from remotes"
             title={fetching ? "Fetching from the remotes…" : "Fetch all remotes (updates the behind/ahead counters)"}
-            className={`${GLASS_CONTROL} grid cursor-default place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 disabled:opacity-50 size-7`}
+            className={`${GLASS_CONTROL} grid place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 disabled:opacity-50 size-7`}
           >
             <RemoteIcon size={13} className={fetching ? "animate-spin" : undefined} />
           </button>
@@ -503,7 +503,7 @@ export function TitleBar({
           disabled={refreshing || !repo}
           aria-label="Refresh"
           title="Reload the current repository"
-          className={`${GLASS_CONTROL} grid cursor-default place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 disabled:opacity-50 size-7`}
+          className={`${GLASS_CONTROL} grid place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 disabled:opacity-50 size-7`}
         >
           <RefreshIcon width={13} height={13} className={refreshing ? "animate-spin" : undefined} />
         </button>
@@ -512,7 +512,7 @@ export function TitleBar({
           onClick={onOpenSettings}
           aria-label="Open settings"
           title="Settings"
-          className={`${GLASS_CONTROL} relative grid cursor-default place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-7`}
+          className={`${GLASS_CONTROL} relative grid place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-7`}
         >
           <SettingsIcon size={13} />
           {updateReady && (
@@ -529,7 +529,7 @@ export function TitleBar({
           onClick={() => void windowAction("minimize")}
           aria-label="Minimize"
           title="Minimize"
-          className="grid w-11 cursor-default place-items-center text-ink-soft hover:bg-hover-glass"
+          className="grid w-11 place-items-center text-ink-soft hover:bg-hover-glass"
         >
           <WindowMinimizeIcon />
         </button>
@@ -538,7 +538,7 @@ export function TitleBar({
           onClick={() => void windowAction("toggleMaximize")}
           aria-label={maximized ? "Restore" : "Maximize"}
           title={maximized ? "Restore" : "Maximize"}
-          className="grid w-11 cursor-default place-items-center text-ink-soft hover:bg-hover-glass"
+          className="grid w-11 place-items-center text-ink-soft hover:bg-hover-glass"
         >
           {maximized ? <WindowRestoreIcon /> : <WindowMaximizeIcon />}
         </button>
@@ -547,7 +547,7 @@ export function TitleBar({
           onClick={() => void windowAction("close")}
           aria-label="Close"
           title="Close"
-          className="grid w-11 cursor-default place-items-center text-ink-soft hover:bg-danger hover:text-white"
+          className="grid w-11 place-items-center text-ink-soft hover:bg-danger hover:text-white"
         >
           <WindowCloseIcon />
         </button>

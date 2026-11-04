@@ -217,6 +217,14 @@
 }
 
 @layer base {
+  /* Interactive controls read as clickable; disabled ones keep the plain arrow. */
+  button:not(:disabled),
+  [role="button"]:not([aria-disabled="true"]),
+  a[href],
+  summary {
+    cursor: pointer;
+  }
+
   :root {
     color-scheme: light;
   }

@@ -26,10 +26,10 @@ function splitPath(path: string): { dir: string; base: string } {
 }
 
 const FILE_ROW_CLASS =
-  "grid h-7 w-full cursor-default grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-2 border-0 bg-transparent pr-3.5 text-left transition-colors hover:bg-hover-glass focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/60 data-[selected=true]:bg-selected-glass data-[selected=true]:shadow-[inset_3px_0_0_var(--color-primary)] data-[selected=true]:hover:bg-selected-glass";
+  "grid h-7 w-full grid-cols-[14px_minmax(0,1fr)_auto] items-center gap-2 border-0 bg-transparent pr-3.5 text-left transition-colors hover:bg-hover-glass focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/60 data-[selected=true]:bg-selected-glass data-[selected=true]:shadow-[inset_3px_0_0_var(--color-primary)] data-[selected=true]:hover:bg-selected-glass";
 
 const DIR_ROW_CLASS =
-  "grid h-7 w-full cursor-default grid-cols-[14px_minmax(0,1fr)] items-center gap-2 border-0 bg-transparent pr-3.5 text-left transition-colors hover:bg-hover-glass focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/60";
+  "grid h-7 w-full grid-cols-[14px_minmax(0,1fr)] items-center gap-2 border-0 bg-transparent pr-3.5 text-left transition-colors hover:bg-hover-glass focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/60";
 
 /**
  * One changed file: status badge, path, +/- counts. The flat list shows the directory prefix
@@ -185,7 +185,7 @@ function ViewToggle({
           aria-pressed={view === segment.value}
           title={segment.title}
           onClick={() => onViewChange?.(segment.value)}
-          className={`h-5.5 cursor-default rounded-full px-2.5 text-[11px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 ${
+          className={`h-5.5 rounded-full px-2.5 text-[11px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 ${
             view === segment.value
               ? "bg-primary text-white"
               : "text-ink-dim hover:bg-hover-glass hover:text-ink"
@@ -234,7 +234,7 @@ export function FileList({
             onClick={onToggleCollapse}
             aria-expanded={!collapsed}
             title={collapsed ? "Expand file list" : "Collapse file list"}
-            className="grid shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-5"
+            className="grid shrink-0 place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-5"
           >
             <ChevronDownIcon size={11} className={collapsed ? "-rotate-90" : ""} />
           </button>

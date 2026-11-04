@@ -365,7 +365,7 @@ function ScopeToggle({
           aria-pressed={scope === segment.value}
           title={segment.title}
           onClick={() => onScopeChange(segment.value)}
-          className={`h-5.5 cursor-default rounded-full px-2.5 text-[11px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 ${
+          className={`h-5.5 rounded-full px-2.5 text-[11px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 ${
             scope === segment.value
               ? "bg-primary text-white"
               : "text-ink-dim hover:bg-hover-glass hover:text-ink"
@@ -405,7 +405,7 @@ function LayoutToggle({
           aria-pressed={layout === segment.value}
           title={segment.title}
           onClick={() => onLayoutChange(segment.value)}
-          className={`h-5.5 cursor-default rounded-full px-2.5 text-[11px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 ${
+          className={`h-5.5 rounded-full px-2.5 text-[11px] font-semibold transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 ${
             layout === segment.value
               ? "bg-primary text-white"
               : "text-ink-dim hover:bg-hover-glass hover:text-ink"
@@ -434,7 +434,7 @@ function WrapToggle({
       aria-label="Wrap long lines"
       title={wrap ? "Scroll long lines" : "Wrap long lines"}
       onClick={() => onWrapChange?.(!wrap)}
-      className={`grid size-6 shrink-0 cursor-default place-items-center rounded-full border transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 ${
+      className={`grid size-6 shrink-0 place-items-center rounded-full border transition-colors focus-visible:ring-2 focus-visible:ring-primary/60 ${
         wrap
           ? "border-primary/40 bg-primary/15 text-primary-ink"
           : "border-hairline bg-glass-soft text-ink-dim backdrop-blur-md hover:bg-hover-glass hover:text-ink"

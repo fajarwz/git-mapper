@@ -42,7 +42,7 @@ const SECTION_HEADER_CLASS =
   "sticky top-0 z-10 flex items-center gap-2 border-b border-hairline bg-sheet-band px-3.5 py-1.5 text-[11px] font-semibold text-ink-dim";
 
 const SECTION_ACTION_CLASS =
-  "ml-auto shrink-0 cursor-default rounded-full px-2 py-0.5 text-[11px] font-semibold text-ink-dim transition-colors hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60 disabled:invisible";
+  "ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold text-ink-dim transition-colors hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60 disabled:invisible";
 
 /** One changed file: status cube, path, counts, and the row's stage/unstage/discard actions. */
 function ItemRow({
@@ -77,7 +77,7 @@ function ItemRow({
     >
       <button
         type="button"
-        className="flex h-7 min-w-0 cursor-default items-center gap-2 bg-transparent text-left focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/60"
+        className="flex h-7 min-w-0 items-center gap-2 bg-transparent text-left focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/60"
         onClick={() => {
           onSelect(file.path);
           onSelectRow?.(file);
@@ -161,7 +161,7 @@ function RowAction({
       title={label}
       onClick={onClick}
       disabled={onClick === undefined}
-      className={`grid size-5 cursor-default place-items-center rounded-full text-ink-dim opacity-70 transition-[opacity,color,background-color] hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-primary/60 ${hoverTone}`}
+      className={`grid size-5 place-items-center rounded-full text-ink-dim opacity-70 transition-[opacity,color,background-color] hover:opacity-100 focus-visible:opacity-100 focus-visible:ring-2 focus-visible:ring-primary/60 ${hoverTone}`}
     >
       {children}
     </button>
@@ -273,7 +273,7 @@ export function StagePanel({
           onClick={onClose}
           aria-label="Close uncommitted-changes rail"
           title="Hide uncommitted changes"
-          className="grid size-7 shrink-0 cursor-default place-items-center rounded-full text-ink-dim transition-colors hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60"
+          className="grid size-7 shrink-0 place-items-center rounded-full text-ink-dim transition-colors hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60"
         >
           <CloseIcon size={10} />
         </button>
@@ -367,7 +367,7 @@ export function StagePanel({
                   ? "Write a commit message first"
                   : "Ctrl+Enter commits the staged files"
             }
-            className="h-7 cursor-default rounded-lg bg-primary px-3 text-[12px] font-semibold text-white transition-filter hover:brightness-110 focus-visible:ring-2 focus-visible:ring-primary-ink/70 disabled:opacity-60"
+            className="h-7 rounded-lg bg-primary px-3 text-[12px] font-semibold text-white transition-filter hover:brightness-110 focus-visible:ring-2 focus-visible:ring-primary-ink/70 disabled:opacity-60"
           >
             Commit
           </button>
@@ -378,7 +378,7 @@ export function StagePanel({
             type="button"
             onClick={() => setPendingDiscard("all")}
             title="Discard every change, staged and unstaged"
-            className="ml-auto shrink-0 cursor-default rounded-full px-2.5 py-1 text-[11px] font-semibold text-ink-dim transition-colors hover:bg-danger/15 hover:text-danger-ink focus-visible:ring-2 focus-visible:ring-primary/60 disabled:invisible"
+            className="ml-auto shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold text-ink-dim transition-colors hover:bg-danger/15 hover:text-danger-ink focus-visible:ring-2 focus-visible:ring-primary/60 disabled:invisible"
             disabled={files.length === 0 || busy}
           >
             Discard all…

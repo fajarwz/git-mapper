@@ -27,7 +27,7 @@ export function EmptyState({ onOpen, loading, repos }: EmptyStateProps) {
           type="button"
           onClick={onOpen}
           disabled={loading}
-          className={`${GLASS_CONTROL} inline-flex h-10 cursor-default items-center gap-2 px-4 text-[13px] font-semibold text-ink hover:bg-sheet-strong disabled:opacity-60`}
+          className={`${GLASS_CONTROL} inline-flex h-10 items-center gap-2 px-4 text-[13px] font-semibold text-ink hover:bg-sheet-strong disabled:opacity-60`}
         >
           <PlusIcon />
           {loading ? "Opening…" : "Open folder"}

@@ -166,7 +166,7 @@ export function DetailsPanel({
                   onClick={() => setSummaryCollapsed((collapsed) => !collapsed)}
                   aria-expanded={!summaryCollapsed}
                   title={summaryCollapsed ? "Expand commit details" : "Collapse commit details"}
-                  className="grid shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-6"
+                  className="grid shrink-0 place-items-center rounded-full text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-6"
                 >
                   <ChevronDownIcon className={summaryCollapsed ? "-rotate-90" : ""} />
                 </button>
@@ -194,7 +194,7 @@ export function DetailsPanel({
                   onClick={onClose}
                   title="Hide details panel"
                   aria-label="Hide details panel"
-                  className="ml-auto grid shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-6"
+                  className="ml-auto grid shrink-0 place-items-center rounded-full text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-6"
                 >
                   <CloseIcon />
                 </button>
@@ -226,7 +226,7 @@ export function DetailsPanel({
                       type="button"
                       onClick={copyHash}
                       title={hashCopied ? undefined : "Copy full commit hash"}
-                      className="w-fit cursor-default rounded font-mono text-[11px] text-ink-soft hover:bg-hover-glass"
+                      className="w-fit rounded font-mono text-[11px] text-ink-soft hover:bg-hover-glass"
                     >
                       {hashCopied ? "Copied!" : commit.hash.slice(0, 10)}
                     </button>
@@ -294,7 +294,7 @@ export function DetailsPanel({
               onClick={onClose}
               aria-label="Hide the uncommitted diff"
               title="Hide the uncommitted diff"
-              className="ml-auto grid size-7 shrink-0 cursor-default place-items-center rounded-full text-ink-dim transition-colors hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60"
+              className="ml-auto grid size-7 shrink-0 place-items-center rounded-full text-ink-dim transition-colors hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60"
             >
               <CloseIcon size={10} />
             </button>

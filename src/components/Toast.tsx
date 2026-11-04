@@ -38,7 +38,7 @@ export function Toast({
           onClick={onClose}
           title="Dismiss"
           aria-label="Dismiss notice"
-          className="grid shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-5"
+          className="grid shrink-0 place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-5"
         >
           <CloseIcon />
         </button>

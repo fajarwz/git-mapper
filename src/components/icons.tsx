@@ -21,6 +21,7 @@ import RawSearchIcon from "../assets/search.svg?react";
 import RawChangesIcon from "../assets/changes.svg?react";
 import RawMinusIcon from "../assets/minus.svg?react";
 import RawUndoIcon from "../assets/undo.svg?react";
+import RawHeartIcon from "../assets/heart.svg?react";
 interface IconProps {
   size?: number;
 }
@@ -99,6 +100,10 @@ export function MinusIcon({ size = 12 }: IconProps) {
 
 export function TrashIcon({ size = 12 }: IconProps) {
   return <SizedIcon glyph={RawUndoIcon} size={size} />;
+}
+
+export function HeartIcon({ size = 11, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawHeartIcon} size={size} className={className} />;
 }
 
 /* Fixed-size glyphs re-exported as-is; their dimensions live in the SVG files. */

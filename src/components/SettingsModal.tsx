@@ -4,7 +4,7 @@ import type { SyntaxScheme } from "../lib/highlight";
 import { GITHUB_URL, type UpdateMode, type UpdateStatus } from "../lib/updater";
 import type { Theme } from "../lib/theme";
 import { PANEL } from "../lib/ui";
-import { CheckIcon, CloseIcon } from "./icons";
+import { CheckIcon, CloseIcon, HeartIcon } from "./icons";
 
 interface SettingsModalProps {
   theme: Theme;
@@ -84,10 +84,12 @@ function updateStatusLine(status: UpdateStatus): string {
   }
 }
 
-function openGithub() {
+const DONATE_URL = "https://github.com/sponsors/fajarwz";
+
+function openExternal(url: string) {
   const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-  if (inTauri) void openUrl(GITHUB_URL);
-  else window.open(GITHUB_URL, "_blank", "noopener");
+  if (inTauri) void openUrl(url);
+  else window.open(url, "_blank", "noopener");
 }
 
 function ThemePreview({ theme }: { theme: Theme }) {
@@ -190,7 +192,7 @@ export function SettingsModal({
             type="button"
             onClick={onClose}
             aria-label="Close settings"
-            className="grid shrink-0 cursor-default place-items-center rounded-full text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-7"
+            className="grid shrink-0 place-items-center rounded-full text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-7"
           >
             <CloseIcon />
           </button>
@@ -212,7 +214,7 @@ export function SettingsModal({
               aria-label="Show avatars"
               title={showAvatars ? "Avatars are on" : "Avatars are off"}
               onClick={() => onShowAvatarsChange(!showAvatars)}
-              className={`relative inline-flex h-5.5 w-10 shrink-0 cursor-default items-center rounded-full border border-hairline transition-colors ${
+              className={`relative inline-flex h-5.5 w-10 shrink-0 items-center rounded-full border border-hairline transition-colors ${
                 showAvatars ? "bg-primary" : "bg-ink/15"
               }`}
             >
@@ -293,7 +295,7 @@ export function SettingsModal({
               aria-label="Update automatically"
               title={updateMode === "auto" ? "Automatic updates are on" : "Updates are manual"}
               onClick={() => onUpdateModeChange(updateMode === "auto" ? "manual" : "auto")}
-              className={`relative inline-flex h-5.5 w-10 shrink-0 cursor-default items-center rounded-full border border-hairline transition-colors ${
+              className={`relative inline-flex h-5.5 w-10 shrink-0 items-center rounded-full border border-hairline transition-colors ${
                 updateMode === "auto" ? "bg-primary" : "bg-ink/15"
               }`}
             >
@@ -343,10 +345,19 @@ export function SettingsModal({
             <p className="m-0 text-[11px] leading-snug text-ink-dim">
               Built by fajarwz — a standalone Git history viewer
             </p>
+            <button
+              type="button"
+              onClick={() => openExternal(DONATE_URL)}
+              title="Sponsor Git Mapper on GitHub, in your browser"
+              className="mt-1 inline-flex items-center gap-1 rounded text-[11px] font-medium text-ink-dim underline-offset-2 hover:text-ink hover:underline focus-visible:text-ink focus-visible:underline focus-visible:outline-none"
+            >
+              <HeartIcon size={11} />
+              Support this project
+            </button>
           </div>
           <button
             type="button"
-            onClick={() => openGithub()}
+            onClick={() => openExternal(GITHUB_URL)}
             title="Open the GitHub repository"
             className="shrink-0 rounded-lg border border-hairline bg-glass-strong px-3 py-1.5 text-[12px] font-semibold text-ink hover:bg-hover-glass"
           >
