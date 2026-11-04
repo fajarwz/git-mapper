@@ -63,6 +63,9 @@ interface StatusInfo {
   head: string;
   /** Digest of the working tree: catches an edit inside a file the count already included. */
   worktree: string;
+  /** The merge resolver's state: MERGE_HEAD present, and its unmerged paths. */
+  merging?: boolean;
+  conflicts?: string[];
 }
 
 /** Cheap, stable digest: we only ever compare ref snapshots for equality. */
@@ -309,6 +312,8 @@ export async function loadRepository(dir: string): Promise<Repository> {
     head: status.head,
     changed: status.changed,
     worktree: status.worktree,
+    merging: status.merging ?? false,
+    conflicts: status.conflicts ?? [],
     refsDigest: hashText(refsRaw),
     stashDigest: hashText(stashesRaw),
     commits: finalCommits,
@@ -354,6 +359,11 @@ export async function refreshRepository(
   const knownDirtyCount = hadWip ? repo.changed : 0;
   // The path count stays put while a file is edited, so the tree digest does the real work.
   const worktreeMoved = status.worktree !== repo.worktree;
+  // A merge arriving (bad pull of work elsewhere) or being resolved must leave the early
+  // exit even when HEAD, refs and the digest sit still: the rail banners off this pair.
+  const mergingMoved =
+    (status.merging ?? false) !== (repo.merging ?? false) ||
+    (status.conflicts ?? []).length !== (repo.conflicts ?? []).length;
 
   if (
     !force &&
@@ -362,7 +372,8 @@ export async function refreshRepository(
     refsDigest === repo.refsDigest &&
     stashDigest === repo.stashDigest &&
     dirtyCount === knownDirtyCount &&
-    !worktreeMoved
+    !worktreeMoved &&
+    !mergingMoved
   ) {
     return null;
   }
@@ -467,6 +478,8 @@ export async function refreshRepository(
       head: status.head,
       changed: status.changed,
       worktree: status.worktree,
+      merging: status.merging ?? false,
+      conflicts: status.conflicts ?? [],
       refsDigest,
       stashDigest,
       commits: withLanes(commits),
@@ -614,6 +627,49 @@ export async function commitStaged(dir: string, message: string): Promise<void> 
 /** Takes the tip commit back one step (`reset --soft`): its tree returns staged, nothing lost. */
 export async function undoCommit(dir: string): Promise<void> {
   await call("undo_commit", { dir }, (raw) => raw as void);
+}
+
+export interface MergeOutcome {
+  merged: boolean;
+  conflicts: string[];
+}
+
+/** Merges a branch into the checked-out one; conflicts come back as the outcome, not an error. */
+export async function mergeBranch(dir: string, target: string): Promise<MergeOutcome> {
+  return call("merge_branch", { dir, target }, (raw) => raw as MergeOutcome);
+}
+
+/** Takes one side of each unmerged path from the index stages and stages it. */
+export async function resolveConflictSides(
+  dir: string,
+  paths: string[],
+  side: "ours" | "theirs",
+): Promise<void> {
+  await call("resolve_conflicts", { dir, paths, side }, (raw) => raw as void);
+}
+
+/** Rolls the merge back to the pre-merge tip; the app asks first via the danger dialog. */
+export async function abortMerge(dir: string): Promise<void> {
+  await call("abort_merge", { dir }, (raw) => raw as void);
+}
+
+/** Commits the fully resolved merge with git's own prepared message (`--no-edit`). */
+export async function completeMerge(dir: string): Promise<void> {
+  await call("complete_merge", { dir }, (raw) => raw as void);
+}
+
+export interface ConflictSnapshot {
+  /** Ours patched against the shared base; empty when our side had no stage (deleted). */
+  oursPatch: string;
+  theirsPatch: string;
+}
+
+/** Both sides of one unmerged path, patched against the base; a missing stage renders absent. */
+export async function loadConflictFiles(dir: string, path: string): Promise<ConflictSnapshot> {
+  return call("read_conflict_files", { dir, path }, (raw) => {
+    const snake = raw as { ours_patch?: string; theirs_patch?: string };
+    return { oursPatch: snake.ours_patch ?? "", theirsPatch: snake.theirs_patch ?? "" };
+  });
 }
 
 
