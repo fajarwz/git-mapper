@@ -16,6 +16,7 @@ import {
 import { PANEL } from "../lib/ui";
 import { Avatar } from "./Avatar";
 import { DiffViewer, type DiffLayout, type DiffScope } from "./DiffViewer";
+import { ConflictViewer, type ConflictFile } from "./ConflictViewer";
 import { FileList, type FileView } from "./FileList";
 import { RefPill } from "./RefPill";
 import type { CommitRef } from "../types";
@@ -52,6 +53,10 @@ interface DetailsPanelProps {
   isWorktree?: boolean;
   /** Asks App for one file's patch (patches are lazy; the file list arrives without them). */
   onPatchNeeded?: (path: string) => void;
+  /** Set while a merge conflict row was summoned from the rail: both sides replace the diff. */
+  conflict?: ConflictFile | null;
+  /** Resolves the conflict's path from within the conflict view (same wire as the rail). */
+  onResolveConflict?: (paths: string[], side: "ours" | "theirs") => void;
   onClose: () => void;
   onHeightChange: (height: number) => void;
 }
@@ -75,6 +80,8 @@ export function DetailsPanel({
   onRefContextMenu,
   isWorktree = false,
   onPatchNeeded,
+  conflict,
+  onResolveConflict,
   onClose,
   onHeightChange,
 }: DetailsPanelProps) {
@@ -123,7 +130,12 @@ export function DetailsPanel({
   // entirely and the diff takes the whole pane — the full-view click, without a duplicate
   // list to maintain next to the staging rail.
   const showSidebar = !isWorktree;
-  const diffViewer = (
+  const diffViewer = conflict ? (
+    <ConflictViewer
+      conflict={conflict}
+      onResolve={(side) => onResolveConflict?.([conflict.path], side)}
+    />
+  ) : (
     <DiffViewer
       files={files}
       file={selectedFile}

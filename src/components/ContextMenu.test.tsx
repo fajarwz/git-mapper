@@ -56,6 +56,42 @@ test("a local branch that is not checked out offers the checkout", () => {
   assert.ok(onClose.mock.calls.length > 0, "the menu closes once the action fires");
 });
 
+test("a non-current local branch offers the merge into the checked-out one", () => {
+  const onMerge = vi.fn();
+  const { getByRole } = render(
+    <ContextMenu
+      target={target({ ref: { type: "branch", name: "feature" } })}
+      onCheckout={vi.fn()}
+      onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
+      head={HEAD}
+      currentBranch="main"
+      onMerge={onMerge}
+      onClose={vi.fn()}
+    />,
+  );
+
+  const item = getByRole("menuitem", { name: "Merge into main" });
+  fireEvent.click(item);
+  assert.equal(onMerge.mock.calls[0][0], "feature");
+});
+
+test("the merge entry only exists for mergeable pills", () => {
+  // No handler passed (detached HEAD, for instance): the checked-out pill offers nothing.
+  const { queryByRole, getByText } = render(
+    <ContextMenu
+      target={target({ ref: { type: "branch", name: "main", isCurrent: true } })}
+      onCheckout={vi.fn()}
+      onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
+      head={HEAD}
+      onClose={vi.fn()}
+    />,
+  );
+  assert.equal(queryByRole("menuitem", { name: /merge/i }), null);
+  assert.ok(getByText("Copy branch name"), "the copy entries still speak for the pill");
+});
+
 test("the checked-out branch offers no checkout entry", () => {
   const { queryByRole, getByRole } = render(
     <ContextMenu

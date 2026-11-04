@@ -31,18 +31,31 @@ const FILES: WorktreeFile[] = [
   row({ key: "worktree:fresh.txt", path: "fresh.txt", status: "added", untracked: true, additions: 4, deletions: 0 }),
 ];
 
-function renderPanel(files: WorktreeFile[] = FILES, busy = false) {
+function renderPanel(files: WorktreeFile[] = FILES, busy = false, mergeProps: {
+  merging?: boolean;
+  conflicts?: string[];
+} = {}) {
   let stagedPaths: string[] | null = null;
   let unstagedPaths: string[] | null = null;
   let discardedPaths: string[] | null = null;
   let discardedAll = false;
   let commitMessage: string | null = null;
+  let resolved: { paths: string[]; side: string } | null = null;
+  let aborted = false;
+  let completed = false;
+  let conflictSelected: string | null = null;
   let closings = 0;
   const { container } = render(
     <StagePanel
       branch="main"
       files={files}
       busy={busy}
+      merging={mergeProps.merging}
+      conflicts={mergeProps.conflicts}
+      onResolve={(paths, side) => (resolved = { paths, side })}
+      onAbortMerge={() => (aborted = true)}
+      onCompleteMerge={() => (completed = true)}
+      onSelectConflict={(path) => (conflictSelected = path)}
       onStage={(paths) => (stagedPaths = paths)}
       onUnstage={(paths) => (unstagedPaths = paths)}
       onDiscard={(paths) => (discardedPaths = paths)}
@@ -58,6 +71,12 @@ function renderPanel(files: WorktreeFile[] = FILES, busy = false) {
     discarded: () => discardedPaths,
     discardedAll: () => discardedAll,
     commit: () => commitMessage,
+    resolved: () => resolved,
+    aborted: () => aborted,
+    completed: () => completed,
+    completedButton: () =>
+      within(container).getByTitle("Commits the resolved merge with git's own prepared message"),
+    conflictSelected: () => conflictSelected,
     closings: () => closings,
   };
 }
@@ -147,4 +166,42 @@ test("busy waits the buttons; the dock affordances stay honest", () => {
   message.focus();
   fireEvent.keyDown(message, { key: "Escape" });
   assert.equal(wrap.closings(), 2, "Esc with focus inside the rail docks it");
+});
+
+test("a merge in progress renders the Conflicts section with its actions", () => {
+  const wrap = renderPanel(FILES, false, { merging: true, conflicts: ["app.ts"] });
+
+  // The conflict row lists once — the Staged/Changes sections do not echo conflicted paths
+  // (App filters them out; the test starts from an App-like shape).
+  assert.ok(within(wrap.container).getByText("Conflicts"));
+  assert.ok(within(wrap.container).getByLabelText("Take ours for app.ts"));
+  assert.ok(within(wrap.container).getByLabelText("Take theirs for app.ts"));
+  const commitButton = within(wrap.container).getByText("Commit") as HTMLButtonElement;
+  assert.equal(commitButton.disabled, true, "a merge in progress reserves the commit button");
+  const complete = within(wrap.container).getByText("Complete merge") as HTMLButtonElement;
+  assert.ok(complete, "completing is the footer's second button during a merge");
+
+  // Sides resolve one-by-one; the row click summons the conflict view.
+  fireEvent.click(within(wrap.container).getByLabelText("Take theirs for app.ts"));
+  assert.deepEqual(wrap.resolved(), { paths: ["app.ts"], side: "theirs" });
+  fireEvent.click(within(wrap.container).getByText("app.ts"));
+  assert.equal(wrap.conflictSelected(), "app.ts");
+
+  // Abort asks first — the dialog's own button carries the payload.
+  fireEvent.click(within(wrap.container).getByText("Abort merge…"));
+  assert.equal(wrap.aborted(), false, "nothing fired before the confirm");
+  fireEvent.click(within(document.body).getByRole("button", { name: "Abort merge" }));
+  assert.equal(wrap.aborted(), true);
+
+  // A merge with everything staged reads resolved and the merge completes from the footer.
+  const stagedFile = row({ key: "index:app.ts", path: "app.ts", staged: true });
+  const settled = renderPanel([stagedFile], false, { merging: true, conflicts: ["app.ts"] });
+  assert.ok(within(settled.container).getByText("resolved"));
+  fireEvent.click(settled.completedButton());
+  assert.equal(settled.completed(), true, "the resolved merge completes from the footer");
+});
+
+test("without a merge nothing of the resolver appears", () => {
+  const wrap = renderPanel();
+  assert.throws(() => within(wrap.container).getByText("Complete merge"));
 });
