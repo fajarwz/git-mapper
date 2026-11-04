@@ -3,9 +3,6 @@ use serde::Serialize;
 use std::path::{Path, PathBuf};
 use std::process::Command;
 
-#[cfg(windows)]
-use std::os::windows::process::CommandExt;
-
 use super::*;
 
 /// A throw-away repository on disk, real `git` CLI driving every command below it.

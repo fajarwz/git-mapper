@@ -5,7 +5,6 @@ use std::path::Path;
 
 use super::*;
 
-#[cfg(windows)]
 #[derive(Serialize)]
 pub struct FilePayload {
     pub numstat: String,

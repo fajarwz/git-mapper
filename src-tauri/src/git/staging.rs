@@ -2,8 +2,6 @@ use std::path::Path;
 
 use super::*;
 
-#[cfg(windows)]
-
 pub fn stage_files_in(dir: &str, paths: &[String]) -> Result<(), String> {
     if paths.is_empty() {
         return Ok(());

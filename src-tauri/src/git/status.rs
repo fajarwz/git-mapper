@@ -3,7 +3,6 @@ use std::path::{Path, PathBuf};
 
 use super::*;
 
-#[cfg(windows)]
 #[derive(Serialize, Debug)]
 pub struct RepoInfo {
     pub path: String,

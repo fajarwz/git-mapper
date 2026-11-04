@@ -1,7 +1,5 @@
 use super::*;
 
-#[cfg(windows)]
-
 /// `--all` includes refs/stash, which drags in the stash commit and the index snapshot it
 /// points at as if they were history. Stashes get their own rows (read_stashes), so they are
 /// excluded here — and from the delta/order reads, which have to describe the same set.
