@@ -1,6 +1,7 @@
 mod actions;
 mod files;
 mod log;
+mod merge;
 mod shell;
 mod staging;
 mod status;
@@ -10,6 +11,7 @@ mod tests;
 pub use actions::*;
 pub use files::*;
 pub use log::*;
+pub use merge::*;
 pub use shell::*;
 pub use staging::*;
 pub use status::*;
@@ -158,6 +160,38 @@ pub async fn push_branch(dir: String) -> Result<String, String> {
     .await
     .map_err(|e| format!("the push task failed: {e}"))?
 }
+
+/// Merges a branch into the checked-out one. Conflicts do not fail the command — the
+/// outcome names them and the staging rail takes over with the resolve/abort/complete
+/// verbs. `run_blocking` because merge can walk the whole worktree on slow mounts.
+#[tauri::command]
+pub async fn merge_branch(dir: String, target: String) -> Result<MergeOutcome, String> {
+    run_blocking("merge", move || merge_branch_in(&dir, &target)).await
+}
+/// Chooses one side of each unmerged path from the index stages and stages it.
+#[tauri::command]
+pub async fn resolve_conflicts(dir: String, paths: Vec<String>, side: String) -> Result<(), String> {
+    run_blocking("resolve conflicts", move || {
+        resolve_conflicts_in(&dir, &paths, &side)
+    })
+    .await
+}
+/// Discards the merge entirely: back to the pre-merge branch tip, behind a danger confirm.
+#[tauri::command]
+pub async fn abort_merge(dir: String) -> Result<(), String> {
+    run_blocking("merge abort", move || abort_merge_in(&dir)).await
+}
+/// Commits the resolved merge with git's own prepared message; refuses paths unresolved.
+#[tauri::command]
+pub async fn complete_merge(dir: String) -> Result<(), String> {
+    run_blocking("merge complete", move || complete_merge_in(&dir)).await
+}
+/// Both conflict sides of one path, patched against the shared base; missing stage = empty.
+#[tauri::command]
+pub async fn read_conflict_files(dir: String, path: String) -> Result<ConflictSnapshot, String> {
+    run_blocking("conflict read", move || read_conflict_files_in(&dir, &path)).await
+}
+
 /// Both sides of an image file change, the way GitHub diffs pictures: old = the parent's blob
 /// (HEAD's for `wip`), new = the commit's (the working file on disk for `wip`). The webview
 /// turns the data URLs into <img> elements with pixel-lossless copies of what git stores.

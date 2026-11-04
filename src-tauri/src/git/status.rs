@@ -40,6 +40,22 @@ pub fn digest(text: &str) -> String {
     format!("{hash:x}:{}", text.len())
 }
 
+/// The `-sb` status lines carrying a conflict pair: a `U` side, or both-added /
+/// both-deleted (no U anywhere) — the merge resolution slice's rows live here.
+pub fn unmerged_paths_of(out: &str) -> Vec<String> {
+    let mut paths = Vec::new();
+    for line in out.lines() {
+        if line.trim().is_empty() || line.starts_with("## ") {
+            continue;
+        }
+        let xy = &line[..2.min(line.len())];
+        if xy.contains('U') || xy == "AA" || xy == "DD" {
+            paths.push(line[3..].trim_end().to_string());
+        }
+    }
+    paths
+}
+
 /// Fingerprint of the working tree: the status list (paths + codes) plus the tracked patch,
 /// plus size/mtime of every untracked file (git keeps those out of any diff).
 /// Only the equality of two stamps matters, so the length and hash of the text both go in.
@@ -107,20 +123,11 @@ pub fn read_status_in(dir: &str) -> Result<StatusInfo, String> {
         let tracked_patch = scope.spawn(|| run_git(dir, &["diff", "--no-color", "HEAD"]).ok());
         // -uall so untracked files are counted one by one instead of per directory.
         let out = run_git(dir, &["status", "-sb", "--untracked-files=all"])?;
-        let mut changed = 0u32;
-        let mut conflicts: Vec<String> = Vec::new();
-        for line in out.lines() {
-            if line.trim().is_empty() || line.starts_with("## ") {
-                continue;
-            }
-            changed += 1;
-            // A conflict pair carries no resolved voice: a `U` side, or both-added /
-            // both-deleted (no U anywhere). The rail will offer sides for each path.
-            let xy = &line[..2.min(line.len())];
-            if xy.contains('U') || xy == "AA" || xy == "DD" {
-                conflicts.push(line[3..].trim_end().to_string());
-            }
-        }
+        let conflicts = unmerged_paths_of(&out);
+        let changed = out
+            .lines()
+            .filter(|l| !l.trim().is_empty() && !l.starts_with("## "))
+            .count() as u32;
         let worktree = worktree_stamp(dir, &out, changed, || tracked_patch.join().ok().flatten());
         // First line: "## main...origin/main [ahead 1, behind 2]" with any piece optional.
         let head = run_git(dir, &["rev-parse", "--verify", "HEAD"])
