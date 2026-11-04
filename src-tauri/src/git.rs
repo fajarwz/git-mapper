@@ -572,8 +572,10 @@ fn discard_files_in(dir: &str, paths: &[String]) -> Result<(), String> {
         &["status", "--porcelain=v2", "--untracked-files=all", "-z"],
     )?;
     // HEAD's paths in one listing: `checkout -f HEAD --` errors for a path it does not carry.
+    // `-r` walks the whole tree — without it the set holds only top-level entries, and any
+    // nested modified path fell through to the intent-to-add branch, which deletes the file.
     let head_paths: std::collections::HashSet<String> =
-        match run_git(dir, &["ls-tree", "--name-only", "-z", "HEAD"]) {
+        match run_git(dir, &["ls-tree", "-r", "--name-only", "-z", "HEAD"]) {
             Ok(tree) => tree.split('\0').map(String::from).collect(),
             Err(_) => std::collections::HashSet::new(), // unborn branch: everything is "not in HEAD"
         };
@@ -1942,12 +1944,24 @@ mod tests {
     fn discard_classifies_untracked_index_adds_and_tracked_paths() {
         let repo = TempRepo::new("discard");
         repo.commit("a.txt", "a\n", "c1");
+        std::fs::create_dir_all(repo.0.join("sub/nested")).expect("dir");
+        repo.commit("sub/nested/deep.txt", "deep\n", "c2");
 
         // A tracked modification goes back to HEAD's text; an untracked file is deleted.
         std::fs::write(repo.0.join("a.txt"), "changed\n").expect("edit");
+        std::fs::write(repo.0.join("sub/nested/deep.txt"), "deep edit\n").expect("nested edit");
         std::fs::write(repo.0.join("tossed.txt"), "doomed\n").expect("untracked file");
-        discard_files_in(repo.path(), &["a.txt".into(), "tossed.txt".into()]).expect("discard");
+        discard_files_in(
+            repo.path(),
+            &["a.txt".into(), "sub/nested/deep.txt".into(), "tossed.txt".into()],
+        )
+        .expect("discard");
         assert_eq!(std::fs::read_to_string(repo.0.join("a.txt")).expect("file"), "a\n");
+        assert_eq!(
+            std::fs::read_to_string(repo.0.join("sub/nested/deep.txt")).expect("file"),
+            "deep\n",
+            "nested paths restore too — HEAD's tree is read recursively, not top-level only"
+        );
         assert!(!repo.0.join("tossed.txt").exists(), "untracked files are removed from disk");
 
         // An index-only add is unstaged, NOT deleted: the content survives as untracked.

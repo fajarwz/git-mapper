@@ -389,8 +389,10 @@ function gitDevApi(): Plugin {
       const fromIndex: string[] = [];
       const fromHead: string[] = [];
       const fromDisk: string[] = [];
+      // `ls-tree -r` walks the whole tree: without -r the set holds only top-level names and
+      // any nested modified path fell into the delete-from-disk branch (the discard-file bug).
       const headSet = new Set(
-        runWith(dirPath, ["ls-tree", "--name-only", "-z", "HEAD"]).split("\0").filter(Boolean),
+        runWith(dirPath, ["ls-tree", "-r", "--name-only", "-z", "HEAD"]).split("\0").filter(Boolean),
       );
       eachStatusV2(statusRaw(dirPath), (x, y, entryPath) => {
         if (!wanted.has(entryPath)) return;
