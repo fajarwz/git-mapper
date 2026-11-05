@@ -52,15 +52,19 @@
   --color-selected-glass: rgb(110 86 207 / 0.16);
   --color-scrim: rgb(255 255 255 / 0.55);
 
-  /* Graph lanes: 6 distinct muted hues that stay separate against glass. */
+  /* Graph lanes: 8 distinct muted hues that stay separate against glass. Gray is
+     reserved for system rows. */
   --color-lane-1: #6e56cf;
   --color-lane-2: #477fb8;
   --color-lane-3: #cf6a92;
   --color-lane-4: #2fa186;
   --color-lane-5: #dd9438;
-  --color-lane-6: #7c77a3;
+  --color-lane-6: #cf5a52;
   --color-lane-7: #3f8f6f;
   --color-lane-8: #b06ab3;
+
+  /* System rows (uncommitted changes, stashes): one fixed gray, same in both themes. */
+  --color-graph-system: #8a8f9c;
 
   /* Glow field: the corner glows behind the glass. Each glow owns one position
      in body::before; retuning the mood means retuning these four + the dark
@@ -118,7 +122,7 @@
   --color-lane-3: #e08bad;
   --color-lane-4: #4cc398;
   --color-lane-5: #efb164;
-  --color-lane-6: #a29cc8;
+  --color-lane-6: #e07a72;
   --color-lane-7: #63c9a4;
   --color-lane-8: #d98fd8;
 

@@ -19,8 +19,8 @@ export const LINE_COLORS = [
   "var(--color-lane-8)",
 ];
 
-/** System rows (uncommitted changes, stashes) draw in the theme's dim gray. */
-export const UNCOMMITTED_COLOR = "var(--color-ink-dim)";
+/** The uncommitted row's dot and connector: one fixed gray, both themes. */
+export const UNCOMMITTED_COLOR = "var(--color-graph-system)";
 
 /**
  * Colour of a branch. Lines and dots belonging to the same branch share this colour even when the

@@ -240,10 +240,12 @@ and the README's Tests badge points at it.
   row per entry with a `stash@{n}` pill and `stashIndex` set. Those rows are NOT pinned above
   history: `mergeStashes` files each one by the date the stash was taken (only the uncommitted
   row is pinned on top), which keeps the list in `--date-order`. They FLOAT in the layout —
-  `withLanes` strips their parents, so each is a one-row tip with no connector to its base: a
-  stash on a months-old commit held a lane open for hundreds of rows, and one whose base sat
-  outside the window traced a line to the very bottom (jersium-marketplace: 8 lanes became 31).
-  The pill and the details panel carry the "taken on" story instead. They are rebuilt on every
+  `withLanes` strips their parents, so each is a one-row tip that holds no lane down to its
+  base: a stash on a months-old commit held a lane open for hundreds of rows, and one whose
+  base sat outside the window traced a line to the very bottom (jersium-marketplace: 8 lanes
+  became 31). `CommitGraph` still draws the link by hand — a dashed curve to the base commit's
+  dot in the stash row's own branch hue, only when the base is loaded, so dot, link and pill
+  match like any branch (fixed gray is the wip row's alone). They are rebuilt on every
   refresh (`stashDigest` notices a take or a drop, and a drop renumbers the survivors so the
   moved pill flashes), and are excluded from the log-order splice. The details panel
   diffs a stash against `^1`; a `stash -u` entry also needs its third parent, a parentless commit

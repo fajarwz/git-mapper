@@ -35,7 +35,7 @@ colors:
   lane-3: "#cf6a92"
   lane-4: "#2fa186"
   lane-5: "#dd9438"
-  lane-6: "#7c77a3"
+  lane-6: "#cf5a52"
   lane-7: "#3f8f6f"
   lane-8: "#b06ab3"
 typography:
@@ -139,7 +139,7 @@ A muted violet world with dusty steel/rose/teal/amber satellites — saturated e
 - **Success Green** (`#30a46c` / ink `#218358`): ahead counters, pushed-north arrows, strings in code.
 - **Warning Amber** (`#e0a24b` / ink `#8a5a11`): sprite-dot tint on the settings gear, behind counters, and the only colour allowed to flash a row (`row-flash`).
 - **Danger Rose** (`#d5535e` / ink `#c23a55`): red confirm dialogs and close buttons only — reserved, never decorative.
-- **Graph lanes** (light `#477fb8 / #cf6a92 / #2fa186 / #dd9438 / #7c77a3 / #3f8f6f / #b06ab3`, all lifted one step in dark): lane identity for the commit graph.
+- **Graph lanes** (light `#477fb8 / #cf6a92 / #2fa186 / #dd9438 / #cf5a52 / #3f8f6f / #b06ab3`, all lifted one step in dark): lane identity for the commit graph. Gray never appears here — it is reserved for the uncommitted row alone: its dot and connector draw in a fixed `#8a8f9c` in both themes. Stash rows keep their branch hue on dot, pill and connector; only the dashed line marks them as snapshots.
 
 ### Neutral
 - **Paper Surface / Canvas** (`#ffffff` light; dark surface `#0f1523`, canvas `#070b12`): solid backgrounds used sparingly (knobs, filled pill text colour) — most backgrounds are glass instead.

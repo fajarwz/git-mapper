@@ -224,8 +224,10 @@ async function readStashes(dir: string): Promise<string> {
     : ((await devApi("read_stashes", { dir })) as { text: string }).text;
 }
 
-function uncommittedCommit(commits: Commit[], changed: number): Commit {
-  const head = commits[0];
+function uncommittedCommit(commits: Commit[], changed: number, head: string): Commit {
+  // The working tree grows out of the checked-out HEAD, not the newest row: with `log --all`
+  // another branch's tip can sit above it. Fall back to the tip only when HEAD is unloaded.
+  const base = commits.find((commit) => commit.hash === head) ?? commits[0];
   return {
     hash: UNCOMMITTED_HASH,
     subject: "Uncommitted changes",
@@ -234,7 +236,7 @@ function uncommittedCommit(commits: Commit[], changed: number): Commit {
     date: new Date().toISOString(),
     lane: 0,
     branchColor: 0,
-    parents: [head.hash],
+    parents: [base.hash],
     refs: [],
     changedCount: changed,
   };
@@ -296,7 +298,7 @@ export async function loadRepository(dir: string): Promise<Repository> {
   const rows = mergeStashes(history, stashRows(parseStashes(stashesRaw)));
   const finalCommits = withLanes(
     status.dirty && history.length > 0
-      ? [uncommittedCommit(history, status.changed), ...rows]
+      ? [uncommittedCommit(history, status.changed, status.head), ...rows]
       : rows,
   );
   return {
@@ -454,7 +456,7 @@ export async function refreshRepository(
   }
 
   const commits = [
-    ...(status.dirty && history.length > 0 ? [uncommittedCommit(history, status.changed)] : []),
+    ...(status.dirty && history.length > 0 ? [uncommittedCommit(history, status.changed, status.head)] : []),
     ...mergeStashes(history, stashes),
   ];
 

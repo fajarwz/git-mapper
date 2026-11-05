@@ -1,6 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { Commit, CommitRef, Repository } from "../types";
+import { UNCOMMITTED_HASH, isStashRow } from "../data/gitLoader";
 import { layoutGraph } from "../lib/graphLanes";
 import { graphWidth } from "../lib/graphGeometry";
 import {
@@ -56,8 +57,17 @@ const HEADER_CELL = "relative flex h-full min-w-0 items-center";
 export function CommitList({ repo, commits, query, selectedHash, flashHashes, onSelect, loadingMore, waking = false, showAvatars, onNearBottom, onCheckoutBranch, onContextMenu }: CommitListProps) {
   // One layout for the graph column and the SVG. Sizing the column from the dot lanes alone used to
   // clip the graph whenever a line ran right of every dot.
+  // Same inputs as gitLoader.withLanes (stash rows float, the uncommitted row is flagged) —
+  // a different shape here desyncs the SVG from the rows' lanes and colours.
   const layout = useMemo(
-    () => layoutGraph(commits.map((commit) => ({ hash: commit.hash, parents: commit.parents }))),
+    () =>
+      layoutGraph(
+        commits.map((commit) => ({
+          hash: commit.hash,
+          parents: isStashRow(commit) ? [] : commit.parents,
+          uncommitted: commit.hash === UNCOMMITTED_HASH,
+        })),
+      ),
     [commits],
   );
   const baseGraphWidth = graphWidth(layout.laneCount);
