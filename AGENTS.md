@@ -4,7 +4,7 @@ Guidance for AI agents working in this repo. Written after the full redesign + r
 
 ## Project
 
-**Git Mapper** (formerly Git Trail) — standalone Git history viewer for Windows. Tauri 2 + React 19 + TypeScript + Tailwind CSS v4 + Vite. Reads real Git data: the Tauri backend runs the `git` CLI and returns porcelain output; TS parsers turn it into `types.ts` shapes. Writes go through the staging rail (stage/unstage/discard, commit, undo tip), stash actions, fetch/pull (`--ff-only`)/push, and in-app merge with a conflict resolver (`merge_branch` + `resolve_conflicts` ours/theirs + `abort_merge`/`complete_merge` in `git/merge.rs`); apart from those scoped verbs, access is read-only.
+**Git Mapper** — standalone Git history viewer for Windows. Tauri 2 + React 19 + TypeScript + Tailwind CSS v4 + Vite. Reads real Git data: the Tauri backend runs the `git` CLI and returns porcelain output; TS parsers turn it into `types.ts` shapes. Writes go through the staging rail (stage/unstage/discard, commit, undo tip), stash actions, fetch/pull (`--ff-only`)/push, and in-app merge with a conflict resolver (`merge_branch` + `resolve_conflicts` ours/theirs + `abort_merge`/`complete_merge` in `git/merge.rs`); apart from those scoped verbs, access is read-only.
 
 - Package/crate/identifier/brand are `git-mapper` / `git_mapper_lib` / `com.fajarwz.git-mapper` / "Git Mapper".
 
