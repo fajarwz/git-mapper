@@ -4,8 +4,7 @@ Guidance for AI agents working in this repo. Written after the full redesign + r
 
 ## Project
 
-**Git Mapper** (formerly Git Trail) — standalone Git history viewer for Windows. Tauri 2 + React 19 + TypeScript + Tailwind CSS v4 + Vite. Reads real Git data: the Tauri backend runs the `git` CLI and returns porcelain output; TS parsers turn it into `types.ts` shapes. Read-only apart from a branch checkout (`checkout_branch`, from double-clicking a branch
-pill), plus `checkout_commit` (detaches HEAD behind a confirm dialog); there is no staging or committing.
+**Git Mapper** — standalone Git history viewer for Windows. Tauri 2 + React 19 + TypeScript + Tailwind CSS v4 + Vite. Reads real Git data: the Tauri backend runs the `git` CLI and returns porcelain output; TS parsers turn it into `types.ts` shapes. Writes go through the staging rail (stage/unstage/discard, commit, undo tip), the stash verbs (apply/pop/drop), fetch/pull (`--ff-only`)/push and the scoped checkouts; apart from those verbs, access is read-only.
 
 - Package/crate/identifier/brand are `git-mapper` / `git_mapper_lib` / `com.fajarwz.git-mapper` / "Git Mapper".
 
@@ -287,5 +286,5 @@ root sets `base = "website"`. Gate: `npm run build` + `npm run check` inside
 
 ## Roadmap (not built yet)
 
-Deep search over unpaginated history (loaded-window filtering is built: the title-bar search box), staging / committing / merging.
+Deep search over unpaginated history (loaded-window filtering is built: the title-bar search box); merge resolution is built and waiting on the local `merge-resolution` branch.
 History pages at 500 commits per read; `loadMoreCommits` appends the next page on scroll.
