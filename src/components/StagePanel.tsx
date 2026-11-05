@@ -319,11 +319,15 @@ export function StagePanel({
           title="Changes"
           count={unstaged.length}
           empty="The working copy is clean."
-          action={{
-            label: "Stage all",
-            title: "Stage every working-tree change",
-            onClick: () => onStage(unstaged.map((file) => file.path)),
-          }}
+          action={
+            unstaged.length > 0
+              ? {
+                label: "Stage all",
+                title: "Stage every working-tree change",
+                onClick: () => onStage(unstaged.map((file) => file.path)),
+              }
+              : undefined
+          }
         >
           {unstaged.map((file) => (
             <ItemRow
