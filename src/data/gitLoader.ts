@@ -130,15 +130,21 @@ function stamp(date: string): number {
 }
 
 /**
- * Stashes are not pinned above history: a stash row files by the date the stash was taken, like
- * any other commit. Each row goes before the first history commit older than it, which keeps the
- * list in git's `--date-order` — the stash's base commit is always below its row, so the lane
- * layout still holds. Equal dates keep the stash list's own order (stash@{0} above stash@{1}).
+ * A stash row hangs directly above the commit it was taken on, so the dashed graph link to its
+ * base spans one row instead of the whole window. Date-filing (before the first older commit)
+ * is only the fallback for a base outside the loaded window: the log's author dates and the
+ * stash's committer date are different clocks, so dates alone parked stashes far above their
+ * base. Several stashes on one base keep the stash list's own order (stash@{0} above stash@{1}).
  */
 function mergeStashes(history: Commit[], stashes: Commit[]): Commit[] {
   const rows = [...history];
   for (const stash of stashes) {
-    const at = rows.findIndex((commit) => stamp(commit.date) < stamp(stash.date));
+    const base = stash.parents[0];
+    const anchored = base ? rows.findIndex((commit) => commit.hash === base) : -1;
+    const at =
+      anchored !== -1
+        ? anchored
+        : rows.findIndex((commit) => stamp(commit.date) < stamp(stash.date));
     if (at === -1) rows.push(stash);
     else rows.splice(at, 0, stash);
   }
@@ -293,8 +299,8 @@ export async function loadRepository(dir: string): Promise<Repository> {
     ...commit,
     refs: mergeRefs(commit.refs, tipRefs.get(commit.hash) ?? []),
   }));
-  // Stashes file into history by the date they were taken; the uncommitted row stays on top:
-  // the working tree is what moves next, then everything else in git's own order.
+  // Stashes hang above their base commit (by date when the base is unloaded); the uncommitted
+  // row stays on top: the working tree is what moves next, then everything else in git's order.
   const rows = mergeStashes(history, stashRows(parseStashes(stashesRaw)));
   const finalCommits = withLanes(
     status.dirty && history.length > 0
