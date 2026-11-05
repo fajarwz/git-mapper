@@ -522,7 +522,7 @@ export function DiffViewer({
     <div data-diff data-syntax={scheme} className="flex min-h-0 min-w-0 flex-col bg-sheet">
       <div className="flex shrink-0 items-center gap-2.5 border-b border-hairline bg-sheet-band px-3.5 py-2">
         {scope === "all" ? (
-          <span className="min-w-0 truncate font-mono text-[11.5px] font-medium text-ink">
+          <span className="min-w-0 truncate text-[11.5px] font-medium text-ink">
             {files.length} file{files.length === 1 ? "" : "s"} changed
           </span>
         ) : file ? (
