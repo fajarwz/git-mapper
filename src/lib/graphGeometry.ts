@@ -19,8 +19,8 @@ export const LINE_COLORS = [
   "var(--color-lane-8)",
 ];
 
-/** Uncommitted changes are drawn in neutral gray, matching vscode-git-graph. */
-export const UNCOMMITTED_COLOR = "#808080";
+/** System rows (uncommitted changes, stashes) draw in the theme's dim gray. */
+export const UNCOMMITTED_COLOR = "var(--color-ink-dim)";
 
 /**
  * Colour of a branch. Lines and dots belonging to the same branch share this colour even when the
@@ -57,6 +57,8 @@ export interface GraphEdge {
   key: string;
   path: string;
   color: string;
+  /** System rows (uncommitted changes) draw dashed, like vscode-git-graph. */
+  uncommitted?: boolean;
 }
 
 /**
@@ -91,11 +93,13 @@ export function buildEdges(layout: GraphLayout): GraphEdge[] {
 
     const flush = (end: number) => {
       if (path === "") return;
-      const color = previousCommitted ? branchColor(branch.color) : UNCOMMITTED_COLOR;
+      const uncommitted = !previousCommitted;
+      const color = uncommitted ? UNCOMMITTED_COLOR : branchColor(branch.color);
       edges.push({
         key: `b${branchIndex}-${segmentStart}`,
         path,
         color,
+        ...(uncommitted ? { uncommitted } : {}),
       });
       path = "";
       segmentStart = end;

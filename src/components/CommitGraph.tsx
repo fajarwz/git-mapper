@@ -39,6 +39,7 @@ export function CommitGraph({ commits, layout, selectedHash }: CommitGraphProps)
           fill="none"
           stroke={edge.color}
           strokeWidth={2}
+          strokeDasharray={edge.uncommitted ? "5 4" : undefined}
           strokeLinecap="round"
         />
       ))}
