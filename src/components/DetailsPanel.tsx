@@ -246,7 +246,7 @@ export function DetailsPanel({
                     </time>
                   </div>
 
-                  <div className="flex min-w-0 items-center gap-1.5 justify-between">
+                  <div className="flex min-h-5 min-w-0 items-center gap-1.5 justify-between">
                     <button
                       type="button"
                       onClick={copyHash}
