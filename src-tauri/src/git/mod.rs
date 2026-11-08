@@ -7,9 +7,23 @@ mod shell;
 mod staging;
 mod status;
 #[cfg(test)]
-mod hunk_tests;
+mod actions_tests;
 #[cfg(test)]
-mod tests;
+mod files_tests;
+#[cfg(test)]
+mod hunks_tests;
+#[cfg(test)]
+mod log_tests;
+#[cfg(test)]
+mod merge_tests;
+#[cfg(test)]
+mod staging_tests;
+#[cfg(test)]
+mod status_tests;
+#[cfg(test)]
+mod sync_tests;
+#[cfg(test)]
+mod test_support;
 
 pub use actions::*;
 pub use files::*;

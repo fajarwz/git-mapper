@@ -25,7 +25,14 @@ cargo test           # in src-tauri/; git.rs against real throwaway repos (runs 
 (`// @vitest-environment jsdom` on the file) and stub `window.__TAURI_INTERNALS__` +
 `ResizeObserver`; `@tauri-apps/api/core` is mocked with `vi.mock(..., () => ({ invoke: vi.fn() }))`.
 `cargo test` builds throwaway git repos under the OS temp dir — keep them self-contained
-(no remote network, cheap fixtures). `npm run lint` is a Tailwind class checker, not a code
+(no remote network, cheap fixtures). Rust tests mirror the TS rule: `src-tauri/src/git/<x>.rs`
+is tested by `<x>_tests.rs` beside it (wired in `mod.rs` as `#[cfg(test)] mod <x>_tests;`, named
+exactly after the module); the one with no module of its own is `sync_tests.rs` (push/pull,
+which live in `mod.rs`). Shared fixtures (`TempRepo`, `git`, `git_out`, `bare_repo`,
+`conflicting_repo`) live in `test_support.rs` — a test file never imports another test file.
+There is no monolithic `tests.rs`; a new test goes with the module whose `*_in` it calls.
+Cross-command workflows would go in `src-tauri/tests/` (integration crate, public API only) once
+the git module is exposed; none exist yet. `npm run lint` is a Tailwind class checker, not a code
 linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass = verifiable state.
 `.github/workflows/ci.yml` runs exactly that gate on every push and pull request (ubuntu runner:
 `npm ci`, lint, build, vitest, then `cargo test` — tauri-build needs `dist/`, hence the build first),
@@ -82,7 +89,15 @@ and the README's Tests badge points at it.
 - **The uncommitted row owns its file list.** `git diff HEAD` never lists untracked paths, so
   `read_commit_files(dir, "wip")` appends numstat/name-status/patch entries for every
   `git ls-files --others --exclude-standard` path (binary → a "not shown" hunk). The dev
-  middleware in `vite.config.ts` mirrors this and the worktree digest — keep the two in sync.
+  middleware (`dev/gitApi/files.ts`, `status.ts`) mirrors this and the worktree digest — keep the
+  two in sync.
+- `dev/gitApi/` — the browser-tab stand-in for the Tauri commands, served by a Vite plugin as
+  `POST /api/git`. One file per Rust module (`status`, `log`, `actions`, `merge`, `hunks`,
+  `staging`, `files`), each exporting a `<module>Handlers` map; `index.ts` merges them and owns
+  the HTTP handler, `git.ts` holds `run` and the `Handlers` type. A new command goes in the file
+  named after its Rust module. `vite.config.ts` stays config only. Files are imported with their
+  `.ts` extension (Vite's future native config loader needs it), and nothing type-checks this
+  folder in CI, so probe a new handler with `curl` against `npm run dev`.
 - `src/lib/` parsers — `gitLogParser`, `gitDiffParser` (DiffLine text carries NO +/- prefix; the renderer adds it), `graphLanes` (git-shaped layout: dense lanes, tips append on the right, merge parents fork just right of the commit, closed lanes shift the rest left, and a commit reserved by several children keeps the leftmost and joins the rest — `MAX_LANES` is a hard width cap). All pure, no React — verifiable with `npx vite-node <probe>` against real git output.
 - Changed files/diffs load lazily per selected commit (`App` keeps `filesByCommitHash`); the commit list never carries them.
 - `src/components/DiffViewer.tsx` — the diff pane has two scopes (`DiffScope`): `file` shows the
