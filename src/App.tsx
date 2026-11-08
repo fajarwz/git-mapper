@@ -53,7 +53,9 @@ import { checkoutBranch,
   loadWorktree,
   stagePaths,
   unstagePaths,
+  applyHunk,
   type ConflictSnapshot,
+  type HunkAction,
 } from "./data/gitLoader";
 import {
   DEFAULT_STAGE_WIDTH,
@@ -65,6 +67,7 @@ import { ResizeHandle } from "./components/ResizeHandle";
 import type { WorktreeFile } from "./lib/staging";
 import type { Repository } from "./types";
 import { useCommitFiles } from "./hooks/useCommitFiles";
+import { useWipSide } from "./hooks/useWipSide";
 
 /** Auto-fetch window on refocus — often enough to notice a push, rare enough to stay quiet. */
 const FETCH_ON_FOCUS_MS = 180_000;
@@ -287,6 +290,15 @@ function App() {
     handlePatchNeeded,
     evictRepoFiles,
   } = useCommitFiles({ repo, selectedCommit, selectedFilePath });
+  // The uncommitted row shows one side at a time (staged / working tree) with hunk buttons.
+  const isWipSelected = selectedCommit?.hash === UNCOMMITTED_HASH;
+  const wipSide = useWipSide({
+    repoPath: repo?.path ?? null,
+    active: isWipSelected && detailsOpen && !conflictView,
+    rows: railFiles,
+    digest: repo?.worktree,
+    selectedFilePath,
+  });
 
   const handleSelectRepo = useCallback(
     (id: string) => {
@@ -367,12 +379,13 @@ function App() {
     setSelectedCommitByRepo((previous) => ({ ...previous, [activeRepoId]: hash }));
     setSelectedFileByRepo((previous) => ({ ...previous, [activeRepoId]: null }));
     setConflictView(null);
+    wipSide.pickSide(null);
     // Picking a commit is a request to read it, so bring the details panel back if it was closed.
     setDetailsOpen(true);
     // The uncommitted row is the rail's second door: it summons the staging state together
     // with its diff; a real commit dock it away — the rail is burst work, not a fixture.
     setStageOpen(hash === UNCOMMITTED_HASH);
-    }, [activeRepoId, setDetailsOpen, setSelectedCommitByRepo, setSelectedFileByRepo, setStageOpen]);
+    }, [activeRepoId, setDetailsOpen, setSelectedCommitByRepo, setSelectedFileByRepo, setStageOpen, wipSide.pickSide]);
 
     // A rail-row click reads that file: the uncommitted row is selected and the details panel
     // rises. The diff scope stays — the reader's preference; the stacked view scrolls to it.
@@ -381,9 +394,10 @@ function App() {
         if (!activeRepoId) return;
         setSelectedCommitByRepo((previous) => ({ ...previous, [activeRepoId]: UNCOMMITTED_HASH }));
         setSelectedFileByRepo((previous) => ({ ...previous, [activeRepoId]: file.path }));
+        wipSide.pickSide(file.staged ? "staged" : "unstaged");
         setDetailsOpen(true);
       },
-      [activeRepoId, setSelectedCommitByRepo, setSelectedFileByRepo, setDetailsOpen],
+      [activeRepoId, setSelectedCommitByRepo, setSelectedFileByRepo, setDetailsOpen, wipSide.pickSide],
     );
 
   const handleSelectFile = useCallback((path: string) => {
@@ -975,6 +989,18 @@ function App() {
     (paths: string[]) => void runStaging((dir) => discardPaths(dir, paths)),
     [runStaging],
   );
+  // A hunk button: the action runs, the rail and repo refresh like any rail write, and the side
+  // reloads explicitly (a hunk moved between index and disk can leave the digest untouched).
+  const reloadWipSide = wipSide.reload;
+  const handleHunkAction = useCallback(
+    (path: string, hunkIndex: number, hunkHeader: string, action: HunkAction) => {
+      const side = action === "unstage" ? "staged" : "unstaged";
+      void runStaging((dir) => applyHunk(dir, path, side, hunkIndex, hunkHeader, action)).then(
+        reloadWipSide,
+      );
+    },
+    [runStaging, reloadWipSide],
+  );
   const handleDiscardAll = useCallback(
     () => void runStaging((dir) => discardEverything(dir)),
     [runStaging],
@@ -1167,11 +1193,16 @@ function App() {
               <DetailsPanel
                 commit={selectedCommit}
                 repoPath={repo.path}
-                files={files}
+                files={isWipSelected ? wipSide.files : files}
                 filesLoading={filesLoading}
-                selectedFile={selectedFile}
+                selectedFile={isWipSelected ? wipSide.selectedFile : selectedFile}
                 onSelectFile={handleSelectFile}
-                onPatchNeeded={handlePatchNeeded}
+                onPatchNeeded={isWipSelected ? undefined : handlePatchNeeded}
+                hunkActions={
+                  isWipSelected
+                    ? { side: wipSide.side, busy: stagingBusy, onAction: handleHunkAction }
+                    : undefined
+                }
                 diffScope={diffScope}
                 onDiffScopeChange={setDiffScope}
                 diffLayout={diffLayout}

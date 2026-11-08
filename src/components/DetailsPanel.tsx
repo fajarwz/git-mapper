@@ -15,7 +15,7 @@ import {
 } from "../lib/tableLayout";
 import { PANEL } from "../lib/ui";
 import { Avatar } from "./Avatar";
-import { DiffViewer, type DiffLayout, type DiffScope } from "./DiffViewer";
+import { DiffViewer, type DiffLayout, type DiffScope, type HunkActions } from "./DiffViewer";
 import { ConflictViewer, type ConflictFile } from "./ConflictViewer";
 import { FileList, type FileView } from "./FileList";
 import { RefPill } from "./RefPill";
@@ -53,6 +53,8 @@ interface DetailsPanelProps {
   isWorktree?: boolean;
   /** Asks App for one file's patch (patches are lazy; the file list arrives without them). */
   onPatchNeeded?: (path: string) => void;
+  /** Uncommitted diff only: the per-hunk buttons and the side (staged / working tree) on show. */
+  hunkActions?: HunkActions;
   /** Set while a merge conflict row was summoned from the rail: both sides replace the diff. */
   conflict?: ConflictFile | null;
   /** Resolves the conflict's path from within the conflict view (same wire as the rail). */
@@ -84,6 +86,7 @@ export function DetailsPanel({
   onRefContextMenu,
   isWorktree = false,
   onPatchNeeded,
+  hunkActions,
   conflict,
   onResolveConflict,
   onWriteConflictText,
@@ -158,6 +161,7 @@ export function DetailsPanel({
       repoPath={repoPath}
       commitHash={commit.hash}
       onPatchNeeded={onPatchNeeded}
+      hunkActions={hunkActions}
     />
   );
 
