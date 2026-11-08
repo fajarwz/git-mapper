@@ -1,4 +1,4 @@
-import { useRef, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import type { KeyboardEvent, PointerEvent } from "react";
 
 type Orientation = "vertical" | "horizontal";
@@ -71,6 +71,14 @@ export function ResizeHandle({
   const [dragging, setDragging] = useState(false);
   const origin = useRef<{ pointer: number; startSize: number } | null>(null);
   const isVertical = orientation === "vertical";
+
+  // A drag that collapses its own panel unmounts this handle before pointerup arrives.
+  useEffect(
+    () => () => {
+      if (origin.current) document.body.classList.remove("is-resizing");
+    },
+    [],
+  );
 
   function clamp(size: number): number {
     return Math.max(min, Math.min(max, size));
