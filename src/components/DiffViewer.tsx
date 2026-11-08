@@ -91,12 +91,14 @@ function DiffBody({
   const highlighted = useHighlightedLines(file.path, texts);
   const changes = useMemo(() => intralineRanges(lines), [lines]);
   // Wrap mode gives up max-content width: rows fill the pane and long lines soft-wrap.
-  const rowSpace = wrap ? "min-w-full" : "w-max min-w-full";
+  // Unwrapped, one w-max box holds every row: each row stretches to the widest line, so tints
+  // and hunk bars end together instead of at their own text width.
+  const rowSpace = "min-w-full";
   const contentSpace = wrap ? "whitespace-pre-wrap break-words pr-[18px]" : "whitespace-pre pr-[18px]";
   let hunkIndex = -1;
 
   return (
-    <>
+    <div className={wrap ? undefined : "w-max min-w-full"}>
       {lines.map((line, index) => {
         if (line.type === "hunk") {
           hunkIndex += 1;
@@ -146,7 +148,7 @@ function DiffBody({
           </div>
         );
       })}
-    </>
+    </div>
   );
 }
 
@@ -606,7 +608,8 @@ export function DiffViewer({
                 }}
               >
                 <FileHeader file={item} />
-                <div className="pt-1">
+                {/* Unwrapped, each file scrolls sideways on its own; the header stays outside. */}
+                <div className={wrap ? "pt-1" : "overflow-x-auto pt-1"}>
                   <DiffSection
                     file={item}
                     layout={layout}

@@ -390,7 +390,7 @@ test("wrap off restores the scrollable max-content rows", () => {
   );
 
   const row = container.querySelector("[data-diff-line='context']");
-  assert.ok(row?.className.includes("w-max"), "rows size to their longest line again");
+  assert.ok(row?.parentElement?.className.includes("w-max"), "rows share one box sized to the longest line");
   assert.equal(container.querySelector(".whitespace-pre-wrap"), null, "nothing soft-wraps");
 });
 
