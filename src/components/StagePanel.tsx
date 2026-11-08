@@ -34,6 +34,11 @@ interface StagePanelProps {
   onCommit: (message: string) => void;
   /** A row click is a request to read that file: App selects it in the details diff. */
   onSelectRow?: (file: WorktreeFile) => void;
+  /**
+   * The row the diff pane is showing (path + side). App owns it, so the highlight follows the
+   * pane — including its fallback to the other side. Unset: the panel tracks its own clicks.
+   */
+  selection?: { path: string; staged: boolean } | null;
   /** Docks the drawer: the × in the header, Esc while the panel holds focus, the badge state. */
   onClose: () => void;
 }
@@ -67,7 +72,8 @@ function ItemRow({
 }: {
   file: WorktreeFile;
   selected: boolean;
-  onSelect: (path: string) => void;
+  /** Gets the row's key, not its path: a half-staged file is two rows and only one is selected. */
+  onSelect: (key: string) => void;
   /** Row click handler from App: selects the file for the details-diff pane. */
   onSelectRow?: (file: WorktreeFile) => void;
   /** Worktree rows only: stamps the file into the index. */
@@ -90,7 +96,7 @@ function ItemRow({
         type="button"
         className="flex h-7 min-w-0 items-center gap-2 bg-transparent text-left focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/60"
         onClick={() => {
-          onSelect(file.path);
+          onSelect(file.key);
           onSelectRow?.(file);
         }}
       >
@@ -232,10 +238,15 @@ export function StagePanel({
   onDiscardAll,
   onCommit,
   onSelectRow,
+  selection,
   onClose,
 }: StagePanelProps) {
   const [message, setMessage] = useState("");
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const isSelected = (file: WorktreeFile) =>
+    selection === undefined
+      ? file.key === selectedPath
+      : selection !== null && selection.path === file.path && selection.staged === file.staged;
   const [pendingDiscard, setPendingDiscard] = useState<"all" | WorktreeFile | null>(null);
   const [pendingAbort, setPendingAbort] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
@@ -405,7 +416,7 @@ export function StagePanel({
             <ItemRow
               key={file.key}
               file={file}
-              selected={file.path === selectedPath}
+              selected={isSelected(file)}
               onSelect={setSelectedPath}
               onSelectRow={onSelectRow}
               onUnstage={() => onUnstage([file.path])}
@@ -432,7 +443,7 @@ export function StagePanel({
             <ItemRow
               key={file.key}
               file={file}
-              selected={file.path === selectedPath}
+              selected={isSelected(file)}
               onSelect={setSelectedPath}
               onSelectRow={onSelectRow}
               onStage={() => onStage([file.path])}

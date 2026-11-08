@@ -48,6 +48,7 @@ and the README's Tests badge points at it.
 - `src/components/BootScreen.tsx` — launch screen. `App` starts `booting` true whenever `readStoredPaths()` finds saved tabs (synchronous, so the decision exists before the first paint) and clears it in the hydration effect's `finally`. While it is up the content area shows the brand + dots, **not** `EmptyState` — the open-folder card must only ever mean "no repositories are open", never "still loading". Fresh installs skip it. Dots animate via the `boot-dot` utility in index.css.
 - `src/components/TitleBar.tsx` — the window IS undecorated (`decorations: false` in `tauri.conf.json`), so this bar doubles as the title bar: brand, repo tabs (Chrome-style shrink + `tab-fade` on clipped labels), toolbar actions (a search box that filters the active repo's loaded commits — Ctrl+F focuses it, Esc clears — plus a refresh button whose glyph spins for at least 550ms so a fast local read still reads as work, and settings) and the caption buttons. Tabs reorder through `@dnd-kit/sortable` (`horizontalListSortingStrategy` + `DragOverlay`); the sensors are **pointer only**, because the keyboard sensor claims Space/Enter on the focused tab and a tab must stay activatable from the keyboard. HTML5 drag-and-drop is not an option here: the webview routes drag events to Tauri's file-drop handler. `data-tauri-drag-region` covers the bar background and the tab strip; the caption buttons need the `core:window:allow-*` entries in `src-tauri/capabilities/default.json`.
 - `src-tauri/src/git.rs` — Tauri commands running the `git` CLI: `open_repository` (validates + toplevel/name), `read_status` (branch / ahead / behind / head + the worktree digest), `read_refs` (`hash	fullref` lines), `read_log` (porcelain fields `\x00`-separated, records `\x1e`-separated, decorations lead each record), `read_log_delta` (`git log --all ^<head>`), `read_log_order` (hashes only, for splicing),
+  `read_wip_side` + `apply_hunk` (hunk-level staging, `git/hunks.rs`),
   `read_commit_files` (numstat + name-status + patch, first-parent; root via `--root`; the
   pseudo hash `wip` means the working tree; one `rev-list --parents -1` probe sets root and
   the `stash -u` third parent, and the diff spawns run concurrently on scoped threads via
@@ -109,6 +110,19 @@ and the README's Tests badge points at it.
   (`git-mapper:diff-wrap`). A split row whose other side has no line (add-only/delete-only) tints
   that void half with a neutral `bg-ink/[0.06]` wash so "came from empty" reads at a glance.
   Diff gutters are muted `text-ink/45` (GitHub's gray), clearly fainter than the code beside them.
+- **The uncommitted diff is one side at a time, like VS Code.** A rail row click picks `staged`
+  (HEAD→index) or `unstaged` (index→disk, untracked files included); `useWipSide` loads that side
+  through `read_wip_side` (patches included) and falls back to the other side when the chosen one
+  has no rows left. `DiffViewer`'s `hunkActions` puts Stage hunk + Discard (confirm) on the
+  unstaged side and Unstage hunk on the staged side, via `HunkButtons.tsx`. `apply_hunk`
+  (`git/hunks.rs`) rebuilds the patch from a fresh one-file diff, checks the hunk's `@@` header
+  against what the UI showed (a moved hunk is refused, never misapplied) and pipes it to
+  `git apply --recount` (`--cached`, `--reverse` or both). An untracked file is one all-added
+  hunk, so its hunk verbs are the whole-file verbs. The combined `git diff HEAD` read behind the
+  commit-list row and file totals is unchanged. The digest does NOT move when a hunk shifts
+  between index and disk inside an already-`MM` file, hence `useWipSide.reload()` after every
+  hunk action. The dev middleware mirrors both commands. Line-level staging reuses `apply_hunk`'s
+  `git apply` with a trimmed hunk; not built.
 - `src/components/FileList.tsx` — the changed-file sidebar. A List/Tree toggle (same segmented
   pattern as the diff-scope toggle) sits beside the counts; DetailsPanel owns the choice and
   persists it (`git-mapper:file-view`; `src/lib/fileTree.ts` builds the tree). The tree renders
@@ -307,5 +321,5 @@ root sets `base = "website"`. Gate: `npm run build` + `npm run check` inside
 
 ## Roadmap (not built yet)
 
-Deep search over unpaginated history (loaded-window filtering is built: the title-bar search box); PR review via a `gh` CLI passthrough is the discussed next slice. (Staging, committing and merge resolution are built.)
+Deep search over unpaginated history (loaded-window filtering is built: the title-bar search box); line-level staging (hunk-level is built); PR review via a `gh` CLI passthrough is the discussed next slice. (Staging, committing and merge resolution are built.)
 History pages at 500 commits per read; `loadMoreCommits` appends the next page on scroll.

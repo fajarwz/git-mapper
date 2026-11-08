@@ -14,7 +14,10 @@ import type { SyntaxScheme } from "../lib/highlight";
 import { intralineRanges, markedLine, type Range } from "../lib/intraline";
 import { isImageFile } from "../lib/imageDiff";
 import { ImageDiff } from "./ImageDiff";
+import { HunkButtons, type HunkActions } from "./HunkButtons";
 import { TextWrapIcon } from "./icons";
+
+export type { HunkActions } from "./HunkButtons";
 
 /**
  * Which files the diff pane shows. "file" is the classic one-file-at-a-time view; "all" stacks
@@ -47,6 +50,8 @@ interface DiffViewerProps {
    * selected file asks at mount, stacked sections ask on scroll-in (240px margin).
    */
   onPatchNeeded?: (path: string) => void;
+  /** Uncommitted diff only: per-hunk stage / unstage / discard buttons, and which side this is. */
+  hunkActions?: HunkActions;
 }
 
 const PREFIX = {
@@ -72,7 +77,15 @@ const GUTTER_TONE = "text-ink/45";
  * reusing the instance across files kept the PREVIOUS file's token HTML on the new file's rows
  * until the new grammar resolved — the preview read as the other file.
  */
-function DiffBody({ file, wrap }: { file: ChangedFile; wrap: boolean }) {
+function DiffBody({
+  file,
+  wrap,
+  hunkActions,
+}: {
+  file: ChangedFile;
+  wrap: boolean;
+  hunkActions?: HunkActions;
+}) {
   const lines = useMemo(() => numberDiffLines(file.diff ?? []), [file]);
   const texts = useMemo(() => lines.map((line) => line.text), [lines]);
   const highlighted = useHighlightedLines(file.path, texts);
@@ -80,18 +93,23 @@ function DiffBody({ file, wrap }: { file: ChangedFile; wrap: boolean }) {
   // Wrap mode gives up max-content width: rows fill the pane and long lines soft-wrap.
   const rowSpace = wrap ? "min-w-full" : "w-max min-w-full";
   const contentSpace = wrap ? "whitespace-pre-wrap break-words pr-[18px]" : "whitespace-pre pr-[18px]";
+  let hunkIndex = -1;
 
   return (
     <>
       {lines.map((line, index) => {
         if (line.type === "hunk") {
+          hunkIndex += 1;
           return (
             <div
               key={index}
               data-diff-line="hunk"
-              className={`block w-full ${wrap ? "whitespace-pre-wrap" : "whitespace-pre"} bg-primary/[0.07] px-3.5 py-1 font-semibold text-primary-ink`}
+              className={`${hunkActions ? "flex items-center gap-2" : "block"} w-full ${wrap ? "whitespace-pre-wrap" : "whitespace-pre"} bg-primary/[0.07] px-3.5 py-1 font-semibold text-primary-ink`}
             >
-              {line.text}
+              {hunkActions ? <span className="min-w-0">{line.text}</span> : line.text}
+              {hunkActions && (
+                <HunkButtons path={file.path} index={hunkIndex} header={line.text} actions={hunkActions} />
+              )}
             </div>
           );
         }
@@ -139,12 +157,14 @@ function DiffSection({
   wrap,
   repoPath,
   commitHash,
+  hunkActions,
 }: {
   file: ChangedFile;
   layout: DiffLayout;
   wrap: boolean;
   repoPath?: string;
   commitHash?: string;
+  hunkActions?: HunkActions;
 }) {
   return isImageFile(file.path) ? (
     <ImageDiff key={file.path} file={file} repoPath={repoPath} commitHash={commitHash} />
@@ -153,9 +173,9 @@ function DiffSection({
       Loading diff…
     </p>
   ) : layout === "split" ? (
-    <SplitDiffBody key={file.path} file={file} wrap={wrap} />
+    <SplitDiffBody key={file.path} file={file} wrap={wrap} hunkActions={hunkActions} />
   ) : (
-    <DiffBody key={file.path} file={file} wrap={wrap} />
+    <DiffBody key={file.path} file={file} wrap={wrap} hunkActions={hunkActions} />
   );
 }
 
@@ -230,9 +250,18 @@ function SplitCells({
  * per-row grids cannot do (each row would size its own auto column). Same lazy grammar load
  * and per-file mount as the unified body.
  */
-function SplitDiffBody({ file, wrap }: { file: ChangedFile; wrap: boolean }) {
+function SplitDiffBody({
+  file,
+  wrap,
+  hunkActions,
+}: {
+  file: ChangedFile;
+  wrap: boolean;
+  hunkActions?: HunkActions;
+}) {
   const lines = useMemo(() => numberDiffLines(file.diff ?? []), [file]);
   const rows = useMemo(() => splitDiffRows(lines), [lines]);
+  let hunkIndex = -1;
   const texts = useMemo(() => lines.map((line) => line.text), [lines]);
   const highlighted = useHighlightedLines(file.path, texts);
   const changes = useMemo(() => intralineRanges(lines), [lines]);
@@ -245,13 +274,22 @@ function SplitDiffBody({ file, wrap }: { file: ChangedFile; wrap: boolean }) {
     >
       {rows.map((row, rowIndex) => {
         if (row.hunk) {
+          hunkIndex += 1;
           return (
             <div
               key={rowIndex}
               data-diff-row="hunk"
-              className={`col-span-4 block ${wrap ? "whitespace-pre-wrap" : "whitespace-pre"} bg-primary/[0.07] px-3.5 py-1 font-semibold text-primary-ink`}
+              className={`col-span-4 ${hunkActions ? "flex items-center gap-2" : "block"} ${wrap ? "whitespace-pre-wrap" : "whitespace-pre"} bg-primary/[0.07] px-3.5 py-1 font-semibold text-primary-ink`}
             >
-              {row.hunk.text}
+              {hunkActions ? <span className="min-w-0">{row.hunk.text}</span> : row.hunk.text}
+              {hunkActions && (
+                <HunkButtons
+                  path={file.path}
+                  index={hunkIndex}
+                  header={row.hunk.text}
+                  actions={hunkActions}
+                />
+              )}
             </div>
           );
         }
@@ -451,6 +489,7 @@ export function DiffViewer({
   repoPath,
   commitHash,
   onPatchNeeded,
+  hunkActions,
 }: DiffViewerProps) {
   const totals = useMemo(
     () =>
@@ -529,6 +568,14 @@ export function DiffViewer({
           </span>
         )}
         {scope === "file" && file && <RenameScore file={file} />}
+        {hunkActions && (
+          <span
+            data-diff-side={hunkActions.side}
+            className="shrink-0 rounded-full bg-primary/15 px-2 py-0.5 text-[10.5px] font-semibold text-primary-ink"
+          >
+            {hunkActions.side === "staged" ? "Staged" : "Working tree"}
+          </span>
+        )}
         <span className="ml-auto flex shrink-0 gap-2 font-mono text-[11px] font-semibold">
           <span className="text-success-ink">
             +{scope === "all" ? totals.additions : (file?.additions ?? 0)}
@@ -566,6 +613,7 @@ export function DiffViewer({
                     wrap={wrap}
                     repoPath={repoPath}
                     commitHash={commitHash}
+                    hunkActions={hunkActions}
                   />
                 </div>
               </section>
@@ -582,6 +630,7 @@ export function DiffViewer({
               wrap={wrap}
               repoPath={repoPath}
               commitHash={commitHash}
+              hunkActions={hunkActions}
             />
           ) : (
             <p className="m-0 p-4 font-sans text-[12px] text-ink-dim">

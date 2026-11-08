@@ -6,9 +6,9 @@ use std::process::Command;
 use super::*;
 
 /// A throw-away repository on disk, real `git` CLI driving every command below it.
-struct TempRepo(PathBuf);
+pub(super) struct TempRepo(pub(super) PathBuf);
 
-fn git(dir: &Path, args: &[&str]) {
+pub(super) fn git(dir: &Path, args: &[&str]) {
     let out = Command::new("git")
         .args(args)
         .current_dir(dir)
@@ -30,7 +30,7 @@ fn set_identity(dir: &Path) {
 }
 
 impl TempRepo {
-    fn new(label: &str) -> Self {
+    pub(super) fn new(label: &str) -> Self {
         let dir =
             std::env::temp_dir().join(format!("git-mapper-test-{}-{label}", std::process::id()));
         let _ = std::fs::remove_dir_all(&dir);
@@ -42,11 +42,11 @@ impl TempRepo {
         TempRepo(dir)
     }
 
-    fn path(&self) -> &str {
+    pub(super) fn path(&self) -> &str {
         self.0.to_string_lossy().replace('\\', "/").leak()
     }
 
-    fn commit(&self, file: &str, body: &str, message: &str) {
+    pub(super) fn commit(&self, file: &str, body: &str, message: &str) {
         std::fs::write(self.0.join(file), body).expect("file written");
         git(&self.0, &["add", file]);
         git(&self.0, &["commit", "-q", "-m", message]);
@@ -66,7 +66,7 @@ fn records_of(raw: &str) -> Vec<Vec<String>> {
         .collect()
 }
 
-fn git_out(dir: &Path, args: &[&str]) -> String {
+pub(super) fn git_out(dir: &Path, args: &[&str]) -> String {
     let out = Command::new("git")
         .args(args)
         .current_dir(dir)

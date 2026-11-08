@@ -627,6 +627,31 @@ export async function discardEverything(dir: string): Promise<void> {
   await call("discard_all", { dir }, (raw) => raw as void);
 }
 
+export type WipSide = "staged" | "unstaged";
+export type HunkAction = "stage" | "unstage" | "discard";
+
+/** One side of the uncommitted changes with patches: HEAD→index, or index→disk plus untracked. */
+export async function loadWipSide(dir: string, side: WipSide): Promise<ChangedFile[]> {
+  const payload = await call("read_wip_side", { dir, side }, (raw) => raw as RawFilePayload);
+  return parseCommitFiles(payload, true);
+}
+
+/** Stages, unstages or discards one hunk; `hunkHeader` lets the backend refuse a moved hunk. */
+export async function applyHunk(
+  dir: string,
+  path: string,
+  side: WipSide,
+  hunkIndex: number,
+  hunkHeader: string,
+  action: HunkAction,
+): Promise<void> {
+  await call(
+    "apply_hunk",
+    { dir, path, side, hunkIndex, hunkHeader, action },
+    (raw) => raw as void,
+  );
+}
+
 /** Commits the current index with `-m`; a message is required and pre-trimmed. */
 export async function commitStaged(dir: string, message: string): Promise<void> {
   await call("commit_staged", { dir, message }, (raw) => raw as void);

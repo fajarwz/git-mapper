@@ -19,6 +19,8 @@ pub fn run() {
             git::unstage_files,
             git::discard_files,
             git::discard_all,
+            git::read_wip_side,
+            git::apply_hunk,
             git::commit_staged,
             git::undo_commit,
             git::pull_branch,
