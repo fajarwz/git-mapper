@@ -1,4 +1,4 @@
-use super::tests::{TempRepo, git_out};
+use super::test_support::{TempRepo, git_out};
 use super::*;
 
 /// Twenty numbered lines: edits at line 2 and line 19 sit in separate hunks (3 lines of context).
