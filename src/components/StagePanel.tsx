@@ -34,6 +34,11 @@ interface StagePanelProps {
   onCommit: (message: string) => void;
   /** A row click is a request to read that file: App selects it in the details diff. */
   onSelectRow?: (file: WorktreeFile) => void;
+  /**
+   * The row the diff pane is showing (path + side). App owns it, so the highlight follows the
+   * pane — including its fallback to the other side. Unset: the panel tracks its own clicks.
+   */
+  selection?: { path: string; staged: boolean } | null;
   /** Docks the drawer: the × in the header, Esc while the panel holds focus, the badge state. */
   onClose: () => void;
 }
@@ -233,10 +238,15 @@ export function StagePanel({
   onDiscardAll,
   onCommit,
   onSelectRow,
+  selection,
   onClose,
 }: StagePanelProps) {
   const [message, setMessage] = useState("");
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
+  const isSelected = (file: WorktreeFile) =>
+    selection === undefined
+      ? file.key === selectedPath
+      : selection !== null && selection.path === file.path && selection.staged === file.staged;
   const [pendingDiscard, setPendingDiscard] = useState<"all" | WorktreeFile | null>(null);
   const [pendingAbort, setPendingAbort] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
@@ -406,7 +416,7 @@ export function StagePanel({
             <ItemRow
               key={file.key}
               file={file}
-              selected={file.key === selectedPath}
+              selected={isSelected(file)}
               onSelect={setSelectedPath}
               onSelectRow={onSelectRow}
               onUnstage={() => onUnstage([file.path])}
@@ -433,7 +443,7 @@ export function StagePanel({
             <ItemRow
               key={file.key}
               file={file}
-              selected={file.key === selectedPath}
+              selected={isSelected(file)}
               onSelect={setSelectedPath}
               onSelectRow={onSelectRow}
               onStage={() => onStage([file.path])}

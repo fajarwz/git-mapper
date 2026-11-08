@@ -1151,6 +1151,11 @@ function App() {
                   onDiscardAll={handleDiscardAll}
                   onCommit={handleStageCommit}
                   onSelectRow={handleRailSelectFile}
+                  selection={
+                    isWipSelected && !conflictView && wipSide.selectedFile
+                      ? { path: wipSide.selectedFile.path, staged: wipSide.side === "staged" }
+                      : null
+                  }
                   onClose={() => setStageOpen(false)}
                 />
                 <ResizeHandle

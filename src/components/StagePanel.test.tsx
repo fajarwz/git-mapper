@@ -224,3 +224,48 @@ test("clicking one copy of a half-staged file highlights only that row", () => {
     ["true", "false"],
   );
 });
+
+test("a selection from App decides the highlight, side included", () => {
+  const files = [
+    row({ key: "index:a.txt", path: "a.txt", staged: true }),
+    row({ key: "worktree:a.txt", path: "a.txt" }),
+  ];
+  const view = render(
+    <StagePanel
+      branch="main"
+      files={files}
+      onResolve={() => {}}
+      onAbortMerge={() => {}}
+      onCompleteMerge={() => {}}
+      onStage={() => {}}
+      onUnstage={() => {}}
+      onDiscard={() => {}}
+      onDiscardAll={() => {}}
+      onCommit={() => {}}
+      selection={{ path: "a.txt", staged: false }}
+      onClose={() => {}}
+    />,
+  );
+  const marks = () =>
+    Array.from(view.container.querySelectorAll("[data-staging-item]")).map((item) =>
+      item.getAttribute("data-selected"),
+    );
+  assert.deepEqual(marks(), ["false", "true"]);
+  view.rerender(
+    <StagePanel
+      branch="main"
+      files={files}
+      onResolve={() => {}}
+      onAbortMerge={() => {}}
+      onCompleteMerge={() => {}}
+      onStage={() => {}}
+      onUnstage={() => {}}
+      onDiscard={() => {}}
+      onDiscardAll={() => {}}
+      onCommit={() => {}}
+      selection={{ path: "a.txt", staged: true }}
+      onClose={() => {}}
+    />,
+  );
+  assert.deepEqual(marks(), ["true", "false"]);
+});
