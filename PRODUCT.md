@@ -31,7 +31,7 @@ Lightweight zero-config viewer that runs real `git` for its data but looks like 
 ## Capabilities and Constraints
 
 - Reads: 500-commit pages (scroll to load more), refs, status, per-commit changed files + patches, image blobs for picture diffs.
-- Mutating: branch checkout (double-click a pill), `checkout_commit` (detached HEAD behind a confirm), the staging rail (stage/unstage/discard, commit with a message, undo the tip), stash apply/pop/drop, fetch/pull (`--ff-only`) and push, and in-app `merge_branch` with a conflict resolver (take ours/theirs per path, mark manually resolved, abort behind a danger confirm, complete with git's own prepared message).
+- Mutating: branch checkout (double-click a pill), `checkout_commit` (detached HEAD behind a confirm), the staging rail (stage/unstage/discard, commit with a message, undo the tip), stash apply/pop/drop, fetch/pull (`--ff-only`) and push, and in-app `merge_branch` with a conflict resolver (keep the current or incoming version per path, or choose current/incoming/both per conflict block inline; mark manually resolved, abort behind a danger confirm, complete with git's own prepared message).
 - Search filters only the loaded 500-commit window (Ctrl+F); deep search over full history is a separate planned slice.
 - Stash rows are viewed/applied/popped/dropped; history rows offer copy, checkout and stash actions via context menu.
 - Light/dark glass themes; window bounds live outside localStorage (window-state plugin).
