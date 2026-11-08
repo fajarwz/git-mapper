@@ -267,6 +267,9 @@ export function StagePanel({
   }, [pendingDiscard, onClose]);
 
   const staged = files.filter((file) => file.staged);
+  const unresolved = merging
+    ? (conflicts ?? []).filter((path) => !staged.some((file) => file.path === path)).length
+    : 0;
   const unstaged = files.filter((file) => !file.staged);
   const additions = files.reduce((total, file) => total + file.additions, 0);
   const deletions = files.reduce((total, file) => total + file.deletions, 0);
@@ -454,64 +457,84 @@ export function StagePanel({
       </div>
 
       <footer className="shrink-0 border-t border-hairline bg-sheet-band p-3">
-        <textarea
-          rows={2}
-          value={message}
-          onChange={(event) => setMessage(event.target.value)}
-          onKeyDown={(event) => {
-            if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
-              event.preventDefault();
-              handleCommit();
-            }
-          }}
-          placeholder="Commit message"
-          aria-label="Commit message"
-          title="Ctrl+Enter commits the staged files"
-          className="block w-full resize-none rounded-lg border border-transparent bg-glass-soft px-2.5 py-1.5 text-[12px] leading-normal text-ink placeholder:text-ink-dim focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
-        />
-        <div className="mt-2 flex items-center gap-2">
-          <button
-            type="button"
-            disabled={staged.length === 0 || message.trim() === "" || busy || merging}
-            onClick={handleCommit}
-            title={
-              merging
-                ? "A merge is in progress — take the sides, then complete it"
-                : staged.length === 0
-                  ? "Stage a file first"
-                  : message.trim() === ""
-                    ? "Write a commit message first"
-                    : "Ctrl+Enter commits the staged files"
-            }
-            className="h-7 rounded-lg bg-primary px-3 text-[12px] font-semibold text-white transition-filter hover:brightness-110 focus-visible:ring-2 focus-visible:ring-primary-ink/70 disabled:opacity-60"
-          >
-            Commit
-          </button>
-          {merging ? (
+        {merging ? (
+          <>
+            <p className="m-0 mb-2 text-[11.5px] leading-snug text-ink-dim">
+              {unresolved > 0
+                ? `${unresolved} conflict${unresolved === 1 ? "" : "s"} left to resolve.`
+                : "All conflicts resolved. Git prepared the merge message."}
+            </p>
             <button
               type="button"
-              disabled={busy}
+              disabled={busy || unresolved > 0}
               onClick={onCompleteMerge}
               title="Commits the resolved merge with git's own prepared message"
-              className="h-7 rounded-lg bg-primary px-3 text-[12px] font-semibold text-white transition-filter hover:brightness-110 focus-visible:ring-2 focus-visible:ring-primary-ink/70 disabled:opacity-60"
+              className="h-8 w-full rounded-lg bg-primary px-3 text-[12px] font-semibold text-white transition-filter hover:brightness-110 focus-visible:ring-2 focus-visible:ring-primary-ink/70 disabled:opacity-50"
             >
               Complete merge
             </button>
-          ) : (
+            <div className="mt-1.5 flex justify-end">
+            <button
+              type="button"
+              onClick={() => setPendingDiscard("all")}
+              title="Discard every change, staged and unstaged"
+              className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold text-ink-dim transition-colors hover:bg-danger/15 hover:text-danger-ink focus-visible:ring-2 focus-visible:ring-primary/60 disabled:invisible"
+              disabled={files.length === 0 || busy}
+            >
+              Discard all…
+            </button>
+            </div>
+          </>
+        ) : (
+          <>
+          <textarea
+            rows={2}
+            value={message}
+            onChange={(event) => setMessage(event.target.value)}
+            onKeyDown={(event) => {
+              if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
+                event.preventDefault();
+                handleCommit();
+              }
+            }}
+            placeholder="Commit message"
+            aria-label="Commit message"
+            title="Ctrl+Enter commits the staged files"
+            className="block w-full resize-none rounded-lg border border-transparent bg-glass-soft px-2.5 py-1.5 text-[12px] leading-normal text-ink placeholder:text-ink-dim focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
+          />
+          <div className="mt-2 flex flex-wrap items-center gap-2">
+            <button
+              type="button"
+              disabled={staged.length === 0 || message.trim() === "" || busy}
+              onClick={handleCommit}
+              title={
+                merging
+                  ? "A merge is in progress — take the sides, then complete it"
+                  : staged.length === 0
+                    ? "Stage a file first"
+                    : message.trim() === ""
+                      ? "Write a commit message first"
+                      : "Ctrl+Enter commits the staged files"
+              }
+              className="h-7 rounded-lg bg-primary px-3 text-[12px] font-semibold text-white transition-filter hover:brightness-110 focus-visible:ring-2 focus-visible:ring-primary-ink/70 disabled:opacity-60"
+            >
+              Commit
+            </button>
             <span className="font-mono text-[10.5px] text-ink-dim">
               {busy ? "…" : staged.length > 0 ? `${staged.length} staged` : ""}
             </span>
-          )}
-          <button
-            type="button"
-            onClick={() => setPendingDiscard("all")}
-            title="Discard every change, staged and unstaged"
-            className="ml-auto shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold text-ink-dim transition-colors hover:bg-danger/15 hover:text-danger-ink focus-visible:ring-2 focus-visible:ring-primary/60 disabled:invisible"
-            disabled={files.length === 0 || busy}
-          >
-            Discard all…
-          </button>
-        </div>
+            <button
+              type="button"
+              onClick={() => setPendingDiscard("all")}
+              title="Discard every change, staged and unstaged"
+              className="ml-auto shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold text-ink-dim transition-colors hover:bg-danger/15 hover:text-danger-ink focus-visible:ring-2 focus-visible:ring-primary/60 disabled:invisible"
+              disabled={files.length === 0 || busy}
+            >
+              Discard all…
+            </button>
+          </div>
+          </>
+        )}
       </footer>
 
       {pendingDiscard !== null && (

@@ -176,10 +176,9 @@ test("a merge in progress renders the Conflicts section with its actions", () =>
   assert.ok(within(wrap.container).getByText("Conflicts"));
   assert.ok(within(wrap.container).getByLabelText("Keep current version of app.ts"));
   assert.ok(within(wrap.container).getByLabelText("Keep incoming version of app.ts"));
-  const commitButton = within(wrap.container).getByText("Commit") as HTMLButtonElement;
-  assert.equal(commitButton.disabled, true, "a merge in progress reserves the commit button");
+  assert.throws(() => within(wrap.container).getByText("Commit"), "a merge swaps Commit for Complete merge");
   const complete = within(wrap.container).getByText("Complete merge") as HTMLButtonElement;
-  assert.ok(complete, "completing is the footer's second button during a merge");
+  assert.equal(complete.disabled, true, "completing waits for every conflict to be resolved");
 
   // Sides resolve one-by-one; the row click summons the conflict view.
   fireEvent.click(within(wrap.container).getByLabelText("Keep incoming version of app.ts"));
