@@ -473,17 +473,6 @@ export function StagePanel({
             >
               Complete merge
             </button>
-            <div className="mt-1.5 flex justify-end">
-            <button
-              type="button"
-              onClick={() => setPendingDiscard("all")}
-              title="Discard every change, staged and unstaged"
-              className="shrink-0 rounded-full px-2.5 py-1 text-[11px] font-semibold text-ink-dim transition-colors hover:bg-danger/15 hover:text-danger-ink focus-visible:ring-2 focus-visible:ring-primary/60 disabled:invisible"
-              disabled={files.length === 0 || busy}
-            >
-              Discard all…
-            </button>
-            </div>
           </>
         ) : (
           <>
