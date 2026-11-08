@@ -63,3 +63,22 @@ test("reload re-reads the side even when the digest did not move", async () => {
   act(() => result.current.reload());
   await waitFor(() => assert.equal(vi.mocked(loadWipSide).mock.calls.length, 2));
 });
+
+test("paths the rail lists as conflicts never stack into the side's diff", async () => {
+  vi.mocked(loadWipSide).mockImplementation(async () => [
+    { path: "a.txt", status: "modified", additions: 1, deletions: 0, diff: [] },
+    { path: "clash.txt", status: "modified", additions: 1, deletions: 0, diff: [] },
+  ]);
+  const { result } = renderHook(() =>
+    useWipSide({
+      repoPath: "/r",
+      active: true,
+      rows: [row("a.txt", false)],
+      hiddenPaths: ["clash.txt"],
+      digest: "d1",
+      selectedFilePath: null,
+    }),
+  );
+  await waitFor(() => assert.equal(result.current.files.length, 1));
+  assert.equal(result.current.files[0].path, "a.txt");
+});

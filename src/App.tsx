@@ -296,6 +296,7 @@ function App() {
     repoPath: repo?.path ?? null,
     active: isWipSelected && detailsOpen && !conflictView,
     rows: railFiles,
+    hiddenPaths: repo?.conflicts,
     digest: repo?.worktree,
     selectedFilePath,
   });
@@ -394,6 +395,7 @@ function App() {
         if (!activeRepoId) return;
         setSelectedCommitByRepo((previous) => ({ ...previous, [activeRepoId]: UNCOMMITTED_HASH }));
         setSelectedFileByRepo((previous) => ({ ...previous, [activeRepoId]: file.path }));
+        setConflictView(null);
         wipSide.pickSide(file.staged ? "staged" : "unstaged");
         setDetailsOpen(true);
       },

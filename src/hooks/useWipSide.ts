@@ -12,6 +12,7 @@ export function useWipSide({
   repoPath,
   active,
   rows,
+  hiddenPaths,
   digest,
   selectedFilePath,
 }: {
@@ -20,6 +21,8 @@ export function useWipSide({
   active: boolean;
   /** The rail's rows: they say which sides have anything to show. */
   rows: WorktreeFile[];
+  /** Paths the rail lists elsewhere (merge conflicts): this diff never stacks them. */
+  hiddenPaths?: string[];
   /** The worktree digest; a move reloads the side. */
   digest: string | undefined;
   selectedFilePath: string | null;
@@ -58,10 +61,12 @@ export function useWipSide({
     };
   }, [repoPath, active, side, digest, version]);
 
-  const files = useMemo(
-    () => (loaded && loaded.key === `${repoPath}:${side}` ? loaded.files : []),
-    [loaded, repoPath, side],
-  );
+  const files = useMemo(() => {
+    if (!loaded || loaded.key !== `${repoPath}:${side}`) return [];
+    if (!hiddenPaths?.length) return loaded.files;
+    const hidden = new Set(hiddenPaths);
+    return loaded.files.filter((file) => !hidden.has(file.path));
+  }, [loaded, repoPath, side, hiddenPaths]);
   const selectedFile = useMemo(
     () => files.find((file) => file.path === selectedFilePath) ?? files[0] ?? null,
     [files, selectedFilePath],
