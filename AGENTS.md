@@ -31,6 +31,17 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
 `npm ci`, lint, build, vitest, then `cargo test` — tauri-build needs `dist/`, hence the build first),
 and the README's Tests badge points at it.
 
+## Branches, commits and PRs
+
+- **Branch names are `<type>/<kebab-slug>`**, with the same types the commit subjects use: `feat/`,
+  `fix/`, `docs/`, `chore/`, `style/`, `perf/`, `refactor/`, `test/` (`feat/merge-resolution`,
+  `fix/stash-row-anchor`). One branch per change; the type is the dominant one when a branch mixes.
+- **Commit subjects are `type(scope): subject`**, scope optional (`feat(git): …`, `fix: …`). Commit
+  per domain (backend, UI, docs, config), each one buildable on its own where the files allow it.
+- **A PR's title follows the same `type(scope): subject` form**, and its body says what changed,
+  what was verified, and what was not.
+- **No attribution lines** (no `Co-Authored-By`, no "Generated with …") in commits or PR bodies.
+
 ## Architecture
 
 - `src/App.tsx` — shell: `TitleBar` row (40px) over a flex-1 content area holding the commit list + details panel, per-repo selection state, details-panel open/height state. `Repository[]` lives in state (open tabs persisted to `localStorage` under `git-mapper:open-repos`, written only after the first load lands); empty state = `EmptyState.tsx`. Open/checkout/restore failures surface as a bottom-right toast (`Toast.tsx`, auto-dismisses in 6s) — with tabs open the empty state never renders, so an error line there would never be seen. Memory: the changed-files cache is an LRU (`FILES_CACHE_CAP` in `gitLoader.ts`), a tab inactive past `SLEEP_AFTER_MS` drops its history (`sleeping` flag; dimmed pill, reload on click), and closing a tab evicts its cache entries.
