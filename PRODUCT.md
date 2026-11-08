@@ -20,7 +20,7 @@ Git Mapper is a standalone desktop Git history viewer. It reads real repositorie
 
 ## Positioning
 
-Lightweight zero-config viewer that runs real `git` for its data but looks like a designed product (frosted-glass feed, lane-coloured graph) — a category neighbor could copy the git plumbing or the glass, not the pairing. Read-only today is a milestone, not a claim: committing is planned next, so copy and IA must not hard-wire "we never touch your repo."
+Lightweight zero-config viewer that runs real `git` for its data but looks like a designed product (frosted-glass feed, lane-coloured graph) — a category neighbor could copy the git plumbing or the glass, not the pairing. The staging rail can already stage and commit your work, so copy and IA must not hard-wire "we never touch your repo."
 
 ## Operating Context
 

@@ -27,6 +27,27 @@ interface CommitGraphProps {
 export function CommitGraph({ commits, layout, selectedHash }: CommitGraphProps) {
   const edges = useMemo(() => buildEdges(layout), [layout]);
 
+  // Stash rows float (no lane held down to their base), so this connector is drawn by hand:
+  // dashed, in the stash row's own branch hue, so dot, link and pill match like any branch.
+  const stashEdges = useMemo(() => {
+    const indexByHash = new Map(commits.map((commit, index) => [commit.hash, index]));
+    return commits.flatMap((commit, index) => {
+      if (commit.stashIndex === undefined) return [];
+      const baseIndex = indexByHash.get(commit.parents[0] ?? "");
+      if (baseIndex === undefined) return [];
+      const x1 = laneX(layout.lanes[index] ?? 0);
+      const y1 = rowY(index);
+      const x2 = laneX(layout.lanes[baseIndex] ?? 0);
+      const y2 = rowY(baseIndex);
+      const d = Math.min(Math.abs(y2 - y1) * 0.8, ROW_HEIGHT);
+      return [{
+        key: `stash-${commit.hash}`,
+        path: `M ${x1} ${y1} C ${x1} ${y1 + d}, ${x2} ${y2 - d}, ${x2} ${y2}`,
+        color: branchColor(layout.branchColors[index] ?? 0),
+      }];
+    });
+  }, [commits, layout]);
+
   const width = graphWidth(layout.laneCount);
   const height = commits.length * ROW_HEIGHT;
 
@@ -39,6 +60,19 @@ export function CommitGraph({ commits, layout, selectedHash }: CommitGraphProps)
           fill="none"
           stroke={edge.color}
           strokeWidth={2}
+          strokeDasharray={edge.uncommitted ? "5 4" : undefined}
+          strokeLinecap="round"
+        />
+      ))}
+
+      {stashEdges.map((edge) => (
+        <path
+          key={edge.key}
+          d={edge.path}
+          fill="none"
+          stroke={edge.color}
+          strokeWidth={2}
+          strokeDasharray="5 4"
           strokeLinecap="round"
         />
       ))}
@@ -49,10 +83,10 @@ export function CommitGraph({ commits, layout, selectedHash }: CommitGraphProps)
         const y = rowY(index);
         const selected = commit.hash === selectedHash;
         const checkedOut = commit.refs.some((ref) => ref.isCurrent);
-        // The dot takes its branch colour; uncommitted changes and stash entries (system-made
-        // rows, not branch history) render in gray, like Git Graph's stash/reflog commits.
+        // The dot takes its branch colour, stash rows included (the dash marks them instead);
+        // only the uncommitted row renders in the reserved gray.
         const color =
-          commit.hash === "wip" || commit.stashIndex !== undefined
+          commit.hash === "wip"
             ? UNCOMMITTED_COLOR
             : branchColor(layout.branchColors[index] ?? 0);
 

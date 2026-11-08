@@ -34,12 +34,11 @@ Grab the latest installer from [the releases page](https://github.com/fajarwz/gi
 
 | OS | Download |
 | --- | --- |
-| Windows | [`Git.Mapper_x64-setup.exe`](https://github.com/fajarwz/git-mapper/releases/latest/download/Git.Mapper_x64-setup.exe) |
-| macOS | [`Git.Mapper.dmg`](https://github.com/fajarwz/git-mapper/releases/latest/download/Git.Mapper.dmg) (Apple Silicon + Intel) |
+| Windows | [`Git.Mapper_x64-setup.exe`](https://github.com/fajarwz/git-mapper/releases/latest/download/Git.Mapper_x64-setup.exe) (Unsigned installer. If SmartScreen appears, click More info, then Run anyway) |
+| macOS | [`Git.Mapper.dmg`](https://github.com/fajarwz/git-mapper/releases/latest/download/Git.Mapper.dmg) (Apple Silicon + Intel. The app isn't notarized — right-click the app and pick **Open** to run it) |
 | Linux | [`Git.Mapper_amd64.AppImage`](https://github.com/fajarwz/git-mapper/releases/latest/download/Git.Mapper_amd64.AppImage) (runs without installing) |
 
-The links above always resolve to the newest release. On macOS, the first launch gets a Gatekeeper
-warning because the app isn't notarized — right-click the app and pick **Open** to run it.
+The links above always resolve to the newest release.
 
 <img src="docs/screenshot.png" alt="Commit list, light theme" width="100%">
 
@@ -73,9 +72,6 @@ warning because the app isn't notarized — right-click the app and pick **Open*
 - Search over the loaded history: hashes, commit messages, authors and ref pills. Ctrl+F focuses
   the title-bar box, Esc clears.
 
-Ships for Windows, macOS and Linux; the macOS builds are signed with the updater's minisign key but
-not notarized, so Gatekeeper warns on first launch (right-click → Open to get past it).
-
 ## Run it
 
 ```bash
@@ -98,10 +94,6 @@ The Rust side (`src-tauri/src/git.rs`) runs `git` and returns its porcelain outp
 `src/lib/` turn that text into the types in `src/types.ts`. Every backend call goes through
 `src/data/gitLoader.ts`, so components never invoke the backend themselves. `npm run dev` serves
 the same commands at `POST /api/git`, which is why the app also runs in a plain browser.
-
-The app writes to a repository on purpose, not by accident: it stages, unstages and discards
-changes, commits, stashes, checks out branches and commits, merges a local branch and resolves
-its conflicts, and pushes or pulls the checked-out branch. Everything else it does is a read.
 
 ## Not there yet
 

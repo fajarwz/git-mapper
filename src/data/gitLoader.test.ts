@@ -28,12 +28,26 @@ const NUL = String.fromCharCode(0);
 const RS = String.fromCharCode(30);
 
 /** One `read_log` record, shaped the way git prints it (tformat, \x00 fields, \x1e record). */
-function logRecord(deco: string, hash: string, parents: string, subject: string): string {
+function logRecord(
+  deco: string,
+  hash: string,
+  parents: string,
+  subject: string,
+  date = "2026-10-25T10:00:00+07:00",
+): string {
   return (
-    [deco, hash, "Fajar", "fajar@example.com", "2026-10-25T10:00:00+07:00", parents, subject].join(NUL) +
+    [deco, hash, "Fajar", "fajar@example.com", date, parents, subject].join(NUL) +
     RS +
     "\n"
   );
+}
+
+interface FakeCommit {
+  deco: string;
+  hash: string;
+  parents: string;
+  subject: string;
+  date?: string;
 }
 
 /** A tiny fake backend: git commands answered from in-memory state, calls recorded. */
@@ -56,11 +70,11 @@ class FakeGit {
   resolvedSide = "";
   conflictPayload = { ours_patch: "-base", theirs_patch: "+side", worktree_text: "<<<<<<< HEAD\n", incoming: "side" };
   // History as git would print it, newest first.
-  commits: Array<{ deco: string; hash: string; parents: string; subject: string }> = [
+  commits: FakeCommit[] = [
     { deco: "(HEAD -> main)", hash: "H1", parents: "H2", subject: "feat: one" },
     { deco: "", hash: "H2", parents: "", subject: "feat: two" },
   ];
-  deltaCommits: Array<{ deco: string; hash: string; parents: string; subject: string }> = [];
+  deltaCommits: FakeCommit[] = [];
   order = "";
   refs = "H1\trefs/heads/main\nH1\trefs/remotes/origin/main\n";
   stashes = "";
@@ -95,11 +109,11 @@ class FakeGit {
       case "read_log": {
         const page = this.commits.slice(Number(args.skip), Number(args.skip) + Number(args.limit));
         this.logSkips.push(Number(args.skip));
-        return Promise.resolve(page.map((c) => logRecord(c.deco, c.hash, c.parents, c.subject)).join(""));
+        return Promise.resolve(page.map((c) => logRecord(c.deco, c.hash, c.parents, c.subject, c.date)).join(""));
       }
       case "read_log_delta":
         return Promise.resolve(
-          this.deltaCommits.map((c) => logRecord(c.deco, c.hash, c.parents, c.subject)).join(""),
+          this.deltaCommits.map((c) => logRecord(c.deco, c.hash, c.parents, c.subject, c.date)).join(""),
         );
       case "read_log_order":
         return Promise.resolve(this.order);
@@ -156,7 +170,7 @@ test("parseForEachRef types refs by namespace and marks the checked-out branch",
   );
 });
 
-test("loading a repository files stashes by date under the wip row and pairs the remote", async () => {
+test("loading a repository hangs stashes above their base under the wip row and pairs the remote", async () => {
   const fake = new FakeGit();
   fake.stashes =
     ["stash@{0}", "sss000", "H1 index1", "Fajar", "fajar@example.com", "2026-10-25T09:00:00+07:00", "WIP on main: H1 feat: one"].join(NUL) +
@@ -170,16 +184,16 @@ test("loading a repository files stashes by date under the wip row and pairs the
   assert.equal(repo.worktree, "wt-initial");
   assert.equal(repo.defaultCommitHash, "H1");
 
-  assert.deepEqual(hashesOf(repo).slice(0, 4), ["wip", "H1", "H2", "sss000"],
-    "wip row on top, then history; the stash files by its date, not pinned above");
+  assert.deepEqual(hashesOf(repo).slice(0, 4), ["wip", "sss000", "H1", "H2"],
+    "wip row on top, then the stash directly above its base commit — even though its date is oldest");
   assert.equal(repo.commits[0].subject, "Uncommitted changes");
   assert.equal(repo.commits[0].changedCount, 2,
     "the count rides the row, not the subject text");
   assert.deepEqual(repo.commits[0].parents, ["H1"]);
-  assert.deepEqual(repo.commits[3].refs.map((r) => r.name), ["stash@{0}"]);
-  assert.deepEqual(repo.commits[3].parents, ["H1"], "stash rows hang off their base commit only");
+  assert.deepEqual(repo.commits[1].refs.map((r) => r.name), ["stash@{0}"]);
+  assert.deepEqual(repo.commits[1].parents, ["H1"], "stash rows hang off their base commit only");
 
-  const headPills = repo.commits[1].refs;
+  const headPills = repo.commits[2].refs;
   assert.ok(headPills.some((r) => r.type === "branch" && r.name === "main" && r.isCurrent),
     "the checked-out branch is a current pill");
   assert.ok(headPills.some((r) => r.type === "branch" && r.withRemote === "origin"),
@@ -196,6 +210,55 @@ test("a stash newer than the head lands between the wip row and history", async 
 
   assert.deepEqual(hashesOf(repo).slice(0, 3), ["wip", "sss000", "H1"],
     "a stash taken after the head commit sits directly under the wip row");
+});
+
+test("a stash anchors to its base, not to the rows its date happens to straddle", async () => {
+  const fake = new FakeGit();
+  fake.dirty = false;
+  fake.changed = 0;
+  // Merged PRs keep old author dates, so the log's dates straddle the stash's date: filing by
+  // date parked the stash between H1 and H2, far above its real base H3 (jersium-marketplace).
+  fake.commits = [
+    { deco: "(HEAD -> main)", hash: "H1", parents: "H2", subject: "feat: one", date: "2026-10-25T11:00:00+07:00" },
+    { deco: "", hash: "H2", parents: "H3", subject: "feat: two", date: "2026-10-25T10:00:00+07:00" },
+    { deco: "", hash: "H3", parents: "", subject: "feat: three", date: "2026-10-25T09:00:00+07:00" },
+  ];
+  fake.stashes =
+    ["stash@{0}", "sss000", "H3 index1", "Fajar", "fajar@example.com", "2026-10-25T10:30:00+07:00", "WIP on main: H3 feat: three"].join(NUL) +
+    RS +
+    "\n";
+  const repo = await bootstrap(fake);
+
+  assert.deepEqual(hashesOf(repo), ["H1", "H2", "sss000", "H3"],
+    "the stash sits directly above its base, wherever its date alone would have filed it");
+});
+
+test("several stashes on one base stack newest first above it", async () => {
+  const fake = new FakeGit();
+  fake.dirty = false;
+  fake.changed = 0;
+  fake.stashes =
+    ["stash@{0}", "sss000", "H2 index1", "Fajar", "fajar@example.com", "2026-10-25T11:00:00+07:00", "WIP on main: H2"].join(NUL) +
+    RS + "\n" +
+    ["stash@{1}", "sss111", "H2 index2", "Fajar", "fajar@example.com", "2026-10-25T09:00:00+07:00", "WIP on main: H2"].join(NUL) +
+    RS + "\n";
+  const repo = await bootstrap(fake);
+
+  assert.deepEqual(hashesOf(repo), ["H1", "sss000", "sss111", "H2"]);
+});
+
+test("a stash whose base is outside the window still files by date", async () => {
+  const fake = new FakeGit();
+  fake.dirty = false;
+  fake.changed = 0;
+  fake.stashes =
+    ["stash@{0}", "sss000", "H9 index1", "Fajar", "fajar@example.com", "2026-10-25T09:00:00+07:00", "WIP on main: H9"].join(NUL) +
+    RS +
+    "\n";
+  const repo = await bootstrap(fake);
+
+  assert.deepEqual(hashesOf(repo), ["H1", "H2", "sss000"],
+    "no loaded base to hang off: the stash lands before the first older commit (here, the end)");
 });
 
 test("a refresh where nothing moved returns null and costs three reads", async () => {
@@ -331,8 +394,10 @@ test("paging counts history rows only: stash rows never drift the skip", async (
   assert.deepEqual(fake.logSkips, [500],
     "page 2 skips 500 history rows — the two stash rows must not push the window past them");
   assert.equal(page2.repo.commits[0].hash, "sss000");
-  assert.equal(page2.repo.commits[2].hash, "c1000",
-    "the stashes (taken later than any commit) sit above the head, history follows");
+  assert.equal(page2.repo.commits[1].hash, "c1000");
+  assert.equal(page2.repo.commits[2].hash, "sss111");
+  assert.equal(page2.repo.commits[3].hash, "c999",
+    "each stash sits directly above its base commit, history follows");
   assert.equal(page2.repo.commits[502].hash, "c500",
     "page 2 continues the chain at c500 — the stash count must not eat rows");
 });

@@ -912,19 +912,30 @@ function App() {
 
   // One dispatcher for the rail's git writes: the action runs, the repo force-refreshes, and
   // a failure speaks (the rows stay exactly as they were — git refused, nothing half-ran).
+  // Speed: each git read costs ~150-400ms of process spawn on Windows, and the rail's row
+  // read (3 scans) used to run AFTER the refresh (~4 scans) — strictly sequential chains of
+  // the same repo state. Both reads start beside each other now, and the digest ref is
+  // pointed at the refreshed digest so the reload effect skips the duplicate read.
   const runStaging = useCallback(
     async (working: (dir: string) => Promise<void>) => {
       if (!repo || !activeRepoPath || stagingBusy) return;
       setStagingBusy(true);
       try {
         await working(activeRepoPath);
-        const refreshed = await refreshRepository(repo, true);
+        const [rows, refreshed] = await Promise.all([
+          loadWorktree(activeRepoPath),
+          refreshRepository(repo, true),
+        ]);
+        // `force` always returns a repo; the null branch satisfies the type contract and
+        // rows read directly, so even a null load shows the post-action rail state.
         if (refreshed) {
+          worktreeDigestRef.current = refreshed.repo.worktree;
           setRepos((previous) =>
             previous.map((item) => (item.id === refreshed.repo.id ? refreshed.repo : item)),
           );
           showFlash(refreshed.touched);
         }
+        setWorktreeFiles(rows);
       } catch (stagingError) {
         setNotice({
           title: "Staging action failed",

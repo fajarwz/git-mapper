@@ -1,7 +1,7 @@
 import { memo } from "react";
 import type { Commit, CommitRef } from "../types";
 import { formatAbsoluteDate } from "../lib/format";
-import { branchColor } from "../lib/graphGeometry";
+import { UNCOMMITTED_COLOR, branchColor } from "../lib/graphGeometry";
 import { COMMIT_ROW_GRID } from "../lib/tableLayout";
 import { RefPill } from "./RefPill";
 import { Avatar } from "./Avatar";
@@ -59,7 +59,7 @@ export const CommitRow = memo(function CommitRow({
         <span
           aria-hidden="true"
           className="h-5 w-0.5 shrink-0"
-          style={{ backgroundColor: branchColor(commit.branchColor) }}
+          style={{ backgroundColor: isWorktreeRow ? UNCOMMITTED_COLOR : branchColor(commit.branchColor) }}
         />
         <span className={`truncate text-[13px] text-ink ${weight}`}>
           {commit.subject}
