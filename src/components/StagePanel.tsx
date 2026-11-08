@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { BranchIcon, CloseIcon, MinusIcon, PlusIcon, TrashIcon } from "./icons";
-import { STATUS_TONES, statusLetter } from "../lib/format";
+import { STATUS_TONES, fileDirTone, fileNameTone, fileTitle, statusLetter } from "../lib/format";
 import type { WorktreeFile } from "../lib/staging";
 import { PANEL } from "../lib/ui";
 
@@ -77,7 +77,7 @@ function ItemRow({
   onDiscard: () => void;
 }) {
   const { dir, base } = splitPath(file.path);
-  const label = file.oldPath ? `${file.oldPath} → ${file.path}` : file.path;
+  const label = fileTitle(file);
 
   return (
     <div
@@ -108,13 +108,13 @@ function ItemRow({
               <span className="shrink-0 text-ink-dim">→</span>
               <span className="truncate">
                 <span className="text-ink-dim">{dir}</span>
-                <span className="text-ink">{base}</span>
+                <span className={fileNameTone(file.status)}>{base}</span>
               </span>
             </span>
           ) : (
             <>
-              {dir !== "" && <span className="text-ink-dim">{dir}</span>}
-              <span className="text-ink">{base}</span>
+              {dir !== "" && <span className={fileDirTone(file.status)}>{dir}</span>}
+              <span className={fileNameTone(file.status)}>{base}</span>
             </>
           )}
         </span>
@@ -352,21 +352,21 @@ export function StagePanel({
                     <span className="flex shrink-0 items-center gap-1">
                       <button
                         type="button"
-                        aria-label={`Take ours for ${base}`}
-                        title={`Stage HEAD's copy of ${base}`}
+                        aria-label={`Keep current version of ${base}`}
+                        title={`Keep the current branch's (${branch}) version of ${base}`}
                         onClick={() => onResolve([path], "ours")}
                         className="rounded-full border border-hairline bg-glass-soft px-1.5 py-0.5 text-[10.5px] font-semibold text-ink-dim transition-colors hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60"
                       >
-                        ours
+                        current
                       </button>
                       <button
                         type="button"
-                        aria-label={`Take theirs for ${base}`}
-                        title={`Stage the merged branch's copy of ${base}`}
+                        aria-label={`Keep incoming version of ${base}`}
+                        title={`Keep the incoming branch's version of ${base}`}
                         onClick={() => onResolve([path], "theirs")}
                         className="rounded-full border border-hairline bg-glass-soft px-1.5 py-0.5 text-[10.5px] font-semibold text-ink-dim transition-colors hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60"
                       >
-                        theirs
+                        incoming
                       </button>
                       {/* Manual edit: the user resolved it in their editor — git add marks it. */}
                       <button

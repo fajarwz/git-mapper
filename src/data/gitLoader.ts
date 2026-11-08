@@ -662,14 +662,37 @@ export interface ConflictSnapshot {
   /** Ours patched against the shared base; empty when our side had no stage (deleted). */
   oursPatch: string;
   theirsPatch: string;
+  /** The file on disk with git's conflict markers; empty when binary or unreadable. */
+  worktreeText: string;
+  /** The branch that was merged in (or a short hash); empty when git left no merge message. */
+  incoming: string;
 }
 
-/** Both sides of one unmerged path, patched against the base; a missing stage renders absent. */
+/** One unmerged path: the file with its markers, and which sides still have a stage. */
 export async function loadConflictFiles(dir: string, path: string): Promise<ConflictSnapshot> {
   return call("read_conflict_files", { dir, path }, (raw) => {
-    const snake = raw as { ours_patch?: string; theirs_patch?: string };
-    return { oursPatch: snake.ours_patch ?? "", theirsPatch: snake.theirs_patch ?? "" };
+    const snake = raw as {
+      ours_patch?: string;
+      theirs_patch?: string;
+      worktree_text?: string;
+      incoming?: string;
+    };
+    return {
+      oursPatch: snake.ours_patch ?? "",
+      theirsPatch: snake.theirs_patch ?? "",
+      worktreeText: snake.worktree_text ?? "",
+      incoming: snake.incoming ?? "",
+    };
   });
+}
+
+/** Saves a hand-resolved conflicted file; the backend stages it once no marker is left. */
+export async function writeConflictResolution(
+  dir: string,
+  path: string,
+  content: string,
+): Promise<void> {
+  await call("write_conflict_resolution", { dir, path, content }, (raw) => raw as void);
 }
 
 

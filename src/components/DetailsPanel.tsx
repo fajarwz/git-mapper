@@ -57,6 +57,10 @@ interface DetailsPanelProps {
   conflict?: ConflictFile | null;
   /** Resolves the conflict's path from within the conflict view (same wire as the rail). */
   onResolveConflict?: (paths: string[], side: "ours" | "theirs") => void;
+  /** Saves the conflicted file after a block choice; resolves once the rewrite landed. */
+  onWriteConflictText?: (path: string, text: string) => Promise<void>;
+  /** The checked-out branch, named on the "current" side of each conflict. */
+  currentBranch?: string;
   onClose: () => void;
   onHeightChange: (height: number) => void;
 }
@@ -82,6 +86,8 @@ export function DetailsPanel({
   onPatchNeeded,
   conflict,
   onResolveConflict,
+  onWriteConflictText,
+  currentBranch = "",
   onClose,
   onHeightChange,
 }: DetailsPanelProps) {
@@ -133,7 +139,10 @@ export function DetailsPanel({
   const diffViewer = conflict ? (
     <ConflictViewer
       conflict={conflict}
+      currentBranch={currentBranch}
+      scheme={syntaxScheme}
       onResolve={(side) => onResolveConflict?.([conflict.path], side)}
+      onWriteText={(text) => onWriteConflictText?.(conflict.path, text) ?? Promise.resolve()}
     />
   ) : (
     <DiffViewer

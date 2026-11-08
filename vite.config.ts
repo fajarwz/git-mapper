@@ -464,22 +464,66 @@ function gitDevApi(): Plugin {
       run(dirPath, ["commit", "--no-edit", "-q"]);
       return null;
     },
-    read_conflict_files: ({ dir, path }) => {
+    read_conflict_files: ({ dir, path: file }) => {
       const dirPath = String(dir);
-      const p = String(path);
+      const p = String(file);
       const [base, ours, theirs] = stagePresence(dirPath, p);
-      const stageDiff = (from: boolean, to: boolean, fromN: number, toN: number): string => {
-        if (!from || !to) return "";
+      // Add/add conflicts have no base stage and git prints no patch for them; wrap the
+      // content in the unified shape the parser reads.
+      const addedPatch = (body: string): string => {
+        const content = body.replace(/\r\n/g, "\n").replace(/\n$/, "");
+        const lines = content === "" ? [] : content.split("\n");
+        return [
+          `diff --git a/${p} b/${p}`,
+          "--- /dev/null",
+          `+++ b/${p}`,
+          `@@ -0,0 +1,${lines.length} @@`,
+          ...lines.map((line) => `+${line}`),
+          "",
+        ].join("\n");
+      };
+      const sidePatch = (stage: number, present: boolean): string => {
+        if (!present) return "";
         try {
-          return runGitRaw(dirPath, ["diff", "--no-color", `:${fromN}:${p}`, `:${toN}:${p}`]);
+          return base
+            ? runGitRaw(dirPath, ["diff", "--no-color", `:1:${p}`, `:${stage}:${p}`])
+            : addedPatch(runGitRaw(dirPath, ["show", `:${stage}:${p}`]));
         } catch {
           return "";
         }
       };
-      return {
-        ours_patch: stageDiff(base, ours, 1, 2),
-        theirs_patch: stageDiff(base, theirs, 1, 3),
+      const worktreeText = (): string => {
+        if (!(base || ours || theirs)) return "";
+        try {
+          return fs.readFileSync(path.join(dirPath, p), "utf8");
+        } catch {
+          return "";
+        }
       };
+      let incoming = "";
+      try {
+        const msgFile = String(runGitRaw(dirPath, ["rev-parse", "--git-path", "MERGE_MSG"])).trim();
+        const first = fs.readFileSync(path.resolve(dirPath, msgFile), "utf8").split(/\r?\n/)[0];
+        incoming = /'([^']*)'/.exec(first)?.[1] ?? "";
+        if (!incoming) incoming = String(run(dirPath, ["rev-parse", "--short", "MERGE_HEAD"])).trim();
+      } catch {
+        /* no merge message: the viewer falls back to "incoming" */
+      }
+      return {
+        ours_patch: sidePatch(2, ours),
+        theirs_patch: sidePatch(3, theirs),
+        worktree_text: worktreeText(),
+        incoming,
+      };
+    },
+    write_conflict_resolution: ({ dir, path: file, content }) => {
+      const dirPath = String(dir);
+      const p = String(file);
+      if (!unmergedPaths(dirPath).includes(p)) throw new Error(`${p} is not conflicted`);
+      const text = String(content);
+      fs.writeFileSync(path.join(dirPath, p), text);
+      if (!/^(<<<<<<<|>>>>>>>)/m.test(text)) run(dirPath, ["add", "--", p]);
+      return null;
     },
     read_worktree_files: ({ dir }) => readWorktreeFiles(String(dir)),
     stage_files: ({ dir, paths }) => {

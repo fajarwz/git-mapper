@@ -29,6 +29,7 @@ import { checkoutBranch,
   checkoutCommit,
   fetchRemote,
   loadConflictFiles,
+  writeConflictResolution,
   loadMoreCommits,
   loadRepository,
   mergeBranch,
@@ -1002,6 +1003,18 @@ function App() {
     [activeRepoId, activeRepoPath, setSelectedCommitByRepo, setDetailsOpen],
   );
 
+  // A block choice rewrites the file; the view then re-reads it so the next block (or the
+  // resolved state, once nothing conflicts) shows without another click.
+  const handleWriteConflictText = useCallback(
+    async (path: string, text: string) => {
+      if (!activeRepoPath) return;
+      await runStaging((dir) => writeConflictResolution(dir, path, text));
+      const snapshot = await loadConflictFiles(activeRepoPath, path).catch(() => null);
+      if (snapshot) setConflictView({ path, snapshot });
+    },
+    [activeRepoPath, runStaging],
+  );
+
   // The conflict view rides the repo's conflict list: once the path is resolved, aborted out,
   // or the tab switched, the panes would show stale sides — drop it.
   useEffect(() => {
@@ -1062,7 +1075,7 @@ function App() {
         onPush={handlePush}
         syncing={syncing}
         syncError={syncError}
-        stageCount={railFiles.length}
+        stageCount={railFiles.length + (repo?.conflicts?.length ?? 0)}
         stageOpen={stageOpen}
         onToggleStage={handleToggleStage}
       />
@@ -1164,6 +1177,8 @@ function App() {
                 isWorktree={selectedCommit.hash === UNCOMMITTED_HASH}
                 conflict={conflictView}
                 onResolveConflict={handleResolveConflicts}
+                onWriteConflictText={handleWriteConflictText}
+                currentBranch={repo.branch}
                 onClose={() => setDetailsOpen(false)}
                 onHeightChange={setDetailsHeight}
               />

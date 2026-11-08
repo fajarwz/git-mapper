@@ -54,7 +54,7 @@ class FakeGit {
   conflicts: string[] = [];
   mergeOutcome = { merged: false, conflicts: ["a.conflict"] };
   resolvedSide = "";
-  conflictPayload = { ours_patch: "-base", theirs_patch: "+side" };
+  conflictPayload = { ours_patch: "-base", theirs_patch: "+side", worktree_text: "<<<<<<< HEAD\n", incoming: "side" };
   // History as git would print it, newest first.
   commits: Array<{ deco: string; hash: string; parents: string; subject: string }> = [
     { deco: "(HEAD -> main)", hash: "H1", parents: "H2", subject: "feat: one" },
@@ -404,5 +404,10 @@ test("merge verbs pass through op names and the snake_case payload folds", async
   assert.ok(fake.calls.includes("abort_merge") && fake.calls.includes("complete_merge"));
 
   const snap = await loadConflictFiles(fake.openPath, "a.conflict");
-  assert.deepEqual(snap, { oursPatch: "-base", theirsPatch: "+side" });
+  assert.deepEqual(snap, {
+    oursPatch: "-base",
+    theirsPatch: "+side",
+    worktreeText: "<<<<<<< HEAD\n",
+    incoming: "side",
+  });
 });
