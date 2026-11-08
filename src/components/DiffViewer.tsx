@@ -1,8 +1,17 @@
-import { Fragment, useEffect, useMemo, useRef, useState } from "react";
+import { Fragment, useEffect, useMemo, useRef } from "react";
 import type { ChangedFile } from "../types";
-import { STATUS_LABELS, STATUS_TONES, numberDiffLines, type NumberedDiffLine } from "../lib/format";
+import {
+  STATUS_LABELS,
+  STATUS_TONES,
+  fileNameTone,
+  fileTitle,
+  numberDiffLines,
+  type NumberedDiffLine,
+} from "../lib/format";
 import { splitDiffRows } from "../lib/gitDiffParser";
-import { highlightSync, languageForPath, loadHighlighter, type SyntaxScheme } from "../lib/highlight";
+import { useHighlightedLines } from "../hooks/useHighlightedLines";
+import type { SyntaxScheme } from "../lib/highlight";
+import { intralineRanges, markedLine, type Range } from "../lib/intraline";
 import { isImageFile } from "../lib/imageDiff";
 import { ImageDiff } from "./ImageDiff";
 import { TextWrapIcon } from "./icons";
@@ -57,36 +66,6 @@ const LINE_TONES = {
 const GUTTER_TONE = "text-ink/45";
 
 /**
- * Highlighted HTML per line, filled once the file's grammar has loaded. Rows render plain
- * until then, and a file whose language we do not know just stays plain forever.
- */
-function useHighlightedLines(file: ChangedFile, lines: NumberedDiffLine[]) {
-  const [highlighted, setHighlighted] = useState<string[] | null>(null);
-  useEffect(() => {
-    setHighlighted(null);
-    const language = languageForPath(file.path);
-    if (!language || lines.length === 0) {
-      setHighlighted(null);
-      return;
-    }
-    let cancelled = false;
-    void (async () => {
-      const ready = await loadHighlighter(language);
-      if (cancelled) return;
-      if (!ready) {
-        setHighlighted(null);
-        return;
-      }
-      setHighlighted(lines.map((line) => highlightSync(line.text, language) ?? ""));
-    })();
-    return () => {
-      cancelled = true;
-    };
-  }, [file, lines]);
-  return highlighted;
-}
-
-/**
  * One file's diff lines, unified: one stacked column with its own lazy grammar load. Mounted
  * per file so the highlighting follows that file's language instead of whichever file was
  * selected before. The mount has to be forced per file (key={file.path} at the call sites):
@@ -95,7 +74,9 @@ function useHighlightedLines(file: ChangedFile, lines: NumberedDiffLine[]) {
  */
 function DiffBody({ file, wrap }: { file: ChangedFile; wrap: boolean }) {
   const lines = useMemo(() => numberDiffLines(file.diff ?? []), [file]);
-  const highlighted = useHighlightedLines(file, lines);
+  const texts = useMemo(() => lines.map((line) => line.text), [lines]);
+  const highlighted = useHighlightedLines(file.path, texts);
+  const changes = useMemo(() => intralineRanges(lines), [lines]);
   // Wrap mode gives up max-content width: rows fill the pane and long lines soft-wrap.
   const rowSpace = wrap ? "min-w-full" : "w-max min-w-full";
   const contentSpace = wrap ? "whitespace-pre-wrap break-words pr-[18px]" : "whitespace-pre pr-[18px]";
@@ -116,10 +97,11 @@ function DiffBody({ file, wrap }: { file: ChangedFile; wrap: boolean }) {
         }
 
         const tone = LINE_TONES[line.type];
-        const html = highlighted?.[index];
+        const tokens = highlighted?.[index];
+        const html = markedLine(line, tokens, changes.get(index));
         // With tokens on, the content span drops the line tone colour: token spans carry the
         // palette, and only untokenized text keeps the soft base. The row tint stays.
-        const contentClass = `${contentSpace} ${html === undefined ? tone.text : "text-ink-soft"}`;
+        const contentClass = `${contentSpace} ${tokens === undefined ? tone.text : "text-ink-soft"}`;
 
         return (
           <div
@@ -186,11 +168,14 @@ function SplitCells({
   line,
   side,
   html,
+  ranges,
   wrap,
 }: {
   line: NumberedDiffLine | null;
   side: "old" | "new";
   html?: string;
+  /** Changed words of this line against its paired line on the other side. */
+  ranges?: Range[];
   wrap: boolean;
 }) {
   if (!line) {
@@ -214,6 +199,7 @@ function SplitCells({
   const tone = LINE_TONES[line.type === "hunk" ? "context" : line.type];
   const number = side === "old" ? line.oldNumber : line.newNumber;
   const cellClass = `${wrap ? "whitespace-pre-wrap break-words" : "whitespace-pre"} border-r border-rule pl-2 pr-2 ${tone.row}`;
+  const marked = markedLine(line, html, ranges);
   return (
     <>
       <span
@@ -222,12 +208,12 @@ function SplitCells({
       >
         {number ?? ""}
       </span>
-      {html !== undefined ? (
+      {marked !== undefined ? (
         <span
           data-diff-code={side}
           data-diff-line={line.type}
-          className={`${cellClass} text-ink-soft`}
-          dangerouslySetInnerHTML={{ __html: html }}
+          className={`${cellClass} ${html === undefined ? tone.text : "text-ink-soft"}`}
+          dangerouslySetInnerHTML={{ __html: marked }}
         />
       ) : (
         <span data-diff-code={side} data-diff-line={line.type} className={`${cellClass} ${tone.text}`}>
@@ -247,7 +233,9 @@ function SplitCells({
 function SplitDiffBody({ file, wrap }: { file: ChangedFile; wrap: boolean }) {
   const lines = useMemo(() => numberDiffLines(file.diff ?? []), [file]);
   const rows = useMemo(() => splitDiffRows(lines), [lines]);
-  const highlighted = useHighlightedLines(file, lines);
+  const texts = useMemo(() => lines.map((line) => line.text), [lines]);
+  const highlighted = useHighlightedLines(file.path, texts);
+  const changes = useMemo(() => intralineRanges(lines), [lines]);
 
   // Wrap mode swaps the max-content auto tracks for fr tracks: both panes take half the pane
   // each and long lines soft-wrap inside. The one shared grid still keeps panes aligned.
@@ -273,12 +261,14 @@ function SplitDiffBody({ file, wrap }: { file: ChangedFile; wrap: boolean }) {
               line={row.old}
               side="old"
               html={row.oldIndex >= 0 ? highlighted?.[row.oldIndex] : undefined}
+              ranges={changes.get(row.oldIndex)}
               wrap={wrap}
             />
             <SplitCells
               line={row.new}
               side="new"
               html={row.newIndex >= 0 ? highlighted?.[row.newIndex] : undefined}
+              ranges={changes.get(row.newIndex)}
               wrap={wrap}
             />
           </Fragment>
@@ -292,7 +282,10 @@ function SplitDiffBody({ file, wrap }: { file: ChangedFile; wrap: boolean }) {
 function FilePath({ file }: { file: ChangedFile }) {
   if (!file.oldPath) {
     return (
-      <span className="min-w-0 truncate font-mono text-[11.5px] font-medium text-ink" title={file.path}>
+      <span
+        className={`min-w-0 truncate font-mono text-[11.5px] font-medium ${fileNameTone(file.status)}`}
+        title={fileTitle(file)}
+      >
         {file.path}
       </span>
     );
@@ -300,7 +293,7 @@ function FilePath({ file }: { file: ChangedFile }) {
   return (
     <span
       className="flex min-w-0 items-center gap-1.5 font-mono text-[11.5px]"
-      title={`${file.oldPath} → ${file.path}`}
+      title={fileTitle(file)}
     >
       <span className="min-w-0 truncate text-ink-soft">{file.oldPath}</span>
       <span className="shrink-0 text-ink-dim">→</span>

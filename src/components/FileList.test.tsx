@@ -149,3 +149,24 @@ test("FileList wires the list/tree toggle", () => {
   fireEvent.click(treeButton);
   assert.equal(view, "tree", "picking Tree reports the new view");
 });
+
+test("a deleted file's whole path is struck through, directory and name alike", () => {
+  const { container } = render(
+    <FileList
+      files={[file("docs/old-name.md", "deleted", 0, 3), file("src/keep.ts", "modified")]}
+      selectedPath={null}
+      onSelect={() => {}}
+      collapsed={false}
+      onToggleCollapse={() => {}}
+      view="list"
+      onViewChange={() => {}}
+    />,
+  );
+  const struck = (text: string) => within(container).getByText(text).className.includes("line-through");
+  assert.ok(struck("docs/") && struck("old-name.md"), "the deleted path is struck, folder included");
+  assert.ok(!struck("src/") && !struck("keep.ts"), "other files are untouched");
+  // Hover leads with the status, for every kind of file.
+  const titled = [...container.querySelectorAll("[title]")].map((el) => el.getAttribute("title"));
+  assert.ok(titled.includes("Deleted · docs/old-name.md"));
+  assert.ok(titled.includes("Modified · src/keep.ts"));
+});
