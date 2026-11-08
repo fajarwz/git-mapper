@@ -106,33 +106,109 @@ pub fn complete_merge_in(dir: &str) -> Result<(), String> {
 pub struct ConflictSnapshot {
     pub ours_patch: String,
     pub theirs_patch: String,
+    /// The file as it sits on disk, conflict markers included; empty when unreadable or binary.
+    pub worktree_text: String,
+    /// What the user merged in: the branch from git's own merge message, else a short hash.
+    pub incoming: String,
 }
 
-/// Both sides as patches against the shared base: `:1:<path> -> :2/<3>:<path>` — each runs
-/// beside the other, and a missing stage (delete/modify pairs) yields an empty patch that
-/// the panel renders as an absent side. `git diff -- <path>` would answer in git's
-/// combined `--cc` shape, which no parser in this app speaks.
+/// The branch being merged, named the way `git merge` was told: `Merge branch 'x'` and
+/// `Merge remote-tracking branch 'x'` in MERGE_MSG; a bare commit falls back to its short hash.
+fn incoming_name(dir: &str) -> String {
+    let from_message = run_git(dir, &["rev-parse", "--git-path", "MERGE_MSG"])
+        .ok()
+        .and_then(|rel| std::fs::read_to_string(std::path::Path::new(dir).join(rel.trim())).ok())
+        .and_then(|msg| {
+            let first = msg.lines().next()?.to_string();
+            let start = first.find('\'')? + 1;
+            let len = first[start..].find('\'')?;
+            Some(first[start..start + len].to_string())
+        });
+    from_message
+        .or_else(|| {
+            run_git(dir, &["rev-parse", "--short", "MERGE_HEAD"])
+                .ok()
+                .map(|hash| hash.trim().to_string())
+        })
+        .unwrap_or_default()
+}
+
+fn has_conflict_markers(text: &str) -> bool {
+    text.lines()
+        .any(|line| line.starts_with("<<<<<<<") || line.starts_with(">>>>>>>"))
+}
+
+/// Writes the user's block-by-block resolution into a conflicted file. Once no marker line is
+/// left the file is staged, which is what marks the path resolved; until then it stays unmerged.
+pub fn write_conflict_resolution_in(dir: &str, path: &str, content: &str) -> Result<(), String> {
+    let status = run_git(dir, &["status", "-sb"])?;
+    if !unmerged_paths_of(&status).iter().any(|p| p == path) {
+        return Err(format!("{path} is not conflicted"));
+    }
+    std::fs::write(std::path::Path::new(dir).join(path), content)
+        .map_err(|e| format!("could not write {path}: {e}"))?;
+    if !has_conflict_markers(content) {
+        run_git(dir, &["add", "--", path])?;
+    }
+    Ok(())
+}
+
+/// A file added on both sides has no base stage, so git prints no patch for either side; the
+/// panel still needs one, so the content is wrapped in the same unified shape
+/// `parseDiffSections` reads (every line added, against /dev/null).
+fn added_patch(path: &str, body: &str) -> String {
+    let content = body.strip_suffix('\n').unwrap_or(body);
+    let lines: Vec<&str> = if content.is_empty() {
+        Vec::new()
+    } else {
+        content.split('\n').map(|l| l.trim_end_matches('\r')).collect()
+    };
+    let mut out = format!(
+        "diff --git a/{path} b/{path}\n--- /dev/null\n+++ b/{path}\n@@ -0,0 +1,{} @@\n",
+        lines.len()
+    );
+    for line in lines {
+        out.push('+');
+        out.push_str(line);
+        out.push('\n');
+    }
+    out
+}
+
+/// Each side as a patch against the shared base (`:1:<path> -> :2/<3>:<path>`), plus the file
+/// on disk, where git left its conflict markers. A side with no index stage (delete/modify
+/// pairs) yields an empty patch — the panel reads that as "that side deleted it"; a side with
+/// no *base* stage (add/add) yields a synthesized addition.
 pub fn read_conflict_files_in(dir: &str, path: &str) -> Result<ConflictSnapshot, String> {
     let (base, ours, theirs) = stage_presence(dir, path);
     let blob = |stage: u8| -> String { format!(":{stage}:{path}") };
-    let stage_diff = |from: bool, to: bool, from_n: u8, to_n: u8| -> Result<String, String> {
-        if !from || !to {
+    let side_patch = |stage: u8, present: bool| -> Result<String, String> {
+        if !present {
             return Ok(String::new());
         }
-        run_git(dir, &["diff", "--no-color", &blob(from_n), &blob(to_n)])
+        if base {
+            run_git(dir, &["diff", "--no-color", &blob(1), &blob(stage)])
+        } else {
+            Ok(added_patch(path, &run_git(dir, &["show", &blob(stage)])?))
+        }
     };
     let reads = parallel_git(vec![
-        Box::new(|| stage_diff(base, ours, 1, 2)),
-        Box::new(|| stage_diff(base, theirs, 1, 3)),
+        Box::new(|| side_patch(2, ours)),
+        Box::new(|| side_patch(3, theirs)),
+        Box::new(|| {
+            if !(base || ours || theirs) {
+                return Ok(String::new());
+            }
+            let file = std::path::Path::new(dir).join(path);
+            Ok(std::fs::read_to_string(file).unwrap_or_default())
+        }),
     ]);
+    let mut reads = reads.into_iter();
+    let mut next_read = || reads.next().unwrap_or_else(|| Err("no read returned".into()));
     Ok(ConflictSnapshot {
-        ours_patch: reads
-            .first()
-            .cloned()
-            .unwrap_or_else(|| Err("no read returned".into()))?,
-        theirs_patch: reads
-            .get(1)
-            .cloned()
-            .unwrap_or_else(|| Err("no read returned".into()))?,
+        ours_patch: next_read()?,
+        theirs_patch: next_read()?,
+        worktree_text: next_read()?,
+        incoming: incoming_name(dir),
     })
 }

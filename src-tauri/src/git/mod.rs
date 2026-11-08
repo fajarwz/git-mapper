@@ -186,6 +186,18 @@ pub async fn abort_merge(dir: String) -> Result<(), String> {
 pub async fn complete_merge(dir: String) -> Result<(), String> {
     run_blocking("merge complete", move || complete_merge_in(&dir)).await
 }
+/// Saves a hand-resolved conflicted file; staged once no conflict marker is left in it.
+#[tauri::command]
+pub async fn write_conflict_resolution(
+    dir: String,
+    path: String,
+    content: String,
+) -> Result<(), String> {
+    run_blocking("conflict write", move || {
+        write_conflict_resolution_in(&dir, &path, &content)
+    })
+    .await
+}
 /// Both conflict sides of one path, patched against the shared base; missing stage = empty.
 #[tauri::command]
 pub async fn read_conflict_files(dir: String, path: String) -> Result<ConflictSnapshot, String> {

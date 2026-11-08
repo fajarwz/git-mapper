@@ -1209,7 +1209,72 @@ fn read_conflict_files_returns_both_sides() {
     assert!(snap.ours_patch.contains("+main"));
     assert!(snap.theirs_patch.contains("+side"));
 
-    // A path outside the conflict list has no stages at all — every patch empty, not an error.
+    // The file on disk mid-conflict still holds git's markers, verbatim.
+    assert!(
+        snap.worktree_text.contains("<<<<<<< HEAD\nmain\n=======\nside\n>>>>>>> side"),
+        "worktree: {}",
+        snap.worktree_text
+    );
+
+    assert_eq!(snap.incoming, "side", "the merged branch, named from git's merge message");
+
+    // A path outside the conflict list has no stages at all — everything empty, not an error.
     let absent = read_conflict_files_in(repo.path(), "missing.txt").expect("absent is empty");
-    assert!(absent.ours_patch.is_empty() && absent.theirs_patch.is_empty());
+    assert!(
+        absent.ours_patch.is_empty()
+            && absent.theirs_patch.is_empty()
+            && absent.worktree_text.is_empty()
+    );
+}
+
+#[test]
+fn write_conflict_resolution_stages_only_a_marker_free_file() {
+    let repo = conflicting_repo("conflict-write");
+    // Markers left: the text lands on disk but the path stays unmerged.
+    write_conflict_resolution_in(repo.path(), "a.txt", "<<<<<<< HEAD\nx\n=======\ny\n>>>>>>> side\n")
+        .expect("partial write");
+    assert!(unmerged_paths_of(&run_git(repo.path(), &["status", "-sb"]).unwrap()).contains(&"a.txt".to_string()));
+
+    write_conflict_resolution_in(repo.path(), "a.txt", "main\nside\n").expect("full write");
+    assert_eq!(std::fs::read_to_string(repo.0.join("a.txt")).expect("file"), "main\nside\n");
+    assert!(unmerged_paths_of(&run_git(repo.path(), &["status", "-sb"]).unwrap()).is_empty());
+    complete_merge_in(repo.path()).expect("the merge completes on the hand-made result");
+
+    // A path git does not list as conflicted is never written.
+    assert!(write_conflict_resolution_in(repo.path(), "other.txt", "x").is_err());
+}
+
+#[test]
+fn read_conflict_files_synthesizes_both_added_sides() {
+    let repo = TempRepo::new("conflict-add-add");
+    repo.commit("a.txt", "base\n", "base");
+    git(&repo.0, &["checkout", "-q", "-b", "side"]);
+    repo.commit("both.txt", "from side\n", "side adds");
+    git(&repo.0, &["checkout", "-q", "main"]);
+    repo.commit("both.txt", "from main\n", "main adds");
+    let merged = Command::new("git")
+        .args(["merge", "side", "--no-edit"])
+        .current_dir(&repo.0)
+        .output()
+        .expect("merge ran");
+    assert!(!merged.status.success(), "the merge must conflict");
+
+    // No base stage means no git patch for either side, so both arrive synthesized as additions
+    // rather than empty (which the panel would read as "that side deleted it").
+    let snap = read_conflict_files_in(repo.path(), "both.txt").expect("conflict read");
+    assert!(
+        snap.ours_patch.contains("+from main"),
+        "ours: {}",
+        snap.ours_patch
+    );
+    assert!(
+        snap.theirs_patch.contains("+from side"),
+        "theirs: {}",
+        snap.theirs_patch
+    );
+    assert!(
+        snap.worktree_text.contains("<<<<<<< HEAD"),
+        "worktree: {}",
+        snap.worktree_text
+    );
 }
