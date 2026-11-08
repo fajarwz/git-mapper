@@ -22,6 +22,7 @@ import RawChangesIcon from "../assets/changes.svg?react";
 import RawMinusIcon from "../assets/minus.svg?react";
 import RawUndoIcon from "../assets/undo.svg?react";
 import RawHeartIcon from "../assets/heart.svg?react";
+import RawAlertIcon from "../assets/alert.svg?react";
 interface IconProps {
   size?: number;
 }
@@ -72,6 +73,10 @@ export function PlusIcon({ size = 12 }: IconProps) {
 
 export function ChevronDownIcon({ size = 12, className = "" }: GlyphProps) {
   return <SizedIcon glyph={RawChevronDownIcon} size={size} className={className} />;
+}
+
+export function AlertIcon({ size = 14, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawAlertIcon} size={size} className={className} />;
 }
 
 export function CloseIcon({ size = 12, className = "" }: GlyphProps) {
