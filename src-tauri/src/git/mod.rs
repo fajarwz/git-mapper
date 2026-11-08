@@ -1,15 +1,19 @@
 mod actions;
 mod files;
+mod hunks;
 mod log;
 mod merge;
 mod shell;
 mod staging;
 mod status;
 #[cfg(test)]
+mod hunk_tests;
+#[cfg(test)]
 mod tests;
 
 pub use actions::*;
 pub use files::*;
+pub use hunks::*;
 pub use log::*;
 pub use merge::*;
 pub use shell::*;
@@ -39,6 +43,28 @@ pub async fn discard_files(dir: String, paths: Vec<String>) -> Result<(), String
 #[tauri::command]
 pub async fn discard_all(dir: String) -> Result<(), String> {
     run_blocking("discard all", move || discard_all_in(&dir)).await
+}
+/// One side of the uncommitted changes, the way VS Code lists them: `staged` = HEAD against
+/// the index, `unstaged` = the index against the disk (untracked files included), patches in.
+#[tauri::command]
+pub async fn read_wip_side(dir: String, side: String) -> Result<FilePayload, String> {
+    run_blocking("wip side read", move || read_wip_side_in(&dir, &side)).await
+}
+/// Stages, unstages or discards ONE hunk of a file. `side` says which diff the hunk came from;
+/// `hunk_header` is its `@@` line, checked so a file edited meanwhile is refused, not misapplied.
+#[tauri::command]
+pub async fn apply_hunk(
+    dir: String,
+    path: String,
+    side: String,
+    hunk_index: usize,
+    hunk_header: String,
+    action: String,
+) -> Result<(), String> {
+    run_blocking("hunk apply", move || {
+        apply_hunk_in(&dir, &path, &side, hunk_index, &hunk_header, &action)
+    })
+    .await
 }
 #[tauri::command]
 pub async fn commit_staged(dir: String, message: String) -> Result<(), String> {
