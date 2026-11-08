@@ -28,13 +28,19 @@ import type { Theme } from "./lib/theme";
 import { checkoutBranch,
   checkoutCommit,
   fetchRemote,
+  loadConflictFiles,
+  writeConflictResolution,
   loadMoreCommits,
   loadRepository,
+  mergeBranch,
   pickAndLoadRepository,
   pullBranch,
   pushBranch,
   readStoredPaths,
   refreshRepository,
+  resolveConflictSides,
+  abortMerge,
+  completeMerge,
   stashAction,
   undoCommit,
   UNCOMMITTED_HASH,
@@ -47,6 +53,7 @@ import { checkoutBranch,
   loadWorktree,
   stagePaths,
   unstagePaths,
+  type ConflictSnapshot,
 } from "./data/gitLoader";
 import {
   DEFAULT_STAGE_WIDTH,
@@ -127,6 +134,9 @@ function App() {
   );
   // True while one of the rail's git writes is in flight; the panel's buttons all wait.
   const [stagingBusy, setStagingBusy] = useState(false);
+  // The conflict view: which unmerged path the rail summoned, with both sides' patches.
+  // null kills it — switching tab, picking another commit, or the path resolving away.
+  const [conflictView, setConflictView] = useState<{ path: string; snapshot: ConflictSnapshot } | null>(null);
   // Rail width: a pinned px value survives restarts (like the details height); null stays on
   // the tuned default. The drag pinning an ABSOLUTE width matters here too — never an offset.
   const [stageWidth, setStageWidth] = usePersistedState<number | null>(STORAGE_KEYS.stageWidth, null);
@@ -242,6 +252,13 @@ function App() {
   );
   const activeRepoPath = repo?.path ?? null;
 
+  // During a merge the conflicted paths live in the rail's Conflicts section — the plain
+  // Staged/Changes sections must not echo them as ordinary modified rows.
+  const railFiles = useMemo(() => {
+    const conflicted = new Set(repo?.conflicts ?? []);
+    return worktreeFiles.filter((file) => !conflicted.has(file.path));
+  }, [worktreeFiles, repo]);
+
   // The staging rail's dock state: per-repo persisted, falling back to open while the
   // worktree has changes (a repo opened dirty starts with its rail up).
   const stageOpen = repo ? (stageDrawerByRepo[repo.id] ?? worktreeFiles.length > 0) : false;
@@ -349,6 +366,7 @@ function App() {
     if (!activeRepoId) return;
     setSelectedCommitByRepo((previous) => ({ ...previous, [activeRepoId]: hash }));
     setSelectedFileByRepo((previous) => ({ ...previous, [activeRepoId]: null }));
+    setConflictView(null);
     // Picking a commit is a request to read it, so bring the details panel back if it was closed.
     setDetailsOpen(true);
     // The uncommitted row is the rail's second door: it summons the staging state together
@@ -420,6 +438,51 @@ function App() {
     setFlashHashes([]);
     window.requestAnimationFrame(() => setFlashHashes(hashes));
   }, []);
+
+  // Merging a branch lands through the rail: a clean merge refreshes and flashes the new tip,
+  // a conflicted one opens the rail and the resolver takes over from there.
+  const handleMergeBranch = useCallback(
+    (branch: string) => {
+      if (!activeRepoPath || !repo) return;
+      setPendingConfirm({
+        title: `Merge ${branch} into ${repo.branch}?`,
+        body: (
+          <p>
+            A clean merge lands quietly. With conflicts, the staging rail opens its resolver:
+            take a side for each file, then complete the merge.
+          </p>
+        ),
+        confirmLabel: "Merge",
+        run: async () => {
+          try {
+            const outcome = await mergeBranch(activeRepoPath, branch);
+            const refreshed = await loadRepository(activeRepoPath);
+            setRepos((previous) =>
+              previous.map((item) => (item.id === refreshed.id ? refreshed : item)),
+            );
+            if (outcome.merged) {
+              showFlash(refreshed.commits.slice(-1).map((commit) => commit.hash));
+            } else {
+              setStageOpen(true);
+              setNotice({
+                title: `Merging ${branch} conflicts`,
+                detail:
+                  "Take a side for each conflicted file in the staging rail, then complete the merge.",
+                id: Date.now(),
+              });
+            }
+          } catch (mergeError) {
+            setNotice({
+              title: `Could not merge ${branch}`,
+              detail: mergeError instanceof Error ? mergeError.message : String(mergeError),
+              id: Date.now(),
+            });
+          }
+        },
+      });
+    },
+    [activeRepoPath, repo, showFlash, setStageOpen],
+  );
 
   // Opening a repository — or refocusing the app — quietly pulls every remote into the
   // tracking refs first: the ahead/behind counts and the pills only describe the network's
@@ -917,6 +980,60 @@ function App() {
     [runStaging],
   );
 
+  const handleResolveConflicts = useCallback(
+    (paths: string[], side: "ours" | "theirs") =>
+      void runStaging((dir) => resolveConflictSides(dir, paths, side)),
+    [runStaging],
+  );
+  // Abort walks back to the pre-merge tip: details close (the wip diff would show nothing),
+  // and the rail's rows re-read through the same force refresh the other rail writes use.
+  const handleAbortMerge = useCallback(() => {
+    setConflictView(null);
+    setDetailsOpen(false);
+    void runStaging((dir) => abortMerge(dir));
+  }, [runStaging, setDetailsOpen]);
+  const handleCompleteMerge = useCallback(() => {
+    setConflictView(null);
+    void runStaging((dir) => completeMerge(dir));
+  }, [runStaging]);
+
+  // A conflict row click: the uncommitted row is summoned (the conflict view is its diff),
+  // both sides read, and the details panel rises above them.
+  const handleSelectConflict = useCallback(
+    (path: string) => {
+      if (!activeRepoId || !activeRepoPath) return;
+      setSelectedCommitByRepo((previous) => ({ ...previous, [activeRepoId]: UNCOMMITTED_HASH }));
+      setDetailsOpen(true);
+      loadConflictFiles(activeRepoPath, path)
+        .then((snapshot) => setConflictView({ path, snapshot }))
+        .catch((error) => {
+          console.error("Could not read the conflict sides", error);
+          setConflictView(null);
+        });
+    },
+    [activeRepoId, activeRepoPath, setSelectedCommitByRepo, setDetailsOpen],
+  );
+
+  // A block choice rewrites the file; the view then re-reads it so the next block (or the
+  // resolved state, once nothing conflicts) shows without another click.
+  const handleWriteConflictText = useCallback(
+    async (path: string, text: string) => {
+      if (!activeRepoPath) return;
+      await runStaging((dir) => writeConflictResolution(dir, path, text));
+      const snapshot = await loadConflictFiles(activeRepoPath, path).catch(() => null);
+      if (snapshot) setConflictView({ path, snapshot });
+    },
+    [activeRepoPath, runStaging],
+  );
+
+  // The conflict view rides the repo's conflict list: once the path is resolved, aborted out,
+  // or the tab switched, the panes would show stale sides — drop it.
+  useEffect(() => {
+    if (!conflictView) return;
+    if (repo?.conflicts?.includes(conflictView.path)) return;
+    setConflictView(null);
+  }, [repo, conflictView]);
+
   // A commit succeeds → the rail docks: the burst it serves is over (and the new commit row,
   // spliced by the same refresh, flashes, so the work's landing place is visible).
   const handleStageCommit = useCallback(
@@ -969,7 +1086,7 @@ function App() {
         onPush={handlePush}
         syncing={syncing}
         syncError={syncError}
-        stageCount={worktreeFiles.length}
+        stageCount={railFiles.length + (repo?.conflicts?.length ?? 0)}
         stageOpen={stageOpen}
         onToggleStage={handleToggleStage}
       />
@@ -994,8 +1111,14 @@ function App() {
               >
                 <StagePanel
                   branch={repo.branch}
-                  files={worktreeFiles}
+                  files={railFiles}
                   busy={stagingBusy}
+                  merging={repo.merging === true}
+                  conflicts={repo.conflicts ?? []}
+                  onResolve={handleResolveConflicts}
+                  onAbortMerge={handleAbortMerge}
+                  onCompleteMerge={handleCompleteMerge}
+                  onSelectConflict={handleSelectConflict}
                   onStage={handleStage}
                   onUnstage={handleUnstage}
                   onDiscard={handleDiscard}
@@ -1063,6 +1186,10 @@ function App() {
                   setContextMenu({ commit: selectedCommit, ref, x, y });
                 }}
                 isWorktree={selectedCommit.hash === UNCOMMITTED_HASH}
+                conflict={conflictView}
+                onResolveConflict={handleResolveConflicts}
+                onWriteConflictText={handleWriteConflictText}
+                currentBranch={repo.branch}
                 onClose={() => setDetailsOpen(false)}
                 onHeightChange={setDetailsHeight}
               />
@@ -1109,6 +1236,10 @@ function App() {
           }
           onUndoCommit={() => handleMenuUndoCommit(contextMenu.commit.hash)}
           head={repo?.head ?? ""}
+          onMerge={handleMergeBranch}
+          currentBranch={
+            repo !== null && !repo.branch.startsWith("HEAD") ? repo.branch : undefined
+          }
           onClose={closeContextMenu}
         />
       )}

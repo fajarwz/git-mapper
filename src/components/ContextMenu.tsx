@@ -26,6 +26,10 @@ interface ContextMenuProps {
   onUndoCommit?: () => void;
   /** Full sha of HEAD at the last read: the row that is HEAD gets no checkout entry. */
   head: string;
+  /** The checked-out branch's name; a non-current local branch may be merged into it. */
+  currentBranch?: string;
+  /** Merges a local, non-current branch into the checked-out one; App confirms first. */
+  onMerge?: (branch: string) => void;
   onClose: () => void;
 }
 
@@ -53,6 +57,8 @@ export function ContextMenu({
   undoable = false,
   onUndoCommit,
   head,
+  currentBranch,
+  onMerge,
   onClose,
 }: ContextMenuProps) {
   // The entry that just copied shows "Copied!" for a beat; the others keep their labels.
@@ -88,6 +94,9 @@ export function ContextMenu({
 
   const branch = target.ref?.type === "branch" ? target.ref : null;
   const checkoutable = branch !== null && !branch.isCurrent;
+  // The merge target is exactly the checkoutable case (a local, non-current branch), so
+  // the entry rides the same mount condition — App passes the handler when one is valid.
+  const mergeable = checkoutable && branch !== null && Boolean(onMerge) && Boolean(currentBranch);
   // The commit checkout detaches HEAD: real history rows only — the HEAD row itself offers
   // nothing (it is already out), the uncommitted row ("wip") is not a commit, and stash rows
   // check out nothing. The app confirms first.
@@ -104,6 +113,7 @@ export function ContextMenu({
   // The menu is ~32px an entry; the estimate grows with it so it never opens off-screen.
   const entries =
     (checkoutable ? 1 : 0) +
+    (mergeable ? 1 : 0) +
     (commitCheckoutable ? 1 : 0) +
     (undoable ? 1 : 0) +
     (stashIndex !== undefined ? 3 : 0) +
@@ -133,6 +143,17 @@ export function ContextMenu({
           }}
         >
           Check out {branch.name}
+        </button>
+      )}
+      {mergeable && branch && (
+        <button type="button" role="menuitem" className={ITEM}
+          title={`Merges ${branch.name} into ${currentBranch} — a confirm shows first`}
+          onClick={() => {
+            onClose();
+            onMerge?.(branch.name);
+          }}
+        >
+          Merge into {currentBranch}
         </button>
       )}
       {commitCheckoutable && (

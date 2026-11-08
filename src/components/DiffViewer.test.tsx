@@ -679,3 +679,34 @@ test("switching between image files reads the newly selected file's versions", a
     "the read names the newly selected path",
   );
 });
+
+const editedFile: ChangedFile = {
+  path: "notes.txt",
+  status: "modified",
+  additions: 1,
+  deletions: 1,
+  diff: [
+    { type: "hunk", text: "@@ -1 +1 @@" },
+    { type: "remove", text: 'primary: "#22a88d", ink: 1' },
+    { type: "add", text: 'primary: "#e2557a", ink: 1' },
+  ],
+};
+
+for (const layout of ["unified", "split"] as const) {
+  test(`only the changed word is marked stronger in the ${layout} layout`, () => {
+    const { container } = render(
+      <DiffViewer
+        files={[editedFile]}
+        file={editedFile}
+        scope="file"
+        onScopeChange={() => {}}
+        layout={layout}
+        scheme="app"
+      />,
+    );
+    const marks = [...container.querySelectorAll("mark")].map((mark) => mark.textContent);
+    assert.deepEqual(marks, ["22a88d", "e2557a"], "one mark per side, on the colour value only");
+    // The line text itself is untouched by the marking.
+    assert.ok(container.textContent?.includes('primary: "#22a88d", ink: 1'));
+  });
+}

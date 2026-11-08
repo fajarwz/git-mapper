@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { ConfirmDialog } from "./ConfirmDialog";
 import { BranchIcon, CloseIcon, MinusIcon, PlusIcon, TrashIcon } from "./icons";
-import { STATUS_TONES, statusLetter } from "../lib/format";
+import { STATUS_TONES, fileDirTone, fileNameTone, fileTitle, statusLetter } from "../lib/format";
 import type { WorktreeFile } from "../lib/staging";
 import { PANEL } from "../lib/ui";
 
@@ -11,6 +11,17 @@ interface StagePanelProps {
   files: WorktreeFile[];
   /** True while a git write is in flight: every row action and the commit button wait. */
   busy?: boolean;
+  /** The merge resolution slice's state: MERGE_HEAD present, its unmerged paths. */
+  merging?: boolean;
+  conflicts?: string[];
+  /** Takes one side of every given unmerged path from the index stages and stages it. */
+  onResolve: (paths: string[], side: "ours" | "theirs") => void;
+  /** Abandons the whole merge; the panel asks first through its danger confirm. */
+  onAbortMerge: () => void;
+  /** Commits the fully resolved merge with git's own prepared message. */
+  onCompleteMerge: () => void;
+  /** A conflict row click: App reads both sides into the details panel. */
+  onSelectConflict?: (path: string) => void;
   /** `git add --` these paths (a worktree row's stage, or the Stage-all sweep). */
   onStage: (paths: string[]) => void;
   /** `git restore --staged --` these paths (a staged row's unstage, or the Unstage-all sweep). */
@@ -66,7 +77,7 @@ function ItemRow({
   onDiscard: () => void;
 }) {
   const { dir, base } = splitPath(file.path);
-  const label = file.oldPath ? `${file.oldPath} → ${file.path}` : file.path;
+  const label = fileTitle(file);
 
   return (
     <div
@@ -97,13 +108,13 @@ function ItemRow({
               <span className="shrink-0 text-ink-dim">→</span>
               <span className="truncate">
                 <span className="text-ink-dim">{dir}</span>
-                <span className="text-ink">{base}</span>
+                <span className={fileNameTone(file.status)}>{base}</span>
               </span>
             </span>
           ) : (
             <>
-              {dir !== "" && <span className="text-ink-dim">{dir}</span>}
-              <span className="text-ink">{base}</span>
+              {dir !== "" && <span className={fileDirTone(file.status)}>{dir}</span>}
+              <span className={fileNameTone(file.status)}>{base}</span>
             </>
           )}
         </span>
@@ -209,6 +220,12 @@ export function StagePanel({
   branch,
   files,
   busy = false,
+  merging = false,
+  conflicts,
+  onResolve,
+  onAbortMerge,
+  onCompleteMerge,
+  onSelectConflict,
   onStage,
   onUnstage,
   onDiscard,
@@ -220,6 +237,7 @@ export function StagePanel({
   const [message, setMessage] = useState("");
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const [pendingDiscard, setPendingDiscard] = useState<"all" | WorktreeFile | null>(null);
+  const [pendingAbort, setPendingAbort] = useState(false);
   const sectionRef = useRef<HTMLElement>(null);
 
   // Esc docks the drawer, but only while the user is actually working in it (focus inside the
@@ -247,6 +265,11 @@ export function StagePanel({
     setPendingDiscard(null);
     if (target === "all") onDiscardAll();
     else if (target) onDiscard([target.path]);
+  };
+
+  const confirmAbort = () => {
+    setPendingAbort(false);
+    onAbortMerge();
   };
 
   const handleCommit = () => {
@@ -287,6 +310,82 @@ export function StagePanel({
       </div>
 
       <div className="min-h-0 flex-1 overflow-y-auto">
+        {merging && (
+          <Section
+            title="Conflicts"
+            count={(conflicts ?? []).length}
+            empty="No unmerged paths — the merge is ready to complete."
+            action={{ label: "Abort merge…", title: "Discard the merge and its conflicts", onClick: () => setPendingAbort(true) }}
+          >
+            {(conflicts ?? []).map((path) => {
+              const base = splitPath(path).base;
+              const resolved = staged.some((file) => file.path === path);
+              return (
+                <div
+                  key={path}
+                  data-conflict-item
+                  data-selected={path === selectedPath}
+                  className="grid h-7 w-full grid-cols-[minmax(0,1fr)_auto] items-center gap-1.5 pl-3.5 pr-2 transition-colors hover:bg-hover-glass data-[selected=true]:bg-selected-glass data-[selected=true]:shadow-[inset_3px_0_0_var(--color-warning)]"
+                >
+                  <button
+                    type="button"
+                    className="flex h-7 min-w-0 items-center gap-2 bg-transparent text-left focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/60"
+                    onClick={() => {
+                      setSelectedPath(path);
+                      onSelectConflict?.(path);
+                    }}
+                  >
+                    <span
+                      className="grid size-4.5 shrink-0 place-items-center rounded-[4px] bg-warning/15 font-mono text-[10.5px] font-bold text-warning-ink"
+                      aria-label="conflicted"
+                      title={path}
+                    >
+                      !
+                    </span>
+                    <span className="truncate text-[12px]" title={path}>
+                      {path}
+                    </span>
+                  </button>
+                  {resolved ? (
+                    <span className="shrink-0 pr-1 text-[11px] text-success-ink">resolved</span>
+                  ) : (
+                    <span className="flex shrink-0 items-center gap-1">
+                      <button
+                        type="button"
+                        aria-label={`Keep current version of ${base}`}
+                        title={`Keep the current branch's (${branch}) version of ${base}`}
+                        onClick={() => onResolve([path], "ours")}
+                        className="rounded-full border border-hairline bg-glass-soft px-1.5 py-0.5 text-[10.5px] font-semibold text-ink-dim transition-colors hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60"
+                      >
+                        current
+                      </button>
+                      <button
+                        type="button"
+                        aria-label={`Keep incoming version of ${base}`}
+                        title={`Keep the incoming branch's version of ${base}`}
+                        onClick={() => onResolve([path], "theirs")}
+                        className="rounded-full border border-hairline bg-glass-soft px-1.5 py-0.5 text-[10.5px] font-semibold text-ink-dim transition-colors hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60"
+                      >
+                        incoming
+                      </button>
+                      {/* Manual edit: the user resolved it in their editor — git add marks it. */}
+                      <button
+                        type="button"
+                        aria-label={`Mark ${base} resolved`}
+                        title="The conflict file was resolved in an editor — stage it"
+                        onClick={() => onStage([path])}
+                        className="rounded-full border border-hairline bg-glass-soft px-1.5 py-0.5 text-[10.5px] font-semibold text-ink-dim transition-colors hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60"
+                      >
+                        ✓
+                      </button>
+                    </span>
+                  )}
+                </div>
+              );
+            })}
+          </Section>
+        )}
+
         <Section
           title="Staged"
           count={staged.length}
@@ -362,22 +461,36 @@ export function StagePanel({
         <div className="mt-2 flex items-center gap-2">
           <button
             type="button"
-            disabled={staged.length === 0 || message.trim() === "" || busy}
+            disabled={staged.length === 0 || message.trim() === "" || busy || merging}
             onClick={handleCommit}
             title={
-              staged.length === 0
-                ? "Stage a file first"
-                : message.trim() === ""
-                  ? "Write a commit message first"
-                  : "Ctrl+Enter commits the staged files"
+              merging
+                ? "A merge is in progress — take the sides, then complete it"
+                : staged.length === 0
+                  ? "Stage a file first"
+                  : message.trim() === ""
+                    ? "Write a commit message first"
+                    : "Ctrl+Enter commits the staged files"
             }
             className="h-7 rounded-lg bg-primary px-3 text-[12px] font-semibold text-white transition-filter hover:brightness-110 focus-visible:ring-2 focus-visible:ring-primary-ink/70 disabled:opacity-60"
           >
             Commit
           </button>
-          <span className="font-mono text-[10.5px] text-ink-dim">
-            {busy ? "…" : staged.length > 0 ? `${staged.length} staged` : ""}
-          </span>
+          {merging ? (
+            <button
+              type="button"
+              disabled={busy}
+              onClick={onCompleteMerge}
+              title="Commits the resolved merge with git's own prepared message"
+              className="h-7 rounded-lg bg-primary px-3 text-[12px] font-semibold text-white transition-filter hover:brightness-110 focus-visible:ring-2 focus-visible:ring-primary-ink/70 disabled:opacity-60"
+            >
+              Complete merge
+            </button>
+          ) : (
+            <span className="font-mono text-[10.5px] text-ink-dim">
+              {busy ? "…" : staged.length > 0 ? `${staged.length} staged` : ""}
+            </span>
+          )}
           <button
             type="button"
             onClick={() => setPendingDiscard("all")}
@@ -412,6 +525,22 @@ export function StagePanel({
           danger
           onConfirm={confirmDiscard}
           onClose={() => setPendingDiscard(null)}
+        />
+      )}
+
+      {pendingAbort && (
+        <ConfirmDialog
+          title="Abort the merge?"
+          body={
+            <p>
+              Everything from the merge goes: the conflicted files return to their pre-merge
+              state, and the merged branch stays untouched (nothing was committed).
+            </p>
+          }
+          confirmLabel="Abort merge"
+          danger
+          onConfirm={confirmAbort}
+          onClose={() => setPendingAbort(false)}
         />
       )}
     </section>

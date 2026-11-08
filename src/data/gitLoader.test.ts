@@ -8,10 +8,15 @@ import { invoke } from "@tauri-apps/api/core";
 vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
 import {
+  abortMerge,
+  completeMerge,
+  loadConflictFiles,
   loadRepository,
   loadMoreCommits,
+  mergeBranch,
   parseForEachRef,
   refreshRepository,
+  resolveConflictSides,
   type Repository,
 } from "./gitLoader";
 
@@ -59,6 +64,11 @@ class FakeGit {
   worktree = "wt-initial";
   ahead = 0;
   behind = 0;
+  merging = false;
+  conflicts: string[] = [];
+  mergeOutcome = { merged: false, conflicts: ["a.conflict"] };
+  resolvedSide = "";
+  conflictPayload = { ours_patch: "-base", theirs_patch: "+side", worktree_text: "<<<<<<< HEAD\n", incoming: "side" };
   // History as git would print it, newest first.
   commits: FakeCommit[] = [
     { deco: "(HEAD -> main)", hash: "H1", parents: "H2", subject: "feat: one" },
@@ -83,7 +93,19 @@ class FakeGit {
           changed: this.changed,
           head: this.head,
           worktree: this.worktree,
+          merging: this.merging,
+          conflicts: this.conflicts,
         });
+      case "merge_branch":
+        return Promise.resolve(this.mergeOutcome);
+      case "resolve_conflicts":
+        this.resolvedSide = String(args.side);
+        return Promise.resolve(null);
+      case "abort_merge":
+      case "complete_merge":
+        return Promise.resolve(null);
+      case "read_conflict_files":
+        return Promise.resolve(this.conflictPayload);
       case "read_log": {
         const page = this.commits.slice(Number(args.skip), Number(args.skip) + Number(args.limit));
         this.logSkips.push(Number(args.skip));
@@ -411,4 +433,46 @@ test("paging appends the next page below the window and reports when history run
   const page4 = await loadMoreCommits(page3.repo);
   assert.equal(page4.done, true, "an empty page ends paging");
   assert.equal(page4.repo, page3.repo, "no new page means no new state");
+});
+
+test("refresh leaves the early exit when a merge state arrives or resolves", async () => {
+  const fake = new FakeGit();
+  fake.merging = true;
+  fake.conflicts = ["a.conflict"];
+  const repo = await bootstrap(fake);
+  assert.equal(repo.merging, true);
+  assert.deepEqual(repo.conflicts, ["a.conflict"]);
+
+  // The rail resolved the merge elsewhere: HEAD, refs and digests stand still, only the
+  // merging pair moves — that must still be a refresh.
+  fake.merging = false;
+  fake.conflicts = [];
+  const settled = await refreshRepository(repo);
+  assert.ok(settled !== null, "the merge resolving counts as movement");
+  assert.equal(settled.repo.merging, false);
+  assert.deepEqual(settled.repo.conflicts, []);
+});
+
+test("merge verbs pass through op names and the snake_case payload folds", async () => {
+  const fake = new FakeGit();
+  await bootstrap(fake);
+
+  const outcome = await mergeBranch(fake.openPath, "feature");
+  assert.deepEqual(outcome, { merged: false, conflicts: ["a.conflict"] });
+  assert.ok(fake.calls.includes("merge_branch"));
+
+  await resolveConflictSides(fake.openPath, ["a.conflict"], "theirs");
+  assert.equal(fake.resolvedSide, "theirs", "the side reaches the command");
+
+  await abortMerge(fake.openPath);
+  await completeMerge(fake.openPath);
+  assert.ok(fake.calls.includes("abort_merge") && fake.calls.includes("complete_merge"));
+
+  const snap = await loadConflictFiles(fake.openPath, "a.conflict");
+  assert.deepEqual(snap, {
+    oursPatch: "-base",
+    theirsPatch: "+side",
+    worktreeText: "<<<<<<< HEAD\n",
+    incoming: "side",
+  });
 });

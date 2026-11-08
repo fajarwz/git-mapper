@@ -1,3 +1,15 @@
 {
-  "buildPath": "code"
+  "buildPath": "code",
+  "detector": {
+    "ignoreRules": [],
+    "ignoreFiles": [],
+    "ignoreValues": [
+      {
+        "rule": "overused-font",
+        "value": "plus jakarta sans",
+        "createdAt": "2026-11-08T12:40:03.528Z",
+        "reason": "user confirmed: keep the interface font, it has shipped in multiple releases and existing users expect it"
+      }
+    ]
+  }
 }

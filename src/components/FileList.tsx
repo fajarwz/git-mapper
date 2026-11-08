@@ -1,7 +1,7 @@
 import { Fragment, useMemo, useState } from "react";
 import type { ChangedFile } from "../types";
 import { buildFileTree, type FileTreeNode } from "../lib/fileTree";
-import { STATUS_TONES, statusLetter } from "../lib/format";
+import { STATUS_TONES, fileDirTone, fileNameTone, fileTitle, statusLetter } from "../lib/format";
 import { ChevronDownIcon } from "./icons";
 
 /** How the changed-file list is shaped: a flat path list, or GitHub's folder tree. */
@@ -65,23 +65,23 @@ function FileRow({
       >
         {statusLetter(file.status)}
       </span>
-      <span className="truncate text-[12px]" title={file.oldPath ? `${file.oldPath} → ${file.path}` : file.path}>
+      <span className="truncate text-[12px]" title={fileTitle(file)}>
         {file.oldPath ? (
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="min-w-0 truncate text-ink-dim">{file.oldPath}</span>
             <span className="shrink-0 text-ink-dim">→</span>
             <span className="shrink-0 truncate">
               {showDir && <span className="text-ink-dim">{dir}</span>}
-              <span className="text-ink">{base}</span>
+              <span className={fileNameTone(file.status)}>{base}</span>
             </span>
           </span>
         ) : showDir ? (
           <>
-            <span className="text-ink-dim">{dir}</span>
-            <span className="text-ink">{base}</span>
+            <span className={fileDirTone(file.status)}>{dir}</span>
+            <span className={fileNameTone(file.status)}>{base}</span>
           </>
         ) : (
-          <span className="text-ink">{base}</span>
+          <span className={fileNameTone(file.status)}>{base}</span>
         )}
       </span>
       <span className="flex gap-1.5 font-mono text-[10.5px]">

@@ -78,6 +78,10 @@ export interface Repository {
   refsDigest: string;
   /** Digest of the stash list: taking or dropping a stash changes it, not the refs above. */
   stashDigest: string;
+  /** True while a merge sits unresolved (MERGE_HEAD present) — the staging rail's banner. */
+  merging?: boolean;
+  /** Unmerged paths of that merge, from the same status read; empty otherwise. */
+  conflicts?: string[];
   commits: Commit[];
   /** Commit pre-selected when the tab is first shown. */
   defaultCommitHash: string;

@@ -4,7 +4,7 @@ Guidance for AI agents working in this repo. Written after the full redesign + r
 
 ## Project
 
-**Git Mapper** — standalone Git history viewer for Windows. Tauri 2 + React 19 + TypeScript + Tailwind CSS v4 + Vite. Reads real Git data: the Tauri backend runs the `git` CLI and returns porcelain output; TS parsers turn it into `types.ts` shapes. Writes go through the staging rail (stage/unstage/discard, commit, undo tip), the stash verbs (apply/pop/drop), fetch/pull (`--ff-only`)/push and the scoped checkouts; apart from those verbs, access is read-only.
+**Git Mapper** — standalone Git history viewer for Windows. Tauri 2 + React 19 + TypeScript + Tailwind CSS v4 + Vite. Reads real Git data: the Tauri backend runs the `git` CLI and returns porcelain output; TS parsers turn it into `types.ts` shapes. Writes go through the staging rail (stage/unstage/discard, commit, undo tip), stash actions, fetch/pull (`--ff-only`)/push, and in-app merge with a conflict resolver (`merge_branch` + `resolve_conflicts` ours/theirs + `abort_merge`/`complete_merge` in `git/merge.rs`, with `read_conflict_files` serving the rail's Conflicts section—the file on disk with its markers for the inline block view, plus each side's patch against stage 1 to tell a deletion from a binary file; `write_conflict_resolution` saves a block choice and stages the file once no marker is left); apart from those scoped verbs, access is read-only.
 
 - Package/crate/identifier/brand are `git-mapper` / `git_mapper_lib` / `com.fajarwz.git-mapper` / "Git Mapper".
 
@@ -30,6 +30,17 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
 `.github/workflows/ci.yml` runs exactly that gate on every push and pull request (ubuntu runner:
 `npm ci`, lint, build, vitest, then `cargo test` — tauri-build needs `dist/`, hence the build first),
 and the README's Tests badge points at it.
+
+## Branches, commits and PRs
+
+- **Branch names are `<type>/<kebab-slug>`**, with the same types the commit subjects use: `feat/`,
+  `fix/`, `docs/`, `chore/`, `style/`, `perf/`, `refactor/`, `test/` (`feat/merge-resolution`,
+  `fix/stash-row-anchor`). One branch per change; the type is the dominant one when a branch mixes.
+- **Commit subjects are `type(scope): subject`**, scope optional (`feat(git): …`, `fix: …`). Commit
+  per domain (backend, UI, docs, config), each one buildable on its own where the files allow it.
+- **A PR's title follows the same `type(scope): subject` form**, and its body says what changed,
+  what was verified, and what was not.
+- **No attribution lines** (no `Co-Authored-By`, no "Generated with …") in commits or PR bodies.
 
 ## Architecture
 
@@ -163,6 +174,10 @@ and the README's Tests badge points at it.
 
 ## Known pitfalls
 
+- **A new `#[tauri::command]` must be listed in `generate_handler!` (`src-tauri/src/lib.rs`).**
+  Nothing else notices when it is missing: `cargo test` calls the `*_in` bodies directly, the dev
+  middleware serves the browser fallback, and the dead-code warnings it raises read like noise
+  from the lib crate. Only the desktop window fails, with "command not found" on every call.
 - **Slow repos are the WSL mount, not the row count.** Opening a repo on `\\wsl.localhost`
   (jersium: 12.8k commits, 585 branches) measured 2.5s for the 500-row log, 0.6s refs, but ~21s
   for `git status --porcelain` (9P stat'ing every tracked file) — the worktree digest pays that
@@ -292,5 +307,5 @@ root sets `base = "website"`. Gate: `npm run build` + `npm run check` inside
 
 ## Roadmap (not built yet)
 
-Deep search over unpaginated history (loaded-window filtering is built: the title-bar search box); merge resolution is built and waiting on the local `merge-resolution` branch.
+Deep search over unpaginated history (loaded-window filtering is built: the title-bar search box); PR review via a `gh` CLI passthrough is the discussed next slice. (Staging, committing and merge resolution are built.)
 History pages at 500 commits per read; `loadMoreCommits` appends the next page on scroll.

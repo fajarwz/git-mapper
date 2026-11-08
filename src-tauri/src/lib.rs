@@ -33,6 +33,12 @@ pub fn run() {
             git::read_image_versions,
             git::checkout_branch,
             git::checkout_commit,
+            git::merge_branch,
+            git::resolve_conflicts,
+            git::abort_merge,
+            git::complete_merge,
+            git::read_conflict_files,
+            git::write_conflict_resolution,
             git::fetch_remote,
             git::stash_action
         ])

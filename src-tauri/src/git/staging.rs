@@ -74,11 +74,14 @@ pub fn discard_files_in(dir: &str, paths: &[String]) -> Result<(), String> {
     let mut from_index: Vec<String> = Vec::new();
     let mut from_head: Vec<String> = Vec::new();
     let mut from_disk: Vec<String> = Vec::new(); // intent-to-add: index holds an empty blob only
+    let mut conflicted: Vec<String> = Vec::new();
     for_each_status_v2(&raw, |x, y, path, _orig| {
         if !wanted.contains(path.as_str()) {
             return;
         }
-        if y == '?' {
+        if x == 'U' || y == 'U' {
+            conflicted.push(path);
+        } else if y == '?' {
             clean.push(path);
         } else if x != '.' {
             from_index.push(path);
@@ -88,6 +91,9 @@ pub fn discard_files_in(dir: &str, paths: &[String]) -> Result<(), String> {
             from_disk.push(path);
         }
     });
+    if let Some(path) = conflicted.first() {
+        return Err(format!("{path} is unmerged — resolve the conflict first"));
+    }
 
     let git = |prefix: &[&str], list: &[String]| -> Result<(), String> {
         let mut args: Vec<&str> = prefix.to_vec();

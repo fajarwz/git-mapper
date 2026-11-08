@@ -60,6 +60,10 @@ The links above always resolve to the newest release.
 - A staging rail for that dirty tree: stage, unstage and discard by file, type the message and
   commit without leaving the window. The toolbar fetches the remotes and pulls or pushes the
   checked-out branch.
+- Merging a local branch from its pill's menu. A conflict lands in the rail: keep the current
+  or the incoming version per file, or open it to see the file with its conflict blocks inline
+  (line numbers, syntax colours) and choose current, incoming or both for each block. Finish
+  with git's own prepared message, or abort the merge entirely.
 - Refresh on window focus (only the commits that are new get read) or from the toolbar button.
   Rows a refresh touched flash amber.
 - Light and dark glass themes, remembered across restarts together with the window size and
@@ -94,7 +98,7 @@ the same commands at `POST /api/git`, which is why the app also runs in a plain 
 ## Not there yet
 
 - Searching history beyond the loaded 500-commit window.
-- Merging, rebasing, resolving conflicts.
+- Rebasing and cherry-picking.
 
 ## Support
 

@@ -46,6 +46,24 @@ export const STATUS_TONES: Record<FileStatus, string> = {
   renamed: "bg-primary/15 text-primary-ink",
 };
 
+/** Hover text for a file row: its status first, then the full path ("old → new" for a rename). */
+export function fileTitle(file: { status: FileStatus; path: string; oldPath?: string | null }): string {
+  const where = file.oldPath ? `${file.oldPath} → ${file.path}` : file.path;
+  return `${STATUS_LABELS[file.status]} · ${where}`;
+}
+
+const STRUCK = "line-through decoration-danger-ink decoration-[1.5px]";
+
+/** A deleted file's whole path is struck through and dimmed, in the badge's red (as VS Code does). */
+export function fileNameTone(status: FileStatus): string {
+  return status === "deleted" ? `text-ink-soft ${STRUCK}` : "text-ink";
+}
+
+/** The folder part of the same path: muted either way, struck with the name when deleted. */
+export function fileDirTone(status: FileStatus): string {
+  return status === "deleted" ? `text-ink-dim ${STRUCK}` : "text-ink-dim";
+}
+
 export function statusLetter(status: FileStatus): string {
   switch (status) {
     case "added":
