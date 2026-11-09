@@ -45,6 +45,13 @@ export function commitGrids(
   return { header: `var(--graph-width) ${row}`, row };
 }
 
+/** The message track: flexible until pinned. A pinned width is a ceiling, not a fixed size, so
+ * the column gives way (down to its minimum) when the list narrows (the staging rail opening)
+ * instead of pushing the columns on its right out of the clipped table. */
+export function messageTrack(pinned: number | null): string {
+  return pinned === null ? "minmax(0,1fr)" : `minmax(${MIN_MESSAGE_WIDTH}px,${pinned}px)`;
+}
+
 export const DEFAULT_AUTHOR_WIDTH = 132;
 /** Wide enough for a full "23 Oct 2026 12:09" stamp without truncating. */
 export const DEFAULT_DATE_WIDTH = 122;

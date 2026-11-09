@@ -2,7 +2,7 @@
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
-import { DEFAULT_COLUMNS, commitGrids, normalizeOrder } from "./tableLayout";
+import { DEFAULT_COLUMNS, commitGrids, messageTrack, normalizeOrder } from "./tableLayout";
 
 test("header and row grids share every column the rows need to line up under", () => {
   const { header, row } = commitGrids(DEFAULT_COLUMNS);
@@ -27,4 +27,9 @@ test("the track list follows the column order", () => {
 test("a stored order is repaired: junk and repeats dropped, missing columns appended", () => {
   assert.deepEqual(normalizeOrder(["hash", "hash", "nope", "message"]), ["hash", "message", "author", "date"]);
   assert.deepEqual(normalizeOrder(null), ["message", "author", "date", "hash"]);
+});
+
+test("a pinned message width can shrink to its minimum instead of overflowing the table", () => {
+  assert.equal(messageTrack(null), "minmax(0,1fr)");
+  assert.equal(messageTrack(480), "minmax(160px,480px)");
 });
