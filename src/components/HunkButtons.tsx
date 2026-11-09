@@ -7,6 +7,25 @@ export interface HunkActions {
   side: WipSide;
   busy?: boolean;
   onAction: (path: string, hunkIndex: number, hunkHeader: string, action: HunkAction) => void;
+  /** Same verbs on ticked lines of one hunk; absent = line picking is off. */
+  onLines?: (
+    path: string,
+    hunkIndex: number,
+    hunkHeader: string,
+    action: HunkAction,
+    lines: number[],
+  ) => void;
+}
+
+/** "+2 −1": what a line pick will move, in the diff's own add/remove colours. */
+function Tally({ add, remove }: { add: number; remove: number }) {
+  return (
+    <>
+      {add > 0 && <span className="text-success-ink">+{add}</span>}
+      {add > 0 && remove > 0 && " "}
+      {remove > 0 && <span className="text-danger-ink">−{remove}</span>}
+    </>
+  );
 }
 
 const BUTTON_CLASS =
@@ -14,23 +33,38 @@ const BUTTON_CLASS =
 
 /**
  * VS Code's per-change buttons on a hunk header: Stage + Discard on the unstaged diff, Unstage
- * on the staged one. A discard throws edits away, so it asks first.
+ * on the staged one. Once lines of the hunk are ticked the same buttons act on just those lines.
+ * A discard throws edits away, so it asks first.
  */
 export function HunkButtons({
   path,
   index,
   header,
   actions,
+  picked = [],
+  counts = { add: 0, remove: 0 },
+  onClear = () => {},
 }: {
   path: string;
   index: number;
   header: string;
   actions: HunkActions;
+  /** Ticked changed lines of this hunk (ordinals among its +/- lines). */
+  picked?: number[];
+  /** The picked lines by kind: the label says "+1 −1", the same tally as the file header. */
+  counts?: { add: number; remove: number };
+  onClear?: () => void;
 }) {
   const [confirming, setConfirming] = useState(false);
   // "@@ Binary file, not shown @@" is a placeholder, not a hunk git could apply.
   if (!header.startsWith("@@ -")) return null;
-  const run = (action: HunkAction) => actions.onAction(path, index, header, action);
+  const count = picked.length;
+  const run = (action: HunkAction) => {
+    if (count === 0) return actions.onAction(path, index, header, action);
+    actions.onLines?.(path, index, header, action, picked);
+    onClear();
+  };
+  const target = count === 0 ? "hunk" : <Tally {...counts} />;
 
   return (
     <span data-hunk-actions className="sticky right-3 ml-auto flex shrink-0 gap-1.5">
@@ -42,7 +76,7 @@ export function HunkButtons({
           className={BUTTON_CLASS}
           onClick={() => run("unstage")}
         >
-          Unstage hunk
+          Unstage {target}
         </button>
       ) : (
         <>
@@ -53,7 +87,7 @@ export function HunkButtons({
             className={BUTTON_CLASS}
             onClick={() => run("stage")}
           >
-            Stage hunk
+            Stage {target}
           </button>
           <button
             type="button"
@@ -62,15 +96,26 @@ export function HunkButtons({
             className={BUTTON_CLASS}
             onClick={() => setConfirming(true)}
           >
-            Discard
+            Discard{count > 0 && <> {target}</>}
           </button>
         </>
       )}
+      {count > 0 && (
+        <button
+          type="button"
+          data-hunk-action="clear"
+          className={BUTTON_CLASS}
+          onClick={onClear}
+          aria-label="Clear picked lines"
+        >
+          Clear
+        </button>
+      )}
       {confirming && (
         <ConfirmDialog
-          title="Discard this hunk?"
-          body={`The edits in this hunk of ${path} are removed from the file on disk. This cannot be undone.`}
-          confirmLabel="Discard hunk"
+          title={count > 0 ? "Discard the picked lines?" : "Discard this hunk?"}
+          body={`The ${count > 0 ? "picked lines" : "edits in this hunk"} of ${path} are removed from the file on disk. This cannot be undone.`}
+          confirmLabel={count > 0 ? "Discard lines" : "Discard hunk"}
           danger
           onConfirm={() => {
             setConfirming(false);

@@ -54,6 +54,7 @@ import { checkoutBranch,
   stagePaths,
   unstagePaths,
   applyHunk,
+  applyHunkLines,
   type ConflictSnapshot,
   type HunkAction,
 } from "./data/gitLoader";
@@ -1003,6 +1004,15 @@ function App() {
     },
     [runStaging, reloadWipSide],
   );
+  const handleHunkLines = useCallback(
+    (path: string, hunkIndex: number, hunkHeader: string, action: HunkAction, lines: number[]) => {
+      const side = action === "unstage" ? "staged" : "unstaged";
+      void runStaging((dir) =>
+        applyHunkLines(dir, path, side, hunkIndex, hunkHeader, action, lines),
+      ).then(reloadWipSide);
+    },
+    [runStaging, reloadWipSide],
+  );
   const handleDiscardAll = useCallback(
     () => void runStaging((dir) => discardEverything(dir)),
     [runStaging],
@@ -1207,7 +1217,12 @@ function App() {
                 onPatchNeeded={isWipSelected ? undefined : handlePatchNeeded}
                 hunkActions={
                   isWipSelected
-                    ? { side: wipSide.side, busy: stagingBusy, onAction: handleHunkAction }
+                    ? {
+                        side: wipSide.side,
+                        busy: stagingBusy,
+                        onAction: handleHunkAction,
+                        onLines: handleHunkLines,
+                      }
                     : undefined
                 }
                 diffScope={diffScope}

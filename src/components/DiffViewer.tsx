@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef } from "react";
+import { Fragment, useEffect, useMemo, useRef, type ReactNode } from "react";
 import type { ChangedFile } from "../types";
 import {
   STATUS_LABELS,
@@ -8,8 +8,9 @@ import {
   numberDiffLines,
   type NumberedDiffLine,
 } from "../lib/format";
-import { splitDiffRows } from "../lib/gitDiffParser";
+import { splitDiffRows, type DiffSplitRow } from "../lib/gitDiffParser";
 import { useHighlightedLines } from "../hooks/useHighlightedLines";
+import { useLineSelection, type LineSelection } from "../hooks/useLineSelection";
 import type { SyntaxScheme } from "../lib/highlight";
 import { intralineRanges, markedLine, type Range } from "../lib/intraline";
 import { isImageFile } from "../lib/imageDiff";
@@ -66,9 +67,149 @@ const LINE_TONES = {
   context: { lineNumberBox: "", row: "", text: "text-ink-soft" },
 } as const;
 
+/** With hunk buttons the header pins under the pane top (or the file header, in the stacked
+ * view: --diff-sticky-top), so Stage/Discard stay in reach while you tick lines far down a hunk.
+ * Frosted: a mostly-opaque glass fill with a heavy blur, so lines scrolling beneath smear into a
+ * wash instead of competing with the header text; the primary tint is a gradient layer on top. */
+const PINNED_HUNK =
+  "group/hunk sticky top-[var(--diff-sticky-top,0px)] z-[5] bg-glass-strong bg-linear-to-b from-primary/[0.07] to-primary/[0.07] backdrop-blur-xl";
+
+/** One wrapper per hunk, so a pinned hunk header stays inside its own hunk and the next one
+ * takes the top instead of piling on it. Without hunk buttons nothing is pinned: stay flat. */
+function groupByHunk(isHunk: boolean[], nodes: ReactNode[], className: string, group: boolean) {
+  if (!group) return nodes;
+  const groups: ReactNode[][] = [];
+  nodes.forEach((node, index) => {
+    if (isHunk[index] || groups.length === 0) groups.push([]);
+    groups[groups.length - 1].push(node);
+  });
+  return groups.map((members, index) => (
+    <div key={index} className={className || undefined}>
+      {members}
+    </div>
+  ));
+}
+
+/** A ticked changed line: a solid primary wash replaces its add/remove tint. */
+const PICKED_ROW = "bg-primary/20";
+
+/** Keyboard focus on a tick box: a ring inside the cell (the pick cells are tab-reachable). */
+const PICK_FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/70";
+
+/** The tick box itself: shown on row hover, filled with a check once picked. */
+function PickBox({ picked, hoverGroup }: { picked: boolean; hoverGroup: string }) {
+  return (
+    <span
+      aria-hidden
+      data-pick-box
+      className={`${picked ? "inline-flex" : `hidden ${hoverGroup}`} size-[11px] items-center justify-center rounded-[3px] border align-middle ${picked ? "border-primary bg-primary text-surface" : "border-ink/45 bg-surface/60"}`}
+    >
+      {picked && (
+        <svg viewBox="0 0 10 10" className="size-[8px]" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M2 5.2 4.1 7.3 8 2.9" />
+        </svg>
+      )}
+    </span>
+  );
+}
+
+/** What the hunk header says on hover: how to pick, or why this file only takes whole hunks. */
+function hunkHint(
+  file: ChangedFile,
+  hunkActions: HunkActions | undefined,
+  selection: LineSelection | null,
+  hunkIndex: number,
+  header: string,
+): string | undefined {
+  if (!hunkActions?.onLines || !header.startsWith("@@ -")) return undefined;
+  if (file.status !== "modified") return "Lines can only be picked in a file that exists on both sides";
+  if (selection && selection.pickedIn(hunkIndex).length === 0) {
+    return "Click a gutter to pick lines · drag or Shift-click for a range";
+  }
+  return undefined;
+}
+
+function HunkHint({ text }: { text?: string }) {
+  if (!text) return null;
+  return (
+    <span className="hidden shrink-0 font-sans text-[10.5px] font-normal text-ink-dim group-hover/hunk:inline">
+      {text}
+    </span>
+  );
+}
+
+/** Line picking needs a file that exists on both sides, and a caller that can act on lines. */
+const canPickLines = (file: ChangedFile, hunkActions?: HunkActions) =>
+  Boolean(hunkActions?.onLines) && file.status === "modified";
+
 /** Diff gutters: ink at low alpha, GitHub's muted gray — clearly fainter than the code next to
  * it, and .dark re-points it with the theme. */
 const GUTTER_TONE = "text-ink/45";
+
+/** The props that make a gutter cell a tick box; undefined when the line cannot be picked. */
+interface PickProps {
+  role: "checkbox";
+  tabIndex: 0 | -1;
+  "aria-checked": boolean;
+  "aria-label": string;
+  "data-line-pick": true;
+  onMouseDown: (event: React.MouseEvent) => void;
+  onMouseEnter: () => void;
+  onKeyDown: (event: React.KeyboardEvent<HTMLElement>) => void;
+}
+
+/** `group` = the lines that tick together: a split row's remove and add are one change. Only the
+ * first changed line of a hunk is a tab stop; Up/Down walk the rest, Esc clears the hunk. */
+function pickProps(
+  selection: LineSelection | null,
+  lineIndex: number,
+  group: number[] = [lineIndex],
+  label = "line",
+): PickProps | undefined {
+  const slot = selection?.slots[lineIndex];
+  if (!selection || lineIndex < 0 || !slot) return undefined;
+  return {
+    role: "checkbox",
+    tabIndex: slot.ordinal === 0 ? 0 : -1,
+    "aria-checked": group.every(selection.isPicked),
+    "aria-label": `Pick ${label}`,
+    "data-line-pick": true,
+    onMouseDown: (event) => {
+      if (event.button !== 0) return;
+      event.preventDefault();
+      selection.begin(group, event.shiftKey);
+    },
+    onMouseEnter: () => selection.enter(group),
+    onKeyDown: (event) => {
+      if (event.key === " " || event.key === "Enter") {
+        event.preventDefault();
+        selection.toggleGroup(group);
+      } else if (event.key === "Escape") {
+        selection.clear(slot.hunk);
+      } else if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        const all = [...document.querySelectorAll<HTMLElement>("[data-line-pick]")];
+        all[all.indexOf(event.currentTarget) + (event.key === "ArrowDown" ? 1 : -1)]?.focus();
+      }
+    },
+  };
+}
+
+/** Screen-reader name of a changed line: kind and number. */
+const pickLabel = (line: NumberedDiffLine) =>
+  `${line.type === "add" ? "added" : "removed"} line ${line.newNumber ?? line.oldNumber ?? ""}`.trim();
+
+/** The changed lines of one split row: its remove and add are picked as a pair. */
+function changeGroup(selection: LineSelection | null, row: DiffSplitRow): number[] {
+  return [row.oldIndex, row.newIndex].filter((index) => index >= 0 && selection?.slots[index]);
+}
+
+function rowPicked(selection: LineSelection | null, row: DiffSplitRow): boolean {
+  const group = changeGroup(selection, row);
+  return group.length > 0 && group.every((index) => selection?.isPicked(index));
+}
+
+const clearHunk = (selection: LineSelection, hunk: number) => () => selection.clear(hunk);
 
 /**
  * One file's diff lines, unified: one stacked column with its own lazy grammar load. Mounted
@@ -90,6 +231,7 @@ function DiffBody({
   const texts = useMemo(() => lines.map((line) => line.text), [lines]);
   const highlighted = useHighlightedLines(file.path, texts);
   const changes = useMemo(() => intralineRanges(lines), [lines]);
+  const selection = useLineSelection(file.diff, canPickLines(file, hunkActions));
   // Wrap mode gives up max-content width: rows fill the pane and long lines soft-wrap.
   // Unwrapped, one w-max box holds every row: each row stretches to the widest line, so tints
   // and hunk bars end together instead of at their own text width.
@@ -99,18 +241,29 @@ function DiffBody({
 
   return (
     <div className={wrap ? undefined : "w-max min-w-full"}>
-      {lines.map((line, index) => {
+      {groupByHunk(
+        lines.map((line) => line.type === "hunk"),
+        lines.map((line, index) => {
         if (line.type === "hunk") {
           hunkIndex += 1;
           return (
             <div
               key={index}
               data-diff-line="hunk"
-              className={`${hunkActions ? "flex items-center gap-2" : "block"} w-full ${wrap ? "whitespace-pre-wrap" : "whitespace-pre"} bg-primary/[0.07] px-3.5 py-1 font-semibold text-primary-ink`}
+              className={`${hunkActions ? `flex items-center gap-2 ${PINNED_HUNK}` : "block bg-primary/[0.07]"} w-full ${wrap ? "whitespace-pre-wrap" : "whitespace-pre"} px-3.5 py-1 font-semibold text-primary-ink`}
             >
               {hunkActions ? <span className="min-w-0">{line.text}</span> : line.text}
+              <HunkHint text={hunkHint(file, hunkActions, selection, hunkIndex, line.text)} />
               {hunkActions && (
-                <HunkButtons path={file.path} index={hunkIndex} header={line.text} actions={hunkActions} />
+                <HunkButtons
+                  path={file.path}
+                  index={hunkIndex}
+                  header={line.text}
+                  actions={hunkActions}
+                  picked={selection?.pickedIn(hunkIndex)}
+                  counts={selection?.countsIn(hunkIndex)}
+                  onClear={selection ? clearHunk(selection, hunkIndex) : undefined}
+                />
               )}
             </div>
           );
@@ -123,23 +276,45 @@ function DiffBody({
         // palette, and only untokenized text keeps the soft base. The row tint stays.
         const contentClass = `${contentSpace} ${tokens === undefined ? tone.text : "text-ink-soft"}`;
 
+        const pick = pickProps(selection, index, [index], pickLabel(line));
+        const picked = selection?.isPicked(index) ?? false;
+        const gutterClick = pick
+          ? { onMouseDown: pick.onMouseDown, onMouseEnter: pick.onMouseEnter }
+          : {};
+        const gutterCursor = pick ? " cursor-pointer" : "";
+
         return (
           <div
             key={index}
             data-diff-line={line.type}
-            className={`grid ${rowSpace} grid-cols-[44px_44px_14px_auto] ${tone.row}`}
+            data-line-picked={picked || undefined}
+            className={`group/row grid ${rowSpace} grid-cols-[44px_44px_14px_auto] ${picked ? PICKED_ROW : tone.row}`}
           >
             <span
-              className={`select-none border-r border-rule pr-2 text-right ${line.type === "remove" ? tone.lineNumberBox : GUTTER_TONE}`}
+              {...gutterClick}
+              className={`select-none border-r border-rule pr-2 text-right ${line.type === "remove" ? tone.lineNumberBox : GUTTER_TONE}${gutterCursor}`}
             >
               {line.oldNumber ?? ""}
             </span>
             <span
-              className={`select-none border-r border-rule pr-2 text-right ${line.type === "add" ? tone.lineNumberBox : GUTTER_TONE}`}
+              {...gutterClick}
+              className={`select-none border-r border-rule pr-2 text-right ${line.type === "add" ? tone.lineNumberBox : GUTTER_TONE}${gutterCursor}`}
             >
               {line.newNumber ?? ""}
             </span>
-            <span className={`select-none text-center ${tone.text}`}>{PREFIX[line.type]}</span>
+            <span
+              {...pick}
+              className={`select-none text-center ${tone.text}${gutterCursor}${pick ? ` ${PICK_FOCUS}` : ""}`}
+            >
+              {pick ? (
+                <span className="flex h-[1.6em] items-center justify-center">
+                  <span className={picked ? "hidden" : "group-hover/row:hidden"}>{PREFIX[line.type]}</span>
+                  <PickBox picked={picked} hoverGroup="group-hover/row:inline-flex" />
+                </span>
+              ) : (
+                PREFIX[line.type]
+              )}
+            </span>
             {html !== undefined ? (
               <span className={contentClass} dangerouslySetInnerHTML={{ __html: html }} />
             ) : (
@@ -147,7 +322,10 @@ function DiffBody({
             )}
           </div>
         );
-      })}
+      }),
+        "",
+        Boolean(hunkActions),
+      )}
     </div>
   );
 }
@@ -192,6 +370,8 @@ function SplitCells({
   html,
   ranges,
   wrap,
+  pick,
+  picked = false,
 }: {
   line: NumberedDiffLine | null;
   side: "old" | "new";
@@ -199,6 +379,9 @@ function SplitCells({
   /** Changed words of this line against its paired line on the other side. */
   ranges?: Range[];
   wrap: boolean;
+  /** Present when this line can be ticked for a line-level stage/unstage/discard. */
+  pick?: PickProps;
+  picked?: boolean;
 }) {
   if (!line) {
     return (
@@ -220,25 +403,40 @@ function SplitCells({
   // Hunk rows never reach here (they span both panes above); narrow the tone lookup for tsc.
   const tone = LINE_TONES[line.type === "hunk" ? "context" : line.type];
   const number = side === "old" ? line.oldNumber : line.newNumber;
-  const cellClass = `${wrap ? "whitespace-pre-wrap break-words" : "whitespace-pre"} border-r border-rule pl-2 pr-2 ${tone.row}`;
+  const cellClass = `${wrap ? "whitespace-pre-wrap break-words" : "whitespace-pre"} border-r border-rule pl-2 pr-2 ${picked ? PICKED_ROW : tone.row}`;
   const marked = markedLine(line, html, ranges);
   return (
     <>
       <span
         data-diff-num={side}
-        className={`select-none border-r border-rule pr-2 text-right ${line.type === "add" || line.type === "remove" ? tone.lineNumberBox : GUTTER_TONE}`}
+        {...pick}
+        className={`group/cell select-none border-r border-rule text-right ${pick ? "" : "pr-2"} ${line.type === "add" || line.type === "remove" ? tone.lineNumberBox : GUTTER_TONE}${pick ? ` cursor-pointer ${PICK_FOCUS}` : ""}`}
       >
-        {number ?? ""}
+        {pick ? (
+          // Box and number share one line box, so they centre on the same line however tall the row.
+          <span className="flex items-center gap-x-1 pl-1 pr-2">
+            <PickBox picked={picked} hoverGroup="group-hover/cell:inline-flex" />
+            <span className="ml-auto">{number ?? ""}</span>
+          </span>
+        ) : (
+          (number ?? "")
+        )}
       </span>
       {marked !== undefined ? (
         <span
           data-diff-code={side}
           data-diff-line={line.type}
+          data-line-picked={picked || undefined}
           className={`${cellClass} ${html === undefined ? tone.text : "text-ink-soft"}`}
           dangerouslySetInnerHTML={{ __html: marked }}
         />
       ) : (
-        <span data-diff-code={side} data-diff-line={line.type} className={`${cellClass} ${tone.text}`}>
+        <span
+          data-diff-code={side}
+          data-diff-line={line.type}
+          data-line-picked={picked || undefined}
+          className={`${cellClass} ${tone.text}`}
+        >
           {line.text || " "}
         </span>
       )}
@@ -267,29 +465,50 @@ function SplitDiffBody({
   const texts = useMemo(() => lines.map((line) => line.text), [lines]);
   const highlighted = useHighlightedLines(file.path, texts);
   const changes = useMemo(() => intralineRanges(lines), [lines]);
+  const selection = useLineSelection(file.diff, canPickLines(file, hunkActions));
+  // With tick boxes the number gutters grow just enough for the widest number plus the box.
+  const digits = Math.max(2, ...lines.map((line) => String(Math.max(line.oldNumber ?? 0, line.newNumber ?? 0)).length));
+  const numberTracks: React.CSSProperties | undefined = selection
+    ? {
+        gridTemplateColumns: wrap
+          ? `calc(${digits}ch + 29px) minmax(0,1fr) calc(${digits}ch + 29px) minmax(0,1fr)`
+          : `calc(${digits}ch + 29px) auto calc(${digits}ch + 29px) auto`,
+      }
+    : undefined;
 
   // Wrap mode swaps the max-content auto tracks for fr tracks: both panes take half the pane
   // each and long lines soft-wrap inside. The one shared grid still keeps panes aligned.
   return (
     <div
-      className={`grid ${wrap ? "min-w-full grid-cols-[36px_minmax(0,1fr)_36px_minmax(0,1fr)]" : "w-max min-w-full grid-cols-[36px_auto_36px_auto]"}`}
+      style={numberTracks}
+      className={`grid ${
+        wrap
+          ? `min-w-full ${selection ? "" : "grid-cols-[36px_minmax(0,1fr)_36px_minmax(0,1fr)]"}`
+          : `w-max min-w-full ${selection ? "" : "grid-cols-[36px_auto_36px_auto]"}`
+      }`}
     >
-      {rows.map((row, rowIndex) => {
+      {groupByHunk(
+        rows.map((row) => row.hunk !== null),
+        rows.map((row, rowIndex) => {
         if (row.hunk) {
           hunkIndex += 1;
           return (
             <div
               key={rowIndex}
               data-diff-row="hunk"
-              className={`col-span-4 ${hunkActions ? "flex items-center gap-2" : "block"} ${wrap ? "whitespace-pre-wrap" : "whitespace-pre"} bg-primary/[0.07] px-3.5 py-1 font-semibold text-primary-ink`}
+              className={`col-span-4 ${hunkActions ? `flex items-center gap-2 ${PINNED_HUNK}` : "block bg-primary/[0.07]"} ${wrap ? "whitespace-pre-wrap" : "whitespace-pre"} px-3.5 py-1 font-semibold text-primary-ink`}
             >
               {hunkActions ? <span className="min-w-0">{row.hunk.text}</span> : row.hunk.text}
+              <HunkHint text={hunkHint(file, hunkActions, selection, hunkIndex, row.hunk.text)} />
               {hunkActions && (
                 <HunkButtons
                   path={file.path}
                   index={hunkIndex}
                   header={row.hunk.text}
                   actions={hunkActions}
+                  picked={selection?.pickedIn(hunkIndex)}
+                  counts={selection?.countsIn(hunkIndex)}
+                  onClear={selection ? clearHunk(selection, hunkIndex) : undefined}
                 />
               )}
             </div>
@@ -303,6 +522,8 @@ function SplitDiffBody({
               html={row.oldIndex >= 0 ? highlighted?.[row.oldIndex] : undefined}
               ranges={changes.get(row.oldIndex)}
               wrap={wrap}
+              pick={row.old ? pickProps(selection, row.oldIndex, changeGroup(selection, row), pickLabel(row.old)) : undefined}
+              picked={rowPicked(selection, row)}
             />
             <SplitCells
               line={row.new}
@@ -310,10 +531,15 @@ function SplitDiffBody({
               html={row.newIndex >= 0 ? highlighted?.[row.newIndex] : undefined}
               ranges={changes.get(row.newIndex)}
               wrap={wrap}
+              pick={row.new ? pickProps(selection, row.newIndex, changeGroup(selection, row), pickLabel(row.new)) : undefined}
+              picked={rowPicked(selection, row)}
             />
           </Fragment>
         );
-      })}
+      }),
+        "col-span-4 grid grid-cols-subgrid",
+        Boolean(hunkActions),
+      )}
     </div>
   );
 }
@@ -597,7 +823,10 @@ export function DiffViewer({
         ) : (
           // One scroll container with every file stacked under a sticky header, each keeping its
           // own grammar. Never split into pages — the point is to keep scrolling.
-          <div className="min-h-0 flex-1 overflow-auto bg-sheet pb-3 font-mono text-[12px] leading-[1.6]">
+          <div
+            style={{ "--diff-sticky-top": "36px" } as React.CSSProperties}
+            className="min-h-0 flex-1 overflow-auto bg-sheet pb-3 font-mono text-[12px] leading-[1.6]"
+          >
             {files.map((item) => (
               <section
                 key={item.path}
