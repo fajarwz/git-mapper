@@ -296,6 +296,27 @@ test("changing the selection in stacked scope does not re-render the other files
   assert.equal(bodyRenders.count, after, "no diff body re-rendered for a selection change");
 });
 
+test("a huge wrapped unified diff renders its rows in skippable blocks", () => {
+  const big: ChangedFile = {
+    ...sampleFile,
+    diff: [
+      { type: "hunk", text: "@@ -1,400 +1,400 @@" },
+      ...Array.from({ length: 400 }, (_, i) => ({ type: "context" as const, text: `line ${i}` })),
+    ],
+  };
+  const props = { files: [big], file: big, scope: "file" as const, onScopeChange: () => {}, scheme: "app" as const };
+  const blocks = (container: HTMLElement) =>
+    [...container.querySelectorAll<HTMLElement>("div")].filter((el) => el.style.contentVisibility === "auto");
+
+  const wrapped = render(<DiffViewer {...props} wrap />);
+  assert.ok(blocks(wrapped.container).length >= 3, "rows are split into culled blocks");
+  assert.equal(wrapped.container.querySelectorAll("[data-diff-line]").length, 401, "no row is dropped");
+  cleanup();
+
+  const unwrapped = render(<DiffViewer {...props} wrap={false} />);
+  assert.equal(blocks(unwrapped.container).length, 0, "unwrapped rows size the box, so stay flat");
+});
+
 test("the scope toggle reports the clicked side and marks the active one", () => {
   const picked: string[] = [];
   const { container } = render(

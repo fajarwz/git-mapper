@@ -74,10 +74,41 @@ const LINE_TONES = {
 const PINNED_HUNK =
   "group/hunk sticky top-[var(--diff-sticky-top,0px)] z-[5] bg-glass-strong bg-linear-to-b from-primary/[0.07] to-primary/[0.07] backdrop-blur-xl";
 
+const CULL_CHUNK = 120;
+const CULL_ROW_ESTIMATE = 20;
+
+/** A huge single-file diff in blocks the browser can skip while off-screen. Only for flat,
+ * wrapped, unified bodies: a split grid must stay one grid, and unwrapped rows size the
+ * `w-max` box, which a skipped block would stop contributing to. */
+function cullChunks(nodes: ReactNode[]) {
+  const chunks: ReactNode[] = [];
+  for (let start = 0; start < nodes.length; start += CULL_CHUNK) {
+    const rows = nodes.slice(start, start + CULL_CHUNK);
+    chunks.push(
+      <div
+        key={start}
+        style={{
+          contentVisibility: "auto",
+          containIntrinsicSize: `auto ${rows.length * CULL_ROW_ESTIMATE}px`,
+        }}
+      >
+        {rows}
+      </div>,
+    );
+  }
+  return chunks;
+}
+
 /** One wrapper per hunk, so a pinned hunk header stays inside its own hunk and the next one
  * takes the top instead of piling on it. Without hunk buttons nothing is pinned: stay flat. */
-function groupByHunk(isHunk: boolean[], nodes: ReactNode[], className: string, group: boolean) {
-  if (!group) return nodes;
+function groupByHunk(
+  isHunk: boolean[],
+  nodes: ReactNode[],
+  className: string,
+  group: boolean,
+  cull = false,
+) {
+  if (!group) return cull && nodes.length > CULL_CHUNK * 2 ? cullChunks(nodes) : nodes;
   const groups: ReactNode[][] = [];
   nodes.forEach((node, index) => {
     if (isHunk[index] || groups.length === 0) groups.push([]);
@@ -325,6 +356,7 @@ function DiffBody({
       }),
         "",
         Boolean(hunkActions),
+        wrap,
       )}
     </div>
   );
