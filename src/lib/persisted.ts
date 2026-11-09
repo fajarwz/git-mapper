@@ -46,4 +46,5 @@ export const STORAGE_KEYS = {
   imageDiffMode: "git-mapper:image-diff-mode",
   updateMode: "git-mapper:update-mode",
   showAvatars: "git-mapper:show-avatars",
+  zoom: "git-mapper:zoom",
 } as const;
