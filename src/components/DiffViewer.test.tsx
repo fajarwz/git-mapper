@@ -25,6 +25,18 @@ vi.mock("../lib/highlight", async (importOriginal) => {
   };
 });
 
+const bodyRenders = vi.hoisted(() => ({ count: 0 }));
+vi.mock("../hooks/useLineSelection", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("../hooks/useLineSelection")>();
+  return {
+    ...actual,
+    useLineSelection: (...args: Parameters<typeof actual.useLineSelection>) => {
+      bodyRenders.count += 1;
+      return actual.useLineSelection(...args);
+    },
+  };
+});
+
 beforeEach(() => {
   vi.mocked(loadImageVersions).mockReset();
   highlightState.blockCss = false;
@@ -254,6 +266,34 @@ test("picking a file in the jump list scrolls that file's own section flush to t
     if (original) Element.prototype.scrollIntoView = original;
     else delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
   }
+});
+
+test("a patch landing in stacked scope does not scroll back to the selected file", () => {
+  let jumps = 0;
+  const original = Element.prototype.scrollIntoView;
+  Element.prototype.scrollIntoView = function () {
+    jumps += 1;
+  };
+  try {
+    const lazy: ChangedFile = { ...secondFile, diff: null };
+    const props = { file: sampleFile, scope: "all" as const, onScopeChange: () => {}, scheme: "app" as const };
+    const { rerender } = render(<DiffViewer {...props} files={[sampleFile, lazy]} />);
+    assert.equal(jumps, 1, "the selection is jumped to once");
+    rerender(<DiffViewer {...props} files={[sampleFile, secondFile]} />);
+    assert.equal(jumps, 1, "files changing under the same selection leaves the scroll alone");
+  } finally {
+    if (original) Element.prototype.scrollIntoView = original;
+    else delete (Element.prototype as { scrollIntoView?: unknown }).scrollIntoView;
+  }
+});
+
+test("changing the selection in stacked scope does not re-render the other files' rows", () => {
+  const props = { scope: "all" as const, onScopeChange: () => {}, scheme: "app" as const };
+  const files = [sampleFile, secondFile];
+  const { rerender } = render(<DiffViewer {...props} files={files} file={sampleFile} />);
+  const after = bodyRenders.count;
+  rerender(<DiffViewer {...props} files={files} file={secondFile} />);
+  assert.equal(bodyRenders.count, after, "no diff body re-rendered for a selection change");
 });
 
 test("the scope toggle reports the clicked side and marks the active one", () => {

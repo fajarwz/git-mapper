@@ -1,4 +1,4 @@
-import { Fragment, useEffect, useMemo, useRef, type ReactNode } from "react";
+import { Fragment, memo, useEffect, useMemo, useRef, type ReactNode } from "react";
 import type { ChangedFile } from "../types";
 import {
   STATUS_LABELS,
@@ -351,8 +351,12 @@ function DiffSkeleton({ path }: { path: string }) {
   );
 }
 
-/** The diff body routes itself: image files get the GitHub-style picture diff, text gets lines. */
-function DiffSection({
+/**
+ * The diff body routes itself: image files get the GitHub-style picture diff, text gets lines.
+ * Memoized: in stacked scope a selection change re-renders the viewer, and without this every
+ * loaded file re-built all its rows on each click.
+ */
+const DiffSection = memo(function DiffSection({
   file,
   layout,
   wrap,
@@ -376,7 +380,7 @@ function DiffSection({
   ) : (
     <DiffBody key={file.path} file={file} wrap={wrap} hunkActions={hunkActions} />
   );
-}
+});
 
 /** The no-source-line side of a split row: a neutral ink wash, so "came from empty" reads at a
  * glance instead of looking like a blank context row. Ink alpha, so .dark re-points it. */
@@ -757,11 +761,21 @@ export function DiffViewer({
   // file too high.
   const sections = useRef(new Map<string, HTMLElement>());
   const target = file?.path ?? null;
+  // Keyed, not re-run on `files`: every lazy patch landing replaces the array and would yank
+  // the scroll back to the selected file.
+  const jumpedTo = useRef<string | null>(null);
   useEffect(() => {
-    if (scope !== "all" || !target) return;
+    if (scope !== "all" || !target) {
+      jumpedTo.current = null;
+      return;
+    }
+    const key = `${commitHash ?? ""}\0${target}`;
+    if (jumpedTo.current === key) return;
     const node = sections.current.get(target);
-    if (node && typeof node.scrollIntoView === "function") node.scrollIntoView({ block: "start" });
-  }, [scope, target, files]);
+    if (!node) return;
+    jumpedTo.current = key;
+    if (typeof node.scrollIntoView === "function") node.scrollIntoView({ block: "start" });
+  }, [scope, target, commitHash, files]);
 
   // Patches are lazy: the selected file asks immediately, stacked sections on scroll-in
   // (240px margin). Image files skip (ImageDiff fetches its blobs); without IntersectionObserver
