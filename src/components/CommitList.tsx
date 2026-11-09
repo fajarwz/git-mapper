@@ -193,7 +193,7 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
   const columns = {
     "--graph-width": `${graphColumnWidth}px`,
     // The whole track expression lives in the variable: a fixed px track when pinned, flexible otherwise.
-    "--col-message": messageWidth === null ? "minmax(0,1fr)" : `${messageWidth}px`,
+    "--col-message": messageTrack(messageWidth),
     "--col-author": `${authorWidth}px`,
     "--col-date": `${dateWidth}px`,
     "--col-hash": `${HASH_WIDTH}px`,
