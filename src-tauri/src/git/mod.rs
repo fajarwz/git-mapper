@@ -80,6 +80,22 @@ pub async fn apply_hunk(
     })
     .await
 }
+/// `apply_hunk` narrowed to chosen lines: `lines` counts the hunk's `+`/`-` lines from 0.
+#[tauri::command]
+pub async fn apply_hunk_lines(
+    dir: String,
+    path: String,
+    side: String,
+    hunk_index: usize,
+    hunk_header: String,
+    action: String,
+    lines: Vec<usize>,
+) -> Result<(), String> {
+    run_blocking("hunk lines apply", move || {
+        apply_hunk_lines_in(&dir, &path, &side, hunk_index, &hunk_header, &action, &lines)
+    })
+    .await
+}
 #[tauri::command]
 pub async fn commit_staged(dir: String, message: String) -> Result<(), String> {
     run_blocking("commit", move || commit_staged_in(&dir, &message)).await

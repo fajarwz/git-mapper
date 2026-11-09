@@ -21,6 +21,7 @@ pub fn run() {
             git::discard_all,
             git::read_wip_side,
             git::apply_hunk,
+            git::apply_hunk_lines,
             git::commit_staged,
             git::undo_commit,
             git::pull_branch,
