@@ -136,8 +136,12 @@ and the README's Tests badge points at it.
   hunk, so its hunk verbs are the whole-file verbs. The combined `git diff HEAD` read behind the
   commit-list row and file totals is unchanged. The digest does NOT move when a hunk shifts
   between index and disk inside an already-`MM` file, hence `useWipSide.reload()` after every
-  hunk action. The dev middleware mirrors both commands. Line-level staging reuses `apply_hunk`'s
-  `git apply` with a trimmed hunk; not built.
+  hunk action. The dev middleware mirrors both commands. Line-level: the `+`/`-` gutter cell of a changed line
+  ticks it (`useLineSelection`, `lib/lineSelection.ts`), and the hunk's buttons become Stage/Unstage/
+  Discard N lines via `apply_hunk_lines` — `trim_hunk` cuts the fresh hunk to the picked lines (ordinals
+  count only `+`/`-` lines; a skipped line turns into context or vanishes depending on direction) and
+  `git apply --recount` does the rest. Only for files present on both sides (`modified`): a new or deleted
+  file's patch header says create/delete, so those keep the whole-hunk verbs.
 - `src/components/FileList.tsx` — the changed-file sidebar. A List/Tree toggle (same segmented
   pattern as the diff-scope toggle) sits beside the counts; DetailsPanel owns the choice and
   persists it (`git-mapper:file-view`; `src/lib/fileTree.ts` builds the tree). The tree renders
@@ -344,5 +348,5 @@ root sets `base = "website"`. Gate: `npm run build` + `npm run check` inside
 
 ## Roadmap (not built yet)
 
-Deep search over unpaginated history (loaded-window filtering is built: the title-bar search box); line-level staging (hunk-level is built); PR review via a `gh` CLI passthrough is the discussed next slice. (Staging, committing and merge resolution are built.)
+Deep search over unpaginated history (loaded-window filtering is built: the title-bar search box); PR review via a `gh` CLI passthrough is the discussed next slice. (Staging, committing and merge resolution are built.)
 History pages at 500 commits per read; `loadMoreCommits` appends the next page on scroll.
