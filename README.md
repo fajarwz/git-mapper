@@ -42,35 +42,57 @@ The links above always resolve to the newest release.
 
 <img src="docs/screenshot.png" alt="Commit list, light theme" width="100%">
 
-## What it does
+## Features
 
-- Opens repositories as tabs. Each tab remembers its selected commit, file and panel state, and
-  tabs can be dragged into any order.
-- Commit list with a graph whose lines keep their colour from tip to root, and branch,
-  remote and tag pills. Double-click a branch
-  pill to check it out.
-- Details panel with commit metadata and the changed-file list — flat or folder tree, with status
-  badges — and a line-numbered diff with lazy syntax highlighting. Image files get a picture diff
-  (2-up, swipe, onion peel) instead of a text diff.
-- Diff layout: unified or split (old lines left, new lines right, like GitHub). The empty side of
-  an added or deleted line carries a tinted void so it reads as coming from nothing, and long
-  lines soft-wrap by default with a toggle to scroll instead.
-- An `Uncommitted changes` row on top while the working tree is dirty: staged, unstaged and
-  untracked files, diffed against `HEAD`.
-- A staging rail for that dirty tree: stage, unstage and discard by file, type the message and
-  commit without leaving the window. The toolbar fetches the remotes and pulls or pushes the
-  checked-out branch.
-- Merging a local branch from its pill's menu. A conflict lands in the rail: keep the current
-  or the incoming version per file, or open it to see the file with its conflict blocks inline
-  (line numbers, syntax colours) and choose current, incoming or both for each block. Finish
-  with git's own prepared message, or abort the merge entirely.
-- Refresh on window focus (only the commits that are new get read) or from the toolbar button.
-  Rows a refresh touched flash amber.
-- Light and dark glass themes, remembered across restarts together with the window size and
-  position.
-- Resizable graph gutter, commit / author / date columns and details panel height.
-- Search over the loaded history: hashes, commit messages, authors and ref pills. Ctrl+F focuses
-  the title-bar box, Esc clears.
+**Read history**
+
+- **Lane-coloured graph.** Every branch keeps its colour from tip to root, forks and merges bend at
+  their own commit, and branch, remote and tag pills sit on the rows. Resize the graph gutter,
+  or drag it wider on lane-heavy histories.
+- **Repository tabs.** Each tab remembers its selected commit, file and panel state; drag tabs
+  into any order. Tabs you leave alone go to sleep to save memory and wake on click.
+- **Search.** Filter the loaded history by hash, message, author or ref name. Ctrl+F focuses the
+  title-bar box, Esc clears.
+- **Your columns, your way.** Resize the commit / author / date columns, drag their headers to
+  reorder them, right-click a header to hide one.
+- **Stashes as rows.** Each stash sits above the commit it was taken on. Apply, pop or drop from
+  its menu (pop and drop ask first).
+- **Avatars.** Initials chips by default, Gravatar photos if you like (settings toggle).
+
+**Read changes**
+
+- **Diffs that read.** Line-numbered, syntax-highlighted (lazy per language, three colour
+  schemes), with word-level change marks. Unified or split layout, soft-wrap or scroll.
+- **One file or all of them.** Show the selected file alone, or stack every changed file in one
+  scroll with sticky headers and a jump list.
+- **Flat list or folder tree** for changed files, with status badges and rename hints.
+- **Picture diffs** for images: 2-up, swipe or onion peel, with pixel sizes and byte counts.
+- **Snappy.** Hover a file to prefetch its patch; clicking shows a skeleton while it loads.
+
+**Change things**
+
+- **Stage, commit, undo.** The `Uncommitted changes` row opens a staging rail: stage, unstage or
+  discard by file, write the message and commit without leaving the window. Undo the tip commit
+  and its files come back staged. The rail docks itself when the tree goes clean.
+- **Hunks and single lines.** Stage, unstage or discard one hunk, or tick individual `+`/`-`
+  lines and act on just those. Staged and unstaged sides are shown one at a time, like VS Code.
+- **Sync.** Fetch, pull (fast-forward only) and push the checked-out branch from the counters
+  beside its name.
+- **Checkout.** Double-click a branch pill, or right-click for branch and commit checkout
+  (detaching HEAD asks first).
+- **Merge and resolve.** Merge a local branch from its pill's menu. Conflicts land in the rail:
+  take current or incoming per file, or open the file with its conflict blocks inline and choose
+  current, incoming or both per block. Finish with git's own message, or abort.
+- **Copy** hashes and branch, remote, tag and stash names from the right-click menu.
+
+**Stays out of your way**
+
+- **Always current.** Refresh on window focus (only new commits get read), a periodic background
+  fetch so ahead/behind counts are honest, or the toolbar button. Rows a refresh touched flash.
+- **Light and dark glass themes**, zoom the whole window with Ctrl/Cmd plus, minus and zero, and
+  window size and position restored on launch.
+- **Updates itself.** Checks on launch, downloads in the background, restarts when you say so.
+- **Local and private.** No account, no telemetry in the app; it runs your own `git`.
 
 ## Run it
 
@@ -99,6 +121,7 @@ the same commands at `POST /api/git`, which is why the app also runs in a plain 
 
 - Searching history beyond the loaded 500-commit window.
 - Rebasing and cherry-picking.
+- Pull requests (a `gh` passthrough is the planned next slice).
 
 ## Support
 
