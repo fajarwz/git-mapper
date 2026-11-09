@@ -330,6 +330,9 @@ function DiffBody({
   );
 }
 
+/** Off-screen stacked files skip layout and paint; `auto` remembers each section's real height. */
+const SECTION_CULLING = "[content-visibility:auto] [contain-intrinsic-size:auto_480px]";
+
 const SKELETON_WIDTHS = ["w-2/5", "w-3/4", "w-1/2", "w-5/6", "w-2/3", "w-1/3", "w-3/5", "w-4/5"];
 
 /** Placeholder rows shown while a patch loads, so a click answers before git does. */
@@ -864,6 +867,7 @@ export function DiffViewer({
               <section
                 key={item.path}
                 data-diff-file={item.path}
+                className={SECTION_CULLING}
                 ref={(node) => {
                   if (node) sections.current.set(item.path, node);
                   else sections.current.delete(item.path);
