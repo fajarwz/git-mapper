@@ -170,3 +170,19 @@ test("a deleted file's whole path is struck through, directory and name alike", 
   assert.ok(titled.includes("Deleted · docs/old-name.md"));
   assert.ok(titled.includes("Modified · src/keep.ts"));
 });
+
+test("hovering a file row reports its path so the patch can be prefetched", () => {
+  const hovered: string[] = [];
+  const { container } = render(
+    <FileList
+      files={[file("src/app.tsx", "modified"), file("README.md", "added")]}
+      selectedPath={null}
+      onSelect={() => {}}
+      onHoverFile={(path) => hovered.push(path)}
+      collapsed={false}
+      onToggleCollapse={() => {}}
+    />,
+  );
+  fireEvent.pointerOver(container.querySelectorAll("[data-file-item]")[1]);
+  assert.deepEqual(hovered, ["README.md"]);
+});

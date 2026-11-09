@@ -330,6 +330,27 @@ function DiffBody({
   );
 }
 
+const SKELETON_WIDTHS = ["w-2/5", "w-3/4", "w-1/2", "w-5/6", "w-2/3", "w-1/3", "w-3/5", "w-4/5"];
+
+/** Placeholder rows shown while a patch loads, so a click answers before git does. */
+function DiffSkeleton({ path }: { path: string }) {
+  return (
+    <div
+      data-diff-loading={path}
+      role="status"
+      aria-label="Loading diff"
+      className="flex animate-pulse flex-col gap-2.5 px-3.5 py-3"
+    >
+      {SKELETON_WIDTHS.map((width, index) => (
+        <div key={index} className="flex items-center gap-3">
+          <span className="h-2.5 w-7 shrink-0 rounded-full bg-ink/10" />
+          <span className={`h-2.5 rounded-full bg-ink/[0.07] ${width}`} />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 /** The diff body routes itself: image files get the GitHub-style picture diff, text gets lines. */
 function DiffSection({
   file,
@@ -349,9 +370,7 @@ function DiffSection({
   return isImageFile(file.path) ? (
     <ImageDiff key={file.path} file={file} repoPath={repoPath} commitHash={commitHash} />
   ) : file.diff === null ? (
-    <p data-diff-loading={file.path} className="m-0 px-3.5 py-3 font-sans text-[12px] text-ink-dim">
-      Loading diff…
-    </p>
+    <DiffSkeleton path={file.path} />
   ) : layout === "split" ? (
     <SplitDiffBody key={file.path} file={file} wrap={wrap} hunkActions={hunkActions} />
   ) : (

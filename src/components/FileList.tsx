@@ -12,6 +12,8 @@ interface FileListProps {
   loading?: boolean;
   selectedPath: string | null;
   onSelect: (path: string) => void;
+  /** Pointer rests on a file row: lets the owner start reading its patch before the click. */
+  onHoverFile?: (path: string) => void;
   collapsed: boolean;
   onToggleCollapse: () => void;
   /** Flat paths or the folder tree; defaults to the flat list when the owner does not care. */
@@ -54,6 +56,7 @@ function FileRow({
     <button
       type="button"
       data-file-item
+      data-file-path={file.path}
       className={FILE_ROW_CLASS}
       data-selected={selected}
       onClick={() => onSelect(file.path)}
@@ -203,6 +206,7 @@ export function FileList({
   loading = false,
   selectedPath,
   onSelect,
+  onHoverFile,
   collapsed,
   onToggleCollapse,
   view = "list",
@@ -252,7 +256,17 @@ export function FileList({
       </div>
 
       {!collapsed && (
-      <div className="min-h-0 flex-1 overflow-y-auto py-1">
+      <div
+        className="min-h-0 flex-1 overflow-y-auto py-1"
+        onPointerOver={
+          onHoverFile
+            ? (event) => {
+                const row = (event.target as HTMLElement).closest<HTMLElement>("[data-file-path]");
+                if (row?.dataset.filePath) onHoverFile(row.dataset.filePath);
+              }
+            : undefined
+        }
+      >
         {loading && files.length === 0 && (
           <p className="m-0 px-3.5 py-3 text-[12px] text-ink-dim">Loading files…</p>
         )}

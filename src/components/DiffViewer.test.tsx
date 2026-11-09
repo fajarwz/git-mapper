@@ -69,6 +69,7 @@ test("a file whose patch has not landed shows the loading row and asks for it", 
     />,
   );
   assert.ok(container.querySelector("[data-diff-loading='src/app.tsx']"), "the body does not render yet");
+  assert.ok(within(container).getByRole("status", { name: "Loading diff" }), "a skeleton, not bare text");
   assert.deepEqual(wanted, ["src/app.tsx"], "the pane asks App for the patch");
 });
 

@@ -302,6 +302,7 @@ export function DetailsPanel({
               loading={filesLoading}
               selectedPath={selectedFile?.path ?? null}
               onSelect={onSelectFile}
+              onHoverFile={onPatchNeeded}
               collapsed={filesCollapsed}
               onToggleCollapse={() => setFilesCollapsed((collapsed) => !collapsed)}
               view={fileView}
