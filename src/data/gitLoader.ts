@@ -652,6 +652,23 @@ export async function applyHunk(
   );
 }
 
+/** `applyHunk` narrowed to chosen lines: `lines` counts the hunk's +/- lines from 0. */
+export async function applyHunkLines(
+  dir: string,
+  path: string,
+  side: WipSide,
+  hunkIndex: number,
+  hunkHeader: string,
+  action: HunkAction,
+  lines: number[],
+): Promise<void> {
+  await call(
+    "apply_hunk_lines",
+    { dir, path, side, hunkIndex, hunkHeader, action, lines },
+    (raw) => raw as void,
+  );
+}
+
 /** Commits the current index with `-m`; a message is required and pre-trimmed. */
 export async function commitStaged(dir: string, message: string): Promise<void> {
   await call("commit_staged", { dir, message }, (raw) => raw as void);
