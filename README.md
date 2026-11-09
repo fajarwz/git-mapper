@@ -9,6 +9,8 @@
 A fast, lightweight Git history viewer for the desktop. Open a repository and follow the graph,
 diffs and stashes on a clean pane — no account, no setup.
 
+**[gitmapper.fajarwz.com](https://gitmapper.fajarwz.com)**
+
 [![Release](https://img.shields.io/github/v/release/fajarwz/git-mapper?logo=github&labelColor=17151f&color=6e56cf)](https://github.com/fajarwz/git-mapper/releases/latest)
 [![Downloads](https://img.shields.io/github/downloads/fajarwz/git-mapper/total?labelColor=17151f&color=6e56cf&logo=github)](https://github.com/fajarwz/git-mapper/releases)
 [![Sponsor](https://img.shields.io/badge/Sponsor-GitHub-ea4aaa?labelColor=17151f&logo=githubsponsors&logoColor=white)](https://github.com/sponsors/fajarwz)
@@ -46,6 +48,8 @@ The links above always resolve to the newest release.
 
 **Read history**
 
+<img src="website/public/screens/graph.png" alt="The commit graph in lane colours with branch, tag and stash pills" width="70%">
+
 - **Lane-coloured graph.** Every branch keeps its colour from tip to root, forks and merges bend at
   their own commit, and branch, remote and tag pills sit on the rows. Resize the graph gutter,
   or drag it wider on lane-heavy histories.
@@ -61,6 +65,8 @@ The links above always resolve to the newest release.
 
 **Read changes**
 
+<img src="website/public/screens/split.png" alt="A commit with its split diff open" width="100%">
+
 - **Diffs that read.** Line-numbered, syntax-highlighted (lazy per language, three colour
   schemes), with word-level change marks. Unified or split layout, soft-wrap or scroll.
 - **One file or all of them.** Show the selected file alone, or stack every changed file in one
@@ -70,6 +76,12 @@ The links above always resolve to the newest release.
 - **Snappy.** Hover a file to prefetch its patch; clicking shows a skeleton while it loads.
 
 **Change things**
+
+<img src="website/public/screens/stage.png" alt="The staging rail beside the staged diff" width="100%">
+
+<img src="website/public/screens/hunk.png" alt="Picking single lines of a hunk to stage, unstage or discard" width="100%">
+
+<img src="website/public/screens/conflict.png" alt="Resolving a merge conflict block by block, inline" width="100%">
 
 - **Stage, commit, undo.** The `Uncommitted changes` row opens a staging rail: stage, unstage or
   discard by file, write the message and commit without leaving the window. Undo the tip commit
