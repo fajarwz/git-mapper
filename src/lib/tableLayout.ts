@@ -1,9 +1,49 @@
-/** Shared sizing for the commit table so the header and rows cannot drift apart. */
-export const COMMIT_HEADER_GRID =
-  "grid-cols-[var(--graph-width)_var(--col-message)_var(--col-author)_var(--col-date)_var(--col-hash)_var(--col-spacer)]";
+/** Shared sizing for the commit table so the header and rows cannot drift apart. The track
+ * lists live in `--header-grid` / `--row-grid` (see `commitGrids`), because a hidden column must
+ * drop its track and its gap, not just collapse to 0px. */
+export const COMMIT_HEADER_GRID = "grid-cols-(--header-grid)";
+export const COMMIT_ROW_GRID = "grid-cols-(--row-grid)";
 
-export const COMMIT_ROW_GRID =
-  "grid-cols-[var(--col-message)_var(--col-author)_var(--col-date)_var(--col-hash)_var(--col-spacer)]";
+export type ColumnKey = "author" | "date" | "hash";
+export type ColumnVisibility = Record<ColumnKey, boolean>;
+export const DEFAULT_COLUMNS: ColumnVisibility = { author: true, date: true, hash: true };
+export const COLUMN_LABELS: Record<ColumnKey, string> = { author: "Author", date: "Date", hash: "Hash" };
+
+export type ColumnId = "message" | ColumnKey;
+export const DEFAULT_ORDER: ColumnId[] = ["message", "author", "date", "hash"];
+
+/** A stored order made safe: unknown ids and repeats dropped, anything missing appended. */
+export function normalizeOrder(stored: unknown): ColumnId[] {
+  const known = new Set<string>(DEFAULT_ORDER);
+  const seen = new Set<string>();
+  const kept = (Array.isArray(stored) ? stored : []).filter((id): id is ColumnId => {
+    if (typeof id !== "string" || !known.has(id) || seen.has(id)) return false;
+    seen.add(id);
+    return true;
+  });
+  return [...kept, ...DEFAULT_ORDER.filter((id) => !seen.has(id))];
+}
+
+const TRACKS: Record<ColumnId, string> = {
+  message: "var(--col-message)",
+  author: "var(--col-author)",
+  date: "var(--col-date)",
+  hash: "var(--col-hash)",
+};
+
+/** The columns on screen, in order: the commit column is always there. */
+export function shownColumns(visible: ColumnVisibility, order: ColumnId[]): ColumnId[] {
+  return order.filter((id) => id === "message" || visible[id]);
+}
+
+/** Track lists for the header (graph first) and the rows, for the columns currently shown. */
+export function commitGrids(
+  visible: ColumnVisibility,
+  order: ColumnId[] = DEFAULT_ORDER,
+): { header: string; row: string } {
+  const row = [...shownColumns(visible, order).map((id) => TRACKS[id]), "var(--col-spacer)"].join(" ");
+  return { header: `var(--graph-width) ${row}`, row };
+}
 
 export const DEFAULT_AUTHOR_WIDTH = 132;
 /** Wide enough for a full "23 Oct 2026 12:09" stamp without truncating. */
