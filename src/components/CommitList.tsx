@@ -1,4 +1,9 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import type { ReactNode, Ref } from "react";
+import { DndContext, PointerSensor, closestCenter, pointerWithin, useSensor, useSensors } from "@dnd-kit/core";
+import type { CollisionDetection, DragEndEvent } from "@dnd-kit/core";
+import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import type { CSSProperties } from "react";
 import type { Commit, CommitRef, Repository } from "../types";
 import { UNCOMMITTED_HASH, isStashRow } from "../data/gitLoader";
@@ -6,6 +11,7 @@ import { layoutGraph } from "../lib/graphLanes";
 import { graphWidth } from "../lib/graphGeometry";
 import {
   COMMIT_HEADER_GRID,
+  DEFAULT_COLUMNS,
   DEFAULT_AUTHOR_WIDTH,
   DEFAULT_DATE_WIDTH,
   HASH_WIDTH,
@@ -18,9 +24,18 @@ import {
   MIN_GRAPH_WIDTH,
   MIN_MESSAGE_WIDTH,
   DEFAULT_GRAPH_LANES,
+  COLUMN_LABELS,
+  DEFAULT_ORDER,
+  commitGrids,
+  normalizeOrder,
+  shownColumns,
+  type ColumnId,
+  type ColumnKey,
 } from "../lib/tableLayout";
+import { STORAGE_KEYS, usePersistedState } from "../lib/persisted";
 import { PANEL } from "../lib/ui";
 import { CommitGraph } from "./CommitGraph";
+import { ColumnsMenu } from "./ColumnsMenu";
 import { CommitRow } from "./CommitRow";
 import { ResizeHandle } from "./ResizeHandle";
 
@@ -53,6 +68,53 @@ function widthOf(element: HTMLElement | null, fallback: number): number {
 }
 
 const HEADER_CELL = "relative flex h-full min-w-0 items-center";
+/** The cell under the pointer wins, not the nearest centre: the commit column is far wider than
+ * the rest, so its centre sits nowhere near where a drop on it lands. */
+const columnCollision: CollisionDetection = (args) => {
+  const hits = pointerWithin(args);
+  return hits.length > 0 ? hits : closestCenter(args);
+};
+
+const COLUMN_TITLES: Record<ColumnId, string> = { message: "Commit", ...COLUMN_LABELS };
+
+/** One header cell. Only the label is the drag grip, so the resize handle inside the cell keeps
+ * its own pointer drag; @dnd-kit slides the other cells out of the way as this one moves. */
+function HeaderCell({
+  id,
+  label,
+  innerRef,
+  children,
+}: {
+  id: ColumnId;
+  label: string;
+  innerRef?: Ref<HTMLSpanElement>;
+  children?: ReactNode;
+}) {
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({ id });
+  const { role: _role, ...aria } = attributes;
+  return (
+    <span
+      ref={(node) => {
+        setNodeRef(node);
+        if (typeof innerRef === "function") innerRef(node);
+        else if (innerRef) (innerRef as { current: HTMLSpanElement | null }).current = node;
+      }}
+      data-column-id={id}
+      style={{ transform: CSS.Translate.toString(transform), transition }}
+      className={`${HEADER_CELL} ${isDragging ? "z-10 opacity-60" : ""}`}
+    >
+      <span
+        {...listeners}
+        {...aria}
+        title="Drag to reorder"
+        className="min-w-0 flex-1 cursor-grab touch-none select-none truncate active:cursor-grabbing"
+      >
+        {label}
+      </span>
+      {children}
+    </span>
+  );
+}
 
 export function CommitList({ repo, commits, query, selectedHash, flashHashes, onSelect, loadingMore, waking = false, showAvatars, onNearBottom, onCheckoutBranch, onContextMenu }: CommitListProps) {
   // One layout for the graph column and the SVG. Sizing the column from the dot lanes alone used to
@@ -81,6 +143,28 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
   const [messageWidth, setMessageWidth] = useState<number | null>(null);
   const [authorWidth, setAuthorWidth] = useState(DEFAULT_AUTHOR_WIDTH);
   const [dateWidth, setDateWidth] = useState(DEFAULT_DATE_WIDTH);
+
+  const [stored, setStored] = usePersistedState(STORAGE_KEYS.commitColumns, DEFAULT_COLUMNS);
+  const visible = useMemo(() => ({ ...DEFAULT_COLUMNS, ...stored }), [stored]);
+  const [columnsMenu, setColumnsMenu] = useState<{ x: number; y: number } | null>(null);
+  const closeColumnsMenu = useCallback(() => setColumnsMenu(null), []);
+  const toggleColumn = (column: ColumnKey) => setStored({ ...visible, [column]: !visible[column] });
+  const [storedOrder, setStoredOrder] = usePersistedState<ColumnId[]>(STORAGE_KEYS.commitColumnOrder, DEFAULT_ORDER);
+  const order = useMemo(() => normalizeOrder(storedOrder), [storedOrder]);
+  const shown = useMemo(() => shownColumns(visible, order), [visible, order]);
+  const grids = commitGrids(visible, order);
+  // Distance, not delay: a click on a header stays a click, a drag lifts after four pixels.
+  const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 4 } }));
+  function handleColumnDrop({ active, over }: DragEndEvent) {
+    if (!over || active.id === over.id) return;
+    const from = shown.indexOf(active.id as ColumnId);
+    const to = shown.indexOf(over.id as ColumnId);
+    if (from < 0 || to < 0) return;
+    // Hidden columns keep their slot in the stored order: only the shown ones move.
+    const moved = arrayMove(shown, from, to);
+    const hidden = order.filter((id) => !shown.includes(id));
+    setStoredOrder([...moved, ...hidden]);
+  }
 
   const graphColumnRef = useRef<HTMLDivElement>(null);
   const messageCellRef = useRef<HTMLSpanElement>(null);
@@ -114,6 +198,8 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
     "--col-hash": `${HASH_WIDTH}px`,
     // A pinned message column leaves the leftover space to a spacer; unpinned, the message fills it.
     "--col-spacer": messageWidth === null ? "0px" : "1fr",
+    "--header-grid": grids.header,
+    "--row-grid": grids.row,
   } as CSSProperties;
 
   const measureMessage = () => widthOf(messageCellRef.current, 300);
@@ -132,9 +218,9 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
   // Keep the pinned message column inside the window: the header and rows use the same 52px of gaps/padding.
   function clampMessageWidth(width: number, graph: number, author: number, date: number): number {
     const sectionWidth = sectionRef.current?.getBoundingClientRect().width ?? 0;
-    const limit = sectionWidth
-      ? sectionWidth - (graph + author + date + HASH_WIDTH + 52)
-      : MAX_MESSAGE_WIDTH;
+    const shown = (visible.author ? author : 0) + (visible.date ? date : 0) + (visible.hash ? HASH_WIDTH : 0);
+    const gaps = 8 * (2 + Object.values(visible).filter(Boolean).length) + 12;
+    const limit = sectionWidth ? sectionWidth - (graph + shown + gaps) : MAX_MESSAGE_WIDTH;
     const max = Math.max(MIN_MESSAGE_WIDTH, Math.min(MAX_MESSAGE_WIDTH, limit));
     return Math.max(MIN_MESSAGE_WIDTH, Math.min(max, width));
   }
@@ -165,6 +251,45 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
     );
   }
 
+  const resizers: Partial<Record<ColumnId, ReactNode>> = {
+    message: (
+      <ResizeHandle
+        variant="column"
+        label="Resize commit column"
+        min={MIN_MESSAGE_WIDTH}
+        max={MAX_MESSAGE_WIDTH}
+        value={messageWidth ?? undefined}
+        measure={measureMessage}
+        onResize={(width) => setMessageWidth(clampMessageWidth(width, graphColumnWidth, authorWidth, dateWidth))}
+        onReset={() => setMessageWidth(null)}
+      />
+    ),
+    author: (
+      <ResizeHandle
+        variant="column"
+        label="Resize author column"
+        min={MIN_AUTHOR_WIDTH}
+        max={MAX_AUTHOR_WIDTH}
+        value={authorWidth}
+        measure={() => authorWidth}
+        onResize={handleAuthorResize}
+        onReset={() => setAuthorWidth(DEFAULT_AUTHOR_WIDTH)}
+      />
+    ),
+    date: (
+      <ResizeHandle
+        variant="column"
+        label="Resize date column"
+        min={MIN_DATE_WIDTH}
+        max={MAX_DATE_WIDTH}
+        value={dateWidth}
+        measure={() => dateWidth}
+        onResize={handleDateResize}
+        onReset={() => setDateWidth(DEFAULT_DATE_WIDTH)}
+      />
+    ),
+  };
+
   return (
     <section
       ref={sectionRef}
@@ -174,55 +299,24 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
     >
       <div
         data-commit-header
+        onContextMenu={(event) => {
+          event.preventDefault();
+          setColumnsMenu({ x: event.clientX, y: event.clientY });
+        }}
         className={`grid h-8 shrink-0 items-center gap-2 border-b border-rule bg-sheet pr-3 text-[11.5px] font-semibold text-ink-dim ${COMMIT_HEADER_GRID}`}
       >
         <span aria-hidden="true" />
 
-        <span ref={messageCellRef} className={HEADER_CELL}>
-          Commit
-          <ResizeHandle
-            variant="column"
-            label="Resize commit column"
-            min={MIN_MESSAGE_WIDTH}
-            max={MAX_MESSAGE_WIDTH}
-            value={messageWidth ?? undefined}
-            measure={measureMessage}
-            onResize={(width) =>
-              setMessageWidth(clampMessageWidth(width, graphColumnWidth, authorWidth, dateWidth))
-            }
-            onReset={() => setMessageWidth(null)}
-          />
-        </span>
+        <DndContext sensors={sensors} collisionDetection={columnCollision} onDragEnd={handleColumnDrop}>
+          <SortableContext items={shown} strategy={horizontalListSortingStrategy}>
+            {shown.map((id) => (
+              <HeaderCell key={id} id={id} label={COLUMN_TITLES[id]} innerRef={id === "message" ? messageCellRef : undefined}>
+                {resizers[id]}
+              </HeaderCell>
+            ))}
+          </SortableContext>
+        </DndContext>
 
-        <span className={HEADER_CELL}>
-          Author
-          <ResizeHandle
-            variant="column"
-            label="Resize author column"
-            min={MIN_AUTHOR_WIDTH}
-            max={MAX_AUTHOR_WIDTH}
-            value={authorWidth}
-            measure={() => authorWidth}
-            onResize={handleAuthorResize}
-            onReset={() => setAuthorWidth(DEFAULT_AUTHOR_WIDTH)}
-          />
-        </span>
-
-        <span className={HEADER_CELL}>
-          Date
-          <ResizeHandle
-            variant="column"
-            label="Resize date column"
-            min={MIN_DATE_WIDTH}
-            max={MAX_DATE_WIDTH}
-            value={dateWidth}
-            measure={() => dateWidth}
-            onResize={handleDateResize}
-            onReset={() => setDateWidth(DEFAULT_DATE_WIDTH)}
-          />
-        </span>
-
-        <span className="flex h-full items-center">Hash</span>
         <span aria-hidden="true" />
       </div>
 
@@ -246,6 +340,8 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
               selected={commit.hash === selectedHash}
               fresh={flashHashes.has(commit.hash)}
               showAvatar={showAvatars}
+              columns={visible}
+              order={order}
               onSelect={onSelect}
               onCheckoutBranch={onCheckoutBranch}
               onContextMenu={onContextMenu ? (row, x, y) => {
@@ -283,6 +379,9 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
         onResize={handleGraphResize}
         onReset={() => setPinnedGraphWidth(null)}
       />
+      {columnsMenu && (
+        <ColumnsMenu {...columnsMenu} visible={visible} onToggle={toggleColumn} onClose={closeColumnsMenu} />
+      )}
     </section>
   );
 }
