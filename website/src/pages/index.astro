@@ -320,7 +320,8 @@ const systems = [
       // Feature the installer for the visitor's system as a large card; the rest stay in the list.
       const ua = navigator.userAgent;
       const platform = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform || navigator.platform || "";
-      const mobile = /Android|iPhone|iPad|iPod/i.test(ua);
+      // iPadOS reports a Mac platform but has a touch screen.
+      const mobile = /Android|iPhone|iPad|iPod/i.test(ua) || (/mac/i.test(platform) && navigator.maxTouchPoints > 1);
       const os = mobile ? null : /win/i.test(platform + ua) ? "windows" : /mac/i.test(platform) ? "macos" : /linux|x11/i.test(platform + ua) ? "linux" : null;
       if (os) {
         document.querySelector(`[data-os-card="${os}"]`)?.classList.remove("hidden");
