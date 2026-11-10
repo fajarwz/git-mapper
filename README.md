@@ -48,7 +48,7 @@ The links above always resolve to the newest release.
 
 **Read history**
 
-<img src="website/public/screens/graph.png" alt="The commit graph in lane colours with branch, tag and stash pills" width="70%">
+<img src="website/src/assets/screens/graph.png" alt="The commit graph in lane colours with branch, tag and stash pills" width="70%">
 
 - **Lane-coloured graph.** Every branch keeps its colour from tip to root, forks and merges bend at
   their own commit, and branch, remote and tag pills sit on the rows. Resize the graph gutter,
@@ -65,7 +65,7 @@ The links above always resolve to the newest release.
 
 **Read changes**
 
-<img src="website/public/screens/split.png" alt="A commit with its split diff open" width="100%">
+<img src="website/src/assets/screens/split.png" alt="A commit with its split diff open" width="100%">
 
 - **Diffs that read.** Line-numbered, syntax-highlighted (lazy per language, three colour
   schemes), with word-level change marks. Unified or split layout, soft-wrap or scroll.
@@ -77,11 +77,11 @@ The links above always resolve to the newest release.
 
 **Change things**
 
-<img src="website/public/screens/stage.png" alt="The staging rail beside the staged diff" width="100%">
+<img src="website/src/assets/screens/stage.png" alt="The staging rail beside the staged diff" width="100%">
 
-<img src="website/public/screens/hunk.png" alt="Picking single lines of a hunk to stage, unstage or discard" width="100%">
+<img src="website/src/assets/screens/hunk.png" alt="Picking single lines of a hunk to stage, unstage or discard" width="100%">
 
-<img src="website/public/screens/conflict.png" alt="Resolving a merge conflict block by block, inline" width="100%">
+<img src="website/src/assets/screens/conflict.png" alt="Resolving a merge conflict block by block, inline" width="100%">
 
 - **Stage, commit, undo.** The `Uncommitted changes` row opens a staging rail: stage, unstage or
   discard by file, write the message and commit without leaving the window. Undo the tip commit
