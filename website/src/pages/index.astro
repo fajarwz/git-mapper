@@ -9,7 +9,6 @@ import iconGithub from "../assets/icons/github-mark.svg?raw";
 import iconWindows from "../assets/icons/windows.svg?raw";
 import iconApple from "../assets/icons/apple.svg?raw";
 import iconPackage from "../assets/icons/package.svg?raw";
-import iconLock from "../assets/icons/lock.svg?raw";
 
 const title = "Git Mapper — a fast, lightweight Git history viewer for Windows, macOS and Linux";
 const description =
@@ -23,19 +22,90 @@ const DOWNLOADS = {
   linux: `${RELEASES}/download/Git.Mapper_amd64.AppImage`,
 };
 
-const stats = [
-  { value: "3", label: "platforms" },
-  { value: "2", label: "themes" },
-  { value: "0", label: "accounts needed" },
-  { value: "Free", label: "GPL, always" },
+const features = [
+  {
+    title: "The graph, in lane colours",
+    body: "Every branch owns a hue from tip to root. Forks bend exactly at their commit, merges join back cleanly, and dense lanes stay readable hundreds of rows in.",
+    points: [
+      "Branch, remote and tag pills on every row; double-click to check out",
+      "Search by hash, message, author or ref with Ctrl+F",
+      "Reorder, resize and hide columns to suit you",
+      "Each repository in its own tab, restored on launch",
+    ],
+    img: "/screens/graph.png",
+    alt: "The commit graph: five branches in their own colours forking and merging back into main, with branch, tag and stash pills on the rows",
+    w: 1400,
+    h: 894,
+    layout: "side",
+  },
+  {
+    title: "Stage, commit, undo",
+    body: "The uncommitted row opens a staging rail beside the diff. Stage, unstage or discard by file, write the message and commit. Changed your mind? Undo the tip commit and its files come back staged.",
+    points: [
+      "Stage, unstage or discard a whole hunk in one click",
+      "Fetch, pull (fast-forward only) and push from the branch counters",
+      "Destructive actions sit behind a clear confirm",
+      "The rail docks itself once the working tree is clean",
+    ],
+    img: "/screens/stage.png",
+    alt: "The staging rail listing a staged file and three changes beside the staged diff of src/lib/graph.ts, with an Unstage hunk button",
+    w: 2200,
+    h: 1520,
+    layout: "text-first",
+  },
+  {
+    title: "Down to the single line",
+    body: "Stage or discard one hunk, or tick just the lines you mean. Commit half of a messy file as two clean commits, no command line needed.",
+    points: [
+      "Tick the gutter, or drag across several lines",
+      "The hunk's buttons become Stage, Unstage or Discard N lines",
+      "Staged and unstaged sides shown one at a time, like VS Code",
+      "A hunk that moved underneath you is refused, never misapplied",
+    ],
+    img: "/screens/hunk.png",
+    alt: "An uncommitted diff with five changed lines ticked, and the hunk header now offering Stage +4 -1, Discard +4 -1 and Clear",
+    w: 2260,
+    h: 700,
+    layout: "image-first",
+  },
+  {
+    title: "Merge, and settle conflicts in place",
+    body: "Merge a local branch from its pill. If git stops on conflicts they land in the rail: take a side per file, or open the file and pick current, incoming or both for each block.",
+    points: [
+      "Conflict blocks inline, with line numbers and syntax colours",
+      "Keep current, keep incoming, or keep both, block by block",
+      "Finish with git's own prepared message",
+      "Or abort and the repository returns to how it was",
+    ],
+    img: "/screens/conflict.png",
+    alt: "A merge conflict in src/config.ts shown inline with Keep current, Keep both and Keep incoming buttons, and a Conflicts section in the staging rail",
+    w: 2200,
+    h: 1800,
+    layout: "text-first",
+  },
+  {
+    title: "Diffs that read",
+    body: "Unified or split like GitHub, syntax highlighted in three colour schemes, with word-level marks showing exactly what changed.",
+    points: [
+      "One file at a time, or every changed file stacked in one scroll",
+      "Flat list or folder tree, with status badges and renames",
+      "Picture diffs for images: 2-up, swipe or onion peel",
+      "Hover a file and its patch is already loading",
+    ],
+    img: "/screens/split.png",
+    alt: "A commit selected in the graph with its split diff open: the old lines on the left, the new lines on the right",
+    w: 2560,
+    h: 1520,
+    layout: "image-first",
+  },
 ];
 
 const extras = [
-  { title: "Stashes, first-class", body: "Each stash gets its own row above the commit it was taken on. Apply, pop or drop from its menu." },
+  { title: "Stashes", body: "Each stash gets its own row above the commit it was taken on. Apply, pop or drop from its menu." },
   { title: "Always current", body: "Focus the window and it re-checks branches and the worktree. A background fetch keeps ahead/behind honest." },
   { title: "Tabs that remember", body: "Selected commit, file and panel state per repository. Drag to reorder; idle tabs sleep to save memory." },
-  { title: "Right-click everything", body: "Check out a branch or commit, copy hashes and ref names, merge, undo the tip, handle stashes." },
-  { title: "Light and dark glass", body: "Two themes, zoom the whole window with Ctrl plus, minus and zero, window position restored on launch." },
+  { title: "Right-click menus", body: "Check out a branch or commit, copy hashes and ref names, merge, undo the tip, handle stashes." },
+  { title: "Light and dark", body: "Two themes, zoom the whole window with Ctrl plus, minus and zero, window position restored on launch." },
   { title: "Updates itself", body: "Checks on launch, downloads in the background, restarts when you say so." },
 ];
 ---
@@ -93,7 +163,7 @@ const extras = [
           Browse source
         </a>
       </div>
-      <p class="mt-5 font-mono text-xs tracking-tight text-ink-dim">
+      <p class="mt-5 text-sm text-ink-dim">
         Windows · macOS · Linux · free
       </p>
     </section>
@@ -108,164 +178,88 @@ const extras = [
           altLight="Git Mapper with a repository open, light theme: glass commit feed, lane-coloured graph, diff panel"
           altDark="The same repository in the dark theme: deep canvas with white halos, smoked glass panes"
         />
-        <p class="mt-2.5 px-1.5 font-mono text-xs text-ink-dim">
+        <p class="mt-2.5 px-1.5 text-sm text-ink-dim">
           Same repository, both themes — drag the divider, or press arrow keys while it is focused.
         </p>
       </div>
     </section>
 
-    <!-- Stats strip -->
-    <section class="mx-auto mt-16 grid max-w-4xl grid-cols-2 gap-3 md:grid-cols-4">
-      {stats.map((s) => (
-        <div class="glass-panel panel-shadow rounded-2xl px-4 py-4 text-center">
-          <p class="text-[1.6rem] font-bold tracking-tight text-primary-ink">{s.value}</p>
-          <p class="mt-0.5 text-xs text-ink-dim">{s.label}</p>
-        </div>
-      ))}
-    </section>
-
     <!-- Features -->
-    <section id="features" class="mt-24 scroll-mt-24 md:mt-32">
-      <div class="mx-auto max-w-2xl text-center">
-        <p class="font-mono text-xs font-bold uppercase tracking-widest text-primary-ink">Features</p>
-        <h2 class="mt-3 text-balance text-[clamp(1.7rem,3vw,2.4rem)] font-bold leading-snug tracking-[-0.02em]">
-          Read the history. Then do something about it.
+    <section id="features" class="mt-28 scroll-mt-24 md:mt-36">
+      <div class="max-w-2xl">
+        <h2 class="text-balance text-[clamp(1.9rem,3.4vw,2.7rem)] font-bold leading-[1.1] tracking-[-0.025em]">
+          Read the history, then act on it.
         </h2>
-        <p class="mt-4 text-ink-soft">
-          Git Mapper began as a viewer and grew a careful set of verbs: stage,
-          commit, sync and merge, all without leaving the graph.
+        <p class="mt-4 text-lg text-ink-soft">
+          Stage, commit, sync and merge without leaving the graph.
         </p>
       </div>
 
-      <!-- Feature: the graph -->
-      <div class="mt-14 grid items-center gap-8 md:grid-cols-2 md:gap-12">
-        <div>
-          <p class="font-mono text-xs font-bold uppercase tracking-widest text-ink-dim">Read history</p>
-          <h3 class="mt-2 text-[1.5rem] font-bold tracking-tight">The graph, in lane colours</h3>
-          <p class="mt-3 text-ink-soft">
-            Every branch owns a hue from tip to root. Forks bend exactly at their
-            commit, merges join back cleanly, and dense lanes stay readable
-            hundreds of rows in.
-          </p>
-          <ul class="mt-4 list-disc space-y-2 pl-5 text-[0.95rem] text-ink-soft">
-            <li>Branch, remote and tag pills on every row; double-click to check out</li>
-            <li>Search by hash, message, author or ref, with Ctrl+F</li>
-            <li>Reorder, resize and hide columns to suit you</li>
-            <li>Each repository in its own tab, restored on launch</li>
-          </ul>
-        </div>
-        <div class="panel-shadow min-w-0 rounded-3xl border border-hairline p-2 backdrop-blur-xl md:p-2.5" style="background-color: var(--color-glass-soft)">
-          <img src="/screens/graph.png" alt="The commit graph: five branches in their own colours forking and merging back into main, with branch, tag and stash pills on the rows" width="1400" height="894" loading="lazy" decoding="async" class="block h-auto w-full rounded-2xl border border-rule" />
-        </div>
-      </div>
-
-      <!-- Feature: stage and commit -->
-      <div class="mt-24">
-        <div class="mx-auto max-w-2xl text-center">
-          <p class="font-mono text-xs font-bold uppercase tracking-widest text-ink-dim">Change things</p>
-          <h3 class="mt-2 text-[1.5rem] font-bold tracking-tight">Stage, commit, undo</h3>
-          <p class="mt-3 text-ink-soft">The uncommitted row opens a staging rail beside the diff. Stage, unstage or discard by file, write the message and commit. Changed your mind? Undo the tip commit and its files come back staged.</p>
-        </div>
-        <div class="panel-shadow mx-auto mt-8 max-w-5xl rounded-3xl border border-hairline p-2.5 backdrop-blur-xl md:p-3.5" style="background-color: var(--color-glass-soft)">
-          <img src="/screens/stage.png" alt="The staging rail listing a staged file and three changes beside the staged diff of src/lib/graph.ts, with an Unstage hunk button" width="2200" height="1520" loading="lazy" decoding="async" class="block h-auto w-full rounded-2xl border border-rule" />
-        </div>
-        <ul class="mx-auto mt-6 grid max-w-5xl gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-            <li class="flex items-start gap-2.5 text-[0.9rem] leading-snug text-ink-soft"><span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[10px] font-bold text-primary-ink" aria-hidden="true">✓</span><span>Stage, unstage or discard a whole hunk in one click</span></li>
-            <li class="flex items-start gap-2.5 text-[0.9rem] leading-snug text-ink-soft"><span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[10px] font-bold text-primary-ink" aria-hidden="true">✓</span><span>Fetch, pull (fast-forward only) and push from the branch counters</span></li>
-            <li class="flex items-start gap-2.5 text-[0.9rem] leading-snug text-ink-soft"><span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[10px] font-bold text-primary-ink" aria-hidden="true">✓</span><span>Destructive actions sit behind a clear confirm</span></li>
-            <li class="flex items-start gap-2.5 text-[0.9rem] leading-snug text-ink-soft"><span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[10px] font-bold text-primary-ink" aria-hidden="true">✓</span><span>The rail docks itself once the working tree is clean</span></li>
-        </ul>
-      </div>
-
-      <!-- Feature: hunks and lines -->
-      <div class="mt-24">
-        <div class="mx-auto max-w-2xl text-center">
-          <p class="font-mono text-xs font-bold uppercase tracking-widest text-ink-dim">Change things</p>
-          <h3 class="mt-2 text-[1.5rem] font-bold tracking-tight">Down to the single line</h3>
-          <p class="mt-3 text-ink-soft">
-            Stage or discard one hunk, or tick just the lines you mean. Commit
-            half of a messy file as two clean commits, no command line needed.
-          </p>
-        </div>
-        <div class="panel-shadow mx-auto mt-8 max-w-5xl rounded-3xl border border-hairline p-2.5 backdrop-blur-xl md:p-3.5" style="background-color: var(--color-glass-soft)">
-          <img src="/screens/hunk.png" alt="An uncommitted diff with five changed lines ticked, and the hunk header now offering Stage +4 -1, Discard +4 -1 and Clear" width="2260" height="700" loading="lazy" decoding="async" class="block h-auto w-full rounded-2xl border border-rule" />
-        </div>
-        <ul class="mx-auto mt-6 grid max-w-5xl gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-          <li class="flex items-start gap-2.5 text-[0.9rem] leading-snug text-ink-soft"><span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[10px] font-bold text-primary-ink" aria-hidden="true">✓</span><span>Tick the gutter, or drag across several lines</span></li>
-          <li class="flex items-start gap-2.5 text-[0.9rem] leading-snug text-ink-soft"><span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[10px] font-bold text-primary-ink" aria-hidden="true">✓</span><span>The hunk's buttons become Stage, Unstage or Discard N lines</span></li>
-          <li class="flex items-start gap-2.5 text-[0.9rem] leading-snug text-ink-soft"><span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[10px] font-bold text-primary-ink" aria-hidden="true">✓</span><span>Staged and unstaged sides shown one at a time, like VS Code</span></li>
-          <li class="flex items-start gap-2.5 text-[0.9rem] leading-snug text-ink-soft"><span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[10px] font-bold text-primary-ink" aria-hidden="true">✓</span><span>A hunk that moved underneath you is refused, never misapplied</span></li>
-        </ul>
-      </div>
-
-      <!-- Feature: merge and conflicts -->
-      <div class="mt-24">
-        <div class="mx-auto max-w-2xl text-center">
-          <p class="font-mono text-xs font-bold uppercase tracking-widest text-ink-dim">Change things</p>
-          <h3 class="mt-2 text-[1.5rem] font-bold tracking-tight">Merge, and settle conflicts in place</h3>
-          <p class="mt-3 text-ink-soft">Merge a local branch from its pill. If git stops on conflicts they land in the rail: take a side per file, or open the file and pick current, incoming or both for each block.</p>
-        </div>
-        <div class="panel-shadow mx-auto mt-8 max-w-5xl rounded-3xl border border-hairline p-2.5 backdrop-blur-xl md:p-3.5" style="background-color: var(--color-glass-soft)">
-          <img src="/screens/conflict.png" alt="A merge conflict in src/config.ts shown inline with Keep current, Keep both and Keep incoming buttons, and a Conflicts section in the staging rail" width="2200" height="1800" loading="lazy" decoding="async" class="block h-auto w-full rounded-2xl border border-rule" />
-        </div>
-        <ul class="mx-auto mt-6 grid max-w-5xl gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-            <li class="flex items-start gap-2.5 text-[0.9rem] leading-snug text-ink-soft"><span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[10px] font-bold text-primary-ink" aria-hidden="true">✓</span><span>Conflict blocks inline, with line numbers and syntax colours</span></li>
-            <li class="flex items-start gap-2.5 text-[0.9rem] leading-snug text-ink-soft"><span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[10px] font-bold text-primary-ink" aria-hidden="true">✓</span><span>Keep current, keep incoming, or keep both, block by block</span></li>
-            <li class="flex items-start gap-2.5 text-[0.9rem] leading-snug text-ink-soft"><span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[10px] font-bold text-primary-ink" aria-hidden="true">✓</span><span>Finish with git's own prepared message</span></li>
-            <li class="flex items-start gap-2.5 text-[0.9rem] leading-snug text-ink-soft"><span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[10px] font-bold text-primary-ink" aria-hidden="true">✓</span><span>Or abort and the repository returns to how it was</span></li>
-        </ul>
-      </div>
-
-      <!-- Feature: diffs -->
-      <div class="mt-24">
-        <div class="mx-auto max-w-2xl text-center">
-          <p class="font-mono text-xs font-bold uppercase tracking-widest text-ink-dim">Read changes</p>
-          <h3 class="mt-2 text-[1.5rem] font-bold tracking-tight">Diffs that read</h3>
-          <p class="mt-3 text-ink-soft">Unified or split like GitHub, syntax highlighted in three colour schemes, with word-level marks showing exactly what changed.</p>
-        </div>
-        <div class="panel-shadow mx-auto mt-8 max-w-5xl rounded-3xl border border-hairline p-2.5 backdrop-blur-xl md:p-3.5" style="background-color: var(--color-glass-soft)">
-          <img src="/screens/split.png" alt="A commit selected in the graph with its split diff open: the old lines on the left, the new lines on the right" width="2560" height="1520" loading="lazy" decoding="async" class="block h-auto w-full rounded-2xl border border-rule" />
-        </div>
-        <ul class="mx-auto mt-6 grid max-w-5xl gap-x-6 gap-y-3 sm:grid-cols-2 lg:grid-cols-4">
-            <li class="flex items-start gap-2.5 text-[0.9rem] leading-snug text-ink-soft"><span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[10px] font-bold text-primary-ink" aria-hidden="true">✓</span><span>One file at a time, or every changed file stacked in one scroll</span></li>
-            <li class="flex items-start gap-2.5 text-[0.9rem] leading-snug text-ink-soft"><span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[10px] font-bold text-primary-ink" aria-hidden="true">✓</span><span>Flat list or folder tree, with status badges and renames</span></li>
-            <li class="flex items-start gap-2.5 text-[0.9rem] leading-snug text-ink-soft"><span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[10px] font-bold text-primary-ink" aria-hidden="true">✓</span><span>Picture diffs for images: 2-up, swipe or onion peel</span></li>
-            <li class="flex items-start gap-2.5 text-[0.9rem] leading-snug text-ink-soft"><span class="mt-0.5 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/12 text-[10px] font-bold text-primary-ink" aria-hidden="true">✓</span><span>Hover a file and its patch is already loading</span></li>
-        </ul>
-      </div>
-
-      <!-- Everything else -->
-      <div class="mx-auto mt-24 max-w-2xl text-center">
-        <h3 class="text-balance text-[clamp(1.4rem,2.4vw,1.9rem)] font-bold tracking-[-0.02em]">And the details that add up</h3>
-      </div>
-      <div class="mt-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-        {extras.map((e) => (
-          <article class="glass-panel panel-shadow rounded-2xl p-5">
-            <h4 class="text-[1.02rem] font-bold tracking-tight">{e.title}</h4>
-            <p class="mt-1.5 text-[0.92rem] text-ink-soft">{e.body}</p>
+      <div class="mt-16 space-y-28 md:mt-20 md:space-y-36">
+        {features.map((f) => (
+          <article>
+            {f.layout === "side" ? (
+              <div class="grid items-center gap-10 md:grid-cols-12 md:gap-12">
+                <div class="md:col-span-5">
+                  <h3 class="text-balance text-[1.6rem] font-bold leading-tight tracking-[-0.02em]">{f.title}</h3>
+                  <p class="mt-3 text-ink-soft">{f.body}</p>
+                  <ul class="mt-6 divide-y divide-rule border-y border-rule text-[0.95rem] text-ink-soft">
+                    {f.points.map((pt) => <li class="py-2.5">{pt}</li>)}
+                  </ul>
+                </div>
+                <div class="min-w-0 md:col-span-7">
+                  <div class="panel-shadow overflow-hidden rounded-2xl border border-hairline bg-sheet-strong p-1.5 md:p-2">
+                    <img src={f.img} alt={f.alt} width={f.w} height={f.h} loading="lazy" decoding="async" class="block h-auto w-full rounded-xl border border-rule" />
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div class={f.layout === "image-first" ? "flex flex-col-reverse gap-10" : "flex flex-col gap-10"}>
+                <div class="grid gap-6 md:grid-cols-12 md:gap-12">
+                  <div class="md:col-span-5">
+                    <h3 class="text-balance text-[1.6rem] font-bold leading-tight tracking-[-0.02em]">{f.title}</h3>
+                    <p class="mt-3 text-ink-soft">{f.body}</p>
+                  </div>
+                  <ul class="divide-y divide-rule border-y border-rule text-[0.95rem] text-ink-soft md:col-span-6 md:col-start-7 md:self-start">
+                    {f.points.map((pt) => <li class="py-2.5">{pt}</li>)}
+                  </ul>
+                </div>
+                <div class="panel-shadow overflow-hidden rounded-2xl border border-hairline bg-sheet-strong p-1.5 md:p-2">
+                  <img src={f.img} alt={f.alt} width={f.w} height={f.h} loading="lazy" decoding="async" class="block h-auto w-full rounded-xl border border-rule" />
+                </div>
+              </div>
+            )}
           </article>
         ))}
       </div>
 
-      <!-- Control -->
-      <div class="glass-panel panel-shadow mx-auto mt-14 flex max-w-3xl items-start gap-4 rounded-2xl p-5 md:p-6">
-        <span class="mt-0.5 inline-block h-5 w-5 shrink-0 text-primary-ink" set:html={iconLock} />
-        <div>
-          <h3 class="text-[1.05rem] font-bold tracking-tight">You stay in control</h3>
-          <p class="mt-1.5 text-[0.95rem] text-ink-soft">
-            Git Mapper runs your own <code class="font-mono text-[0.85em]">git</code> and
-            only does what you click. Pulls are fast-forward only, and anything that
-            throws work away, such as discard, drop or detach, asks first.
-            No account, no cloud.
-          </p>
-        </div>
+      <div class="mt-28 md:mt-36">
+        <h3 class="text-[1.6rem] font-bold leading-tight tracking-[-0.02em]">Also in the box</h3>
+        <dl class="mt-8 grid gap-x-10 gap-y-8 sm:grid-cols-2 lg:grid-cols-3">
+          {extras.map((e) => (
+            <div class="border-t border-rule pt-4">
+              <dt class="font-bold tracking-tight">{e.title}</dt>
+              <dd class="mt-1.5 text-[0.95rem] text-ink-soft">{e.body}</dd>
+            </div>
+          ))}
+        </dl>
+      </div>
+
+      <div class="mt-16 grid gap-4 border-t border-rule pt-8 md:grid-cols-12 md:gap-12">
+        <h3 class="text-[1.6rem] font-bold leading-tight tracking-[-0.02em] md:col-span-5">You stay in control</h3>
+        <p class="text-ink-soft md:col-span-6 md:col-start-7">
+          Git Mapper runs your own <code class="font-mono text-[0.9em]">git</code> and
+          only does what you click. Pulls are fast-forward only, and anything that
+          throws work away, such as discard, drop or detach, asks first.
+          No account, no cloud.
+        </p>
       </div>
     </section>
 
     <!-- Install -->
-    <section id="install" class="mt-24 scroll-mt-24 pb-24 md:mt-32">
-      <div class="mx-auto max-w-2xl">
-        <h2 class="text-balance text-[clamp(1.7rem,3vw,2.4rem)] font-bold leading-snug tracking-[-0.02em]">
+    <section id="install" class="mt-28 scroll-mt-24 pb-28 md:mt-36">
+      <div class="max-w-2xl">
+        <h2 class="text-balance text-[clamp(1.9rem,3.4vw,2.7rem)] font-bold leading-[1.1] tracking-[-0.025em]">
           Try it on your own repos
         </h2>
         <p class="mt-4 text-ink-soft">
