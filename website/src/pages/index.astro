@@ -293,6 +293,10 @@ const systems = [
           </div>
         ))}
 
+        <p data-desktop-note class="hidden rounded-2xl border border-hairline bg-sheet-strong px-5 py-4 text-sm text-ink-soft">
+          Git Mapper is a desktop app. Open this page on your computer, or grab an installer below for later.
+        </p>
+
         <ul id="download-list" class="mt-4 divide-y divide-rule overflow-hidden rounded-2xl border border-hairline bg-sheet-strong">
           {systems.map((o) => (
             <li data-os-row={o.key}>
@@ -323,6 +327,7 @@ const systems = [
       // iPadOS reports a Mac platform but has a touch screen.
       const mobile = /Android|iPhone|iPad|iPod/i.test(ua) || (/mac/i.test(platform) && navigator.maxTouchPoints > 1);
       const os = mobile ? null : /win/i.test(platform + ua) ? "windows" : /mac/i.test(platform) ? "macos" : /linux|x11/i.test(platform + ua) ? "linux" : null;
+      if (mobile) document.querySelector("[data-desktop-note]")?.classList.remove("hidden");
       if (os) {
         document.querySelector(`[data-os-card="${os}"]`)?.classList.remove("hidden");
         document.querySelector(`[data-os-row="${os}"]`)?.classList.add("hidden");
