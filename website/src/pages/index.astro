@@ -1,8 +1,14 @@
 ---
+import { Image } from "astro:assets";
 import Site from "../layouts/Site.astro";
 import ThemeSlider from "../react/ThemeSlider";
 
 // Assets: the real brand file + every icon lives as its own file under src/assets/.
+import shotGraph from "../assets/screens/graph.png";
+import shotStage from "../assets/screens/stage.png";
+import shotHunk from "../assets/screens/hunk.png";
+import shotConflict from "../assets/screens/conflict.png";
+import shotSplit from "../assets/screens/split.png";
 import logoRaw from "../assets/logo.svg?raw";
 import iconDownload from "../assets/icons/download.svg?raw";
 import iconGithub from "../assets/icons/github-mark.svg?raw";
@@ -32,26 +38,9 @@ const features = [
       "Reorder, resize and hide columns to suit you",
       "Each repository in its own tab, restored on launch",
     ],
-    img: "/screens/graph.png",
+    img: shotGraph,
     alt: "The commit graph: five branches in their own colours forking and merging back into main, with branch, tag and stash pills on the rows",
-    w: 1400,
-    h: 894,
     layout: "side",
-  },
-  {
-    title: "Stage, commit, undo",
-    body: "The uncommitted row opens a staging rail beside the diff. Stage, unstage or discard by file, write the message and commit. Changed your mind? Undo the tip commit and its files come back staged.",
-    points: [
-      "Stage, unstage or discard a whole hunk in one click",
-      "Fetch, pull (fast-forward only) and push from the branch counters",
-      "Destructive actions sit behind a clear confirm",
-      "The rail docks itself once the working tree is clean",
-    ],
-    img: "/screens/stage.png",
-    alt: "The staging rail listing a staged file and three changes beside the staged diff of src/lib/graph.ts, with an Unstage hunk button",
-    w: 2200,
-    h: 1520,
-    layout: "text-first",
   },
   {
     title: "Down to the single line",
@@ -62,11 +51,22 @@ const features = [
       "Staged and unstaged sides shown one at a time, like VS Code",
       "A hunk that moved underneath you is refused, never misapplied",
     ],
-    img: "/screens/hunk.png",
+    img: shotHunk,
     alt: "An uncommitted diff with five changed lines ticked, and the hunk header now offering Stage +4 -1, Discard +4 -1 and Clear",
-    w: 2260,
-    h: 700,
-    layout: "image-first",
+    layout: "side-reverse",
+  },
+  {
+    title: "Stage, commit, undo",
+    body: "The uncommitted row opens a staging rail beside the diff. Stage, unstage or discard by file, write the message and commit. Changed your mind? Undo the tip commit and its files come back staged.",
+    points: [
+      "Stage, unstage or discard a whole hunk in one click",
+      "Fetch, pull (fast-forward only) and push from the branch counters",
+      "Destructive actions sit behind a clear confirm",
+      "The rail docks itself once the working tree is clean",
+    ],
+    img: shotStage,
+    alt: "The staging rail listing a staged file and three changes beside the staged diff of src/lib/graph.ts, with an Unstage hunk button",
+    layout: "text-first",
   },
   {
     title: "Merge, and settle conflicts in place",
@@ -77,10 +77,8 @@ const features = [
       "Finish with git's own prepared message",
       "Or abort and the repository returns to how it was",
     ],
-    img: "/screens/conflict.png",
+    img: shotConflict,
     alt: "A merge conflict in src/config.ts shown inline with Keep current, Keep both and Keep incoming buttons, and a Conflicts section in the staging rail",
-    w: 2200,
-    h: 1800,
     layout: "text-first",
   },
   {
@@ -92,11 +90,9 @@ const features = [
       "Picture diffs for images: 2-up, swipe or onion peel",
       "Hover a file and its patch is already loading",
     ],
-    img: "/screens/split.png",
+    img: shotSplit,
     alt: "A commit selected in the graph with its split diff open: the old lines on the left, the new lines on the right",
-    w: 2560,
-    h: 1520,
-    layout: "image-first",
+    layout: "text-first",
   },
 ];
 
@@ -198,23 +194,23 @@ const extras = [
       <div class="mt-16 space-y-28 md:mt-20 md:space-y-36">
         {features.map((f) => (
           <article>
-            {f.layout === "side" ? (
+            {f.layout === "side" || f.layout === "side-reverse" ? (
               <div class="grid items-center gap-10 md:grid-cols-12 md:gap-12">
-                <div class="md:col-span-5">
+                <div class={f.layout === "side-reverse" ? "md:order-2 md:col-span-5" : "md:col-span-5"}>
                   <h3 class="text-balance text-[1.6rem] font-bold leading-tight tracking-[-0.02em]">{f.title}</h3>
                   <p class="mt-3 text-ink-soft">{f.body}</p>
                   <ul class="mt-6 divide-y divide-rule border-y border-rule text-[0.95rem] text-ink-soft">
                     {f.points.map((pt) => <li class="py-2.5">{pt}</li>)}
                   </ul>
                 </div>
-                <div class="min-w-0 md:col-span-7">
+                <div class={f.layout === "side-reverse" ? "min-w-0 md:order-1 md:col-span-7" : "min-w-0 md:col-span-7"}>
                   <div class="panel-shadow overflow-hidden rounded-2xl border border-hairline bg-sheet-strong p-1.5 md:p-2">
-                    <img src={f.img} alt={f.alt} width={f.w} height={f.h} loading="lazy" decoding="async" class="block h-auto w-full rounded-xl border border-rule" />
+                    <Image src={f.img} alt={f.alt} widths={[640, 1000, 1400]} sizes="(min-width: 1152px) 640px, (min-width: 768px) 55vw, 100vw" format="webp" quality={85} loading="lazy" class="block h-auto w-full rounded-xl border border-rule" />
                   </div>
                 </div>
               </div>
             ) : (
-              <div class={f.layout === "image-first" ? "flex flex-col-reverse gap-10" : "flex flex-col gap-10"}>
+              <div class="flex flex-col gap-10">
                 <div class="grid gap-6 md:grid-cols-12 md:gap-12">
                   <div class="md:col-span-5">
                     <h3 class="text-balance text-[1.6rem] font-bold leading-tight tracking-[-0.02em]">{f.title}</h3>
@@ -225,7 +221,7 @@ const extras = [
                   </ul>
                 </div>
                 <div class="panel-shadow overflow-hidden rounded-2xl border border-hairline bg-sheet-strong p-1.5 md:p-2">
-                  <img src={f.img} alt={f.alt} width={f.w} height={f.h} loading="lazy" decoding="async" class="block h-auto w-full rounded-xl border border-rule" />
+                  <Image src={f.img} alt={f.alt} widths={[800, 1200, 1800, 2200]} sizes="(min-width: 1152px) 1100px, 100vw" format="webp" quality={85} loading="lazy" class="block h-auto w-full rounded-xl border border-rule" />
                 </div>
               </div>
             )}
