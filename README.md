@@ -4,10 +4,10 @@
 
 # Git Mapper
 
-**Every branch, crystal clear.**
+**Git, easy as a click.**
 
-A fast, lightweight Git history viewer for the desktop. Open a repository and follow the graph,
-diffs and stashes on a clean pane — no account, no setup.
+A fast, lightweight Git visualizer for the desktop. Every branch, crystal clear: read your history
+as a graph, then stage, commit and merge with a click. No account, no setup.
 
 **[gitmapper.fajarwz.com](https://gitmapper.fajarwz.com)**
 
