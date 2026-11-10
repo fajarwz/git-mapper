@@ -104,6 +104,12 @@ const extras = [
   { title: "Light and dark", body: "Two themes, zoom the whole window with Ctrl plus, minus and zero, window position restored on launch." },
   { title: "Updates itself", body: "Checks on launch, downloads in the background, restarts when you say so." },
 ];
+
+const systems = [
+  { key: "windows", name: "Windows", icon: iconWindows, href: DOWNLOADS.windows, file: "Git.Mapper_x64-setup.exe", note: "Unsigned installer. If SmartScreen appears, click More info, then Run anyway." },
+  { key: "macos", name: "macOS", icon: iconApple, href: DOWNLOADS.macos, file: "Git.Mapper.dmg", note: "Apple Silicon and Intel. Signed, not notarized: on first launch, right-click the app and pick Open." },
+  { key: "linux", name: "Linux", icon: iconPackage, href: DOWNLOADS.linux, file: "Git.Mapper_amd64.AppImage", note: "Runs without installing." },
+];
 ---
 
 <Site title={title} description={description}>
@@ -264,39 +270,45 @@ const extras = [
         </p>
       </div>
 
-      <div id="downloads" class="glass-panel panel-shadow mt-10 flex flex-col divide-y divide-rule overflow-hidden rounded-2xl">
-        <div data-os="windows" class="flex items-center gap-4 px-5 py-4 max-sm:flex-col max-sm:items-stretch max-sm:gap-3">
-          <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg glass-panel text-ink">
-            <span class="inline-block h-4 w-4" set:html={iconWindows} />
-          </span>
-          <div class="min-w-0 flex-1">
-            <p class="flex items-center gap-2 text-sm font-bold">Windows<span data-os-badge hidden class="rounded-full bg-primary/12 px-2 py-0.5 text-[10px] font-bold text-primary-ink">Your system</span></p>
-            <p class="truncate font-mono text-[11px] text-ink-dim">Git.Mapper_x64-setup.exe</p>
+      <div id="downloads" class="mt-10">
+        {systems.map((o) => (
+          <div data-os-card={o.key} class="glass-panel panel-shadow hidden rounded-2xl p-6 md:p-8">
+            <div class="flex items-center gap-5 max-md:flex-col max-md:items-stretch md:gap-8">
+              <span class="inline-flex h-14 w-14 shrink-0 items-center justify-center rounded-2xl border border-hairline bg-sheet-strong text-ink max-md:hidden">
+                <span class="inline-block h-6 w-6" set:html={o.icon} />
+              </span>
+              <div class="min-w-0 flex-1">
+                <p class="flex flex-wrap items-center gap-2.5 text-[1.4rem] font-bold tracking-tight">
+                  Download for {o.name}
+                  <span class="rounded-full bg-primary/12 px-2.5 py-0.5 text-xs font-bold text-primary-ink">Your system</span>
+                </p>
+                <p class="mt-1 font-mono text-xs text-ink-dim">{o.file}</p>
+                <p class="mt-2 max-w-xl text-sm text-ink-soft">{o.note}</p>
+              </div>
+              <a href={o.href} class="flex shrink-0 items-center justify-center gap-2 rounded-xl bg-primary px-7 py-3.5 text-sm font-semibold text-white soft-shadow transition-[filter] hover:brightness-110">
+                <span class="inline-block h-4 w-4" set:html={iconDownload} />
+                Download
+              </a>
+            </div>
           </div>
-          <a href={DOWNLOADS.windows} class="dl-btn shrink-0 rounded-lg border border-hairline bg-glass-strong px-4 py-2 text-center text-xs font-semibold text-ink transition-colors hover:bg-hover-glass">Download</a>
-        </div>
+        ))}
 
-        <div data-os="macos" class="flex items-center gap-4 px-5 py-4 max-sm:flex-col max-sm:items-stretch max-sm:gap-3">
-          <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg glass-panel text-ink">
-            <span class="inline-block h-4 w-4" set:html={iconApple} />
-          </span>
-          <div class="min-w-0 flex-1">
-            <p class="flex items-center gap-2 text-sm font-bold">macOS<span data-os-badge hidden class="rounded-full bg-primary/12 px-2 py-0.5 text-[10px] font-bold text-primary-ink">Your system</span></p>
-            <p class="font-mono text-[11px] text-ink-dim">Git.Mapper.dmg — Apple Silicon &#43; Intel · first launch: right-click, then Open (signed, not notarized)</p>
-          </div>
-          <a href={DOWNLOADS.macos} class="dl-btn shrink-0 rounded-lg border border-hairline bg-glass-strong px-4 py-2 text-center text-xs font-semibold text-ink transition-colors hover:bg-hover-glass">Download</a>
-        </div>
-
-        <div data-os="linux" class="flex items-center gap-4 px-5 py-4 max-sm:flex-col max-sm:items-stretch max-sm:gap-3">
-          <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg glass-panel text-ink">
-            <span class="inline-block h-4 w-4" set:html={iconPackage} />
-          </span>
-          <div class="min-w-0 flex-1">
-            <p class="flex items-center gap-2 text-sm font-bold">Linux<span data-os-badge hidden class="rounded-full bg-primary/12 px-2 py-0.5 text-[10px] font-bold text-primary-ink">Your system</span></p>
-            <p class="font-mono text-[11px] text-ink-dim">Git.Mapper_amd64.AppImage — runs without installing</p>
-          </div>
-          <a href={DOWNLOADS.linux} class="dl-btn shrink-0 rounded-lg border border-hairline bg-glass-strong px-4 py-2 text-center text-xs font-semibold text-ink transition-colors hover:bg-hover-glass">Download</a>
-        </div>
+        <ul id="download-list" class="mt-4 divide-y divide-rule overflow-hidden rounded-2xl border border-hairline bg-sheet-strong">
+          {systems.map((o) => (
+            <li data-os-row={o.key}>
+              <div class="flex items-center gap-4 px-5 py-3.5 max-sm:flex-col max-sm:items-stretch max-sm:gap-3">
+                <span class="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-lg border border-hairline text-ink max-sm:hidden">
+                  <span class="inline-block h-4 w-4" set:html={o.icon} />
+                </span>
+                <div class="min-w-0 flex-1">
+                  <p class="text-sm font-bold">{o.name}</p>
+                  <p class="font-mono text-[11px] text-ink-dim">{o.file}</p>
+                </div>
+                <a href={o.href} class="shrink-0 rounded-lg border border-hairline bg-glass-strong px-4 py-2 text-center text-xs font-semibold text-ink transition-colors hover:bg-hover-glass">Download</a>
+              </div>
+            </li>
+          ))}
+        </ul>
       </div>
 
       <p class="mt-6 text-center text-sm text-ink-soft">
@@ -305,18 +317,14 @@ const extras = [
     </section>
 
     <script>
-      // Highlight the installer for the visitor's system; the others stay as quiet secondary buttons.
+      // Feature the installer for the visitor's system as a large card; the rest stay in the list.
       const ua = navigator.userAgent;
       const platform = (navigator as Navigator & { userAgentData?: { platform?: string } }).userAgentData?.platform || navigator.platform || "";
       const mobile = /Android|iPhone|iPad|iPod/i.test(ua);
       const os = mobile ? null : /win/i.test(platform + ua) ? "windows" : /mac/i.test(platform) ? "macos" : /linux|x11/i.test(platform + ua) ? "linux" : null;
-      const row = os ? document.querySelector(`#downloads [data-os="${os}"]`) : null;
-      if (row) {
-        row.classList.add("order-first", "bg-hover-glass");
-        row.querySelector("[data-os-badge]")?.removeAttribute("hidden");
-        const btn = row.querySelector(".dl-btn");
-        btn?.classList.remove("border-hairline", "bg-glass-strong", "text-ink", "hover:bg-hover-glass");
-        btn?.classList.add("border-transparent", "bg-primary", "text-white", "soft-shadow", "hover:brightness-110");
+      if (os) {
+        document.querySelector(`[data-os-card="${os}"]`)?.classList.remove("hidden");
+        document.querySelector(`[data-os-row="${os}"]`)?.classList.add("hidden");
       }
     </script>
   </main>
