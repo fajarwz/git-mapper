@@ -132,7 +132,7 @@ export function ContextMenu({
       role="menu"
       aria-label={`Actions for ${target.commit.hash}`}
       onPointerDown={(event) => event.stopPropagation()}
-      className="fixed z-50 flex w-60 flex-col gap-0.5 rounded-xl border border-hairline bg-glass p-1.5 panel-shadow backdrop-blur-sm origin-top-left [--pop-scale:0.96] [--pop-y:0px] pop-in-fast"
+      className="fixed z-50 flex w-60 flex-col gap-0.5 rounded-xl border border-hairline bg-glass p-1.5 panel-shadow backdrop-blur-sm pop-in-menu"
       style={{ left, top }}
     >
       {checkoutable && branch && (

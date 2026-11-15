@@ -1242,7 +1242,7 @@ function App() {
               // the flex row (never clipped by the panel's overflow-hidden) and carries the
               // pinned width; double-click or Home resets it to the tuned default.
               <div
-                className="relative shrink-0 origin-left [--pop-scale:0.99] [--pop-x:-16px] [--pop-y:0px] pop-in-fast"
+                className="relative shrink-0 slide-in-left"
                 style={{ width: stageWidth ?? DEFAULT_STAGE_WIDTH }}
                 data-stage-rail
               >

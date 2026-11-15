@@ -220,11 +220,13 @@
   }
 }
 
-/* Pop-ups spring in from a smaller, lower start: `pop-in` for toasts and dialogs, `pop-in-fast`
-   (no overshoot) for menus and the staging rail. --pop-x / --pop-y / --pop-scale tune the travel,
-   transform-origin the anchor.
+/* Pop-ups spring in from a smaller, lower start. One utility per surface carries its own anchor
+   and travel (--pop-x / --pop-y / --pop-scale), so components name the surface and nothing else:
+   dialogs and the toast spring, menus and the two panels snap without overshoot.
    Reduced motion drops the travel but keeps the surface fully visible. */
 @utility pop-in {
+  --pop-y: 12px;
+  --pop-scale: 0.94;
   animation: pop-in 420ms cubic-bezier(0.34, 1.35, 0.64, 1) both;
 
   @media (prefers-reduced-motion: reduce) {
@@ -232,7 +234,44 @@
   }
 }
 
-@utility pop-in-fast {
+@utility pop-in-toast {
+  transform-origin: bottom right;
+  --pop-y: 20px;
+  --pop-scale: 0.9;
+  animation: pop-in 420ms cubic-bezier(0.34, 1.35, 0.64, 1) both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility pop-in-menu {
+  transform-origin: top left;
+  --pop-y: 0px;
+  --pop-scale: 0.96;
+  animation: pop-in 150ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility slide-in-left {
+  transform-origin: left;
+  --pop-x: -16px;
+  --pop-y: 0px;
+  --pop-scale: 0.99;
+  animation: pop-in 150ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility slide-in-up {
+  transform-origin: bottom;
+  --pop-y: 16px;
+  --pop-scale: 1;
   animation: pop-in 150ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
 
   @media (prefers-reduced-motion: reduce) {
@@ -243,11 +282,11 @@
 @keyframes pop-in {
   from {
     opacity: 0;
-    transform: translate(var(--pop-x, 0px), var(--pop-y, 12px)) scale(var(--pop-scale, 0.94));
+    transform: translate(var(--pop-x, 0px), var(--pop-y)) scale(var(--pop-scale));
   }
 }
 
-/* The way out: quicker than the way in, half the travel, no overshoot. `fade-out` is for a
+/* The way out: quicker than the way in, a short fixed drop, no overshoot. `fade-out` is for a
    dialog's scrim. Both block pointers so a closing surface cannot be clicked twice. */
 @utility pop-out {
   pointer-events: none;
@@ -270,7 +309,7 @@
 @keyframes pop-out {
   to {
     opacity: 0;
-    transform: translateY(calc(var(--pop-y, 12px) * 0.5)) scale(0.97);
+    transform: translateY(8px) scale(0.97);
   }
 }
 
@@ -347,13 +386,8 @@
   }
 
   .dark body::before {
-    /* Same geometry; the glow tokens re-point to white halos. */
+    /* Same gradients; the glow tokens re-point to white halos on the deep canvas. */
     background-color: transparent;
-    background-image:
-      radial-gradient(36rem 30rem at 90% 4%, var(--color-glow-1), transparent 68%),
-      radial-gradient(32rem 28rem at 40% 100%, var(--color-glow-2), transparent 70%),
-      radial-gradient(28rem 24rem at 55% -6%, var(--color-glow-3), transparent 68%),
-      radial-gradient(36rem 30rem at 2% 55%, var(--color-glow-4), transparent 70%);
   }
 
   #root {
@@ -422,7 +456,6 @@
   }
   [data-syntax="app"] .hljs-number,
   [data-syntax="app"] .hljs-literal,
-  [data-syntax="app"] .hljs-attr,
   [data-syntax="app"] .hljs-attribute,
   [data-syntax="app"] .hljs-variable,
   [data-syntax="app"] .hljs-template-variable,
@@ -443,13 +476,10 @@
     color: var(--color-secondary);
     font-weight: 600;
   }
-  [data-syntax="app"] .hljs-selector-tag,
   [data-syntax="app"] .hljs-selector-id,
   [data-syntax="app"] .hljs-selector-class,
   [data-syntax="app"] .hljs-selector-attr,
-  [data-syntax="app"] .hljs-selector-pseudo,
-  [data-syntax="app"] .hljs-meta,
-  [data-syntax="app"] .hljs-doctag {
+  [data-syntax="app"] .hljs-selector-pseudo {
     color: var(--color-primary-ink);
   }
   [data-syntax="app"] .hljs-tag {

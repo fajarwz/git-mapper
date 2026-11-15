@@ -49,7 +49,7 @@ export function Toast({
     <div
       data-toast
       role={persistent ? "status" : "alert"}
-      className={`fixed right-5 bottom-5 z-50 w-96 max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-2xl bg-ink text-surface ring-1 ring-surface/20 panel-shadow origin-bottom-right [--pop-scale:0.9] [--pop-y:20px] ${leaving ? "pop-out" : "pop-in"}`}
+      className={`fixed right-5 bottom-5 z-50 w-96 max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-2xl bg-ink text-surface ring-1 ring-surface/20 panel-shadow ${leaving ? "pop-out" : "pop-in-toast"}`}
     >
       <div className="flex items-start gap-3 p-4">
         <span className={`mt-px grid size-7 shrink-0 place-items-center rounded-full text-white ${badge}`}>
