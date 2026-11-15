@@ -29,6 +29,17 @@ test("Toast shows the title and detail and closes on the button", () => {
   assert.equal(closed, 1, "the close button dismisses the notice");
 });
 
+test("a Toast with an icon stays until dismissed", () => {
+  vi.useFakeTimers();
+  let closed = 0;
+  const { container } = render(
+    <Toast title="Enjoying it?" icon={<span />} onClose={() => (closed += 1)} />,
+  );
+  vi.advanceTimersByTime(60000);
+  assert.equal(closed, 0, "no timer on a persistent notice");
+  assert.equal(container.querySelector(".toast-drain"), null, "no drain bar either");
+});
+
 test("Toast dismisses itself after six seconds", () => {
   vi.useFakeTimers();
   let closed = 0;

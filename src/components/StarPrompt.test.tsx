@@ -31,6 +31,6 @@ test("each action reports itself", () => {
 test("Esc and the close button count as later", () => {
   const calls = setup();
   fireEvent.keyDown(window, { key: "Escape" });
-  fireEvent.click(screen.getByRole("button", { name: "Dismiss" }));
+  fireEvent.click(screen.getByRole("button", { name: "Dismiss notice" }));
   assert.deepEqual(calls, ["later", "later"]);
 });
