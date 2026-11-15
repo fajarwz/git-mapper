@@ -61,6 +61,20 @@ export interface Commit {
   /** Files+diff load lazily per selected commit (see gitLoader.loadCommitFiles). */
 }
 
+/** `moved`: checked out at a commit other than the one the parent records. */
+export type SubmoduleState = "ok" | "moved" | "uninitialized" | "conflict";
+
+export interface Submodule {
+  /** Path relative to the parent repo root, as listed in .gitmodules. */
+  path: string;
+  /** Absolute path; doubles as the id its Repository gets once opened. */
+  fullPath: string;
+  name: string;
+  state: SubmoduleState;
+  /** The commit it sits at (the recorded one while uninitialized). */
+  commit: string;
+}
+
 export interface Repository {
   id: string;
   name: string;
@@ -82,6 +96,8 @@ export interface Repository {
   merging?: boolean;
   /** Unmerged paths of that merge, from the same status read; empty otherwise. */
   conflicts?: string[];
+  /** Direct submodules; empty or absent when the repo has none. */
+  submodules?: Submodule[];
   commits: Commit[];
   /** Commit pre-selected when the tab is first shown. */
   defaultCommitHash: string;

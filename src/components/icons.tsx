@@ -23,6 +23,7 @@ import RawMinusIcon from "../assets/minus.svg?react";
 import RawUndoIcon from "../assets/undo.svg?react";
 import RawHeartIcon from "../assets/heart.svg?react";
 import RawAlertIcon from "../assets/alert.svg?react";
+import RawSubmoduleIcon from "../assets/submodule.svg?react";
 interface IconProps {
   size?: number;
 }
@@ -65,6 +66,10 @@ export function StashIcon({ size = 12 }: IconProps) {
 
 export function RepoIcon({ size = 14 }: IconProps) {
   return <SizedIcon glyph={RawRepoIcon} size={size} />;
+}
+
+export function SubmoduleIcon({ size = 12, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawSubmoduleIcon} size={size} className={className} />;
 }
 
 export function PlusIcon({ size = 12 }: IconProps) {

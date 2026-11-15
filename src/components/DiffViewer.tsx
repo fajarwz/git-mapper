@@ -1,5 +1,7 @@
 import { Fragment, memo, useEffect, useMemo, useRef, type ReactNode } from "react";
-import type { ChangedFile } from "../types";
+import type { ChangedFile, Submodule } from "../types";
+import { submodulePointer } from "../lib/submodule";
+import { SubmoduleDiff } from "./SubmoduleDiff";
 import {
   STATUS_LABELS,
   STATUS_TONES,
@@ -53,6 +55,9 @@ interface DiffViewerProps {
   onPatchNeeded?: (path: string) => void;
   /** Uncommitted diff only: per-hunk stage / unstage / discard buttons, and which side this is. */
   hunkActions?: HunkActions;
+  /** The repo's submodules: a changed gitlink renders as a pointer bump, with an Open button. */
+  submodules?: Submodule[];
+  onOpenSubmodule?: (fullPath: string) => void;
 }
 
 const PREFIX = {
@@ -398,6 +403,8 @@ const DiffSection = memo(function DiffSection({
   repoPath,
   commitHash,
   hunkActions,
+  submodules,
+  onOpenSubmodule,
 }: {
   file: ChangedFile;
   layout: DiffLayout;
@@ -405,7 +412,20 @@ const DiffSection = memo(function DiffSection({
   repoPath?: string;
   commitHash?: string;
   hunkActions?: HunkActions;
+  submodules?: Submodule[];
+  onOpenSubmodule?: (fullPath: string) => void;
 }) {
+  const pointer = submodulePointer(file.diff);
+  if (pointer) {
+    return (
+      <SubmoduleDiff
+        file={file}
+        pointer={pointer}
+        submodule={submodules?.find((item) => item.path === file.path)}
+        onOpen={onOpenSubmodule}
+      />
+    );
+  }
   return isImageFile(file.path) ? (
     <ImageDiff key={file.path} file={file} repoPath={repoPath} commitHash={commitHash} />
   ) : file.diff === null ? (
@@ -776,6 +796,8 @@ export function DiffViewer({
   commitHash,
   onPatchNeeded,
   hunkActions,
+  submodules,
+  onOpenSubmodule,
 }: DiffViewerProps) {
   const totals = useMemo(
     () =>
@@ -915,6 +937,8 @@ export function DiffViewer({
                     repoPath={repoPath}
                     commitHash={commitHash}
                     hunkActions={hunkActions}
+                    submodules={submodules}
+                    onOpenSubmodule={onOpenSubmodule}
                   />
                 </div>
               </section>
@@ -932,6 +956,8 @@ export function DiffViewer({
               repoPath={repoPath}
               commitHash={commitHash}
               hunkActions={hunkActions}
+              submodules={submodules}
+              onOpenSubmodule={onOpenSubmodule}
             />
           ) : (
             <p className="m-0 p-4 font-sans text-[12px] text-ink-dim">

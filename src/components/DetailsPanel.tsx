@@ -1,6 +1,6 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import type { ChangedFile, Commit } from "../types";
+import type { ChangedFile, Commit, Submodule } from "../types";
 import { copyText } from "../lib/clipboard";
 import { formatAbsoluteDate } from "../lib/format";
 import type { SyntaxScheme } from "../lib/highlight";
@@ -63,6 +63,9 @@ interface DetailsPanelProps {
   onWriteConflictText?: (path: string, text: string) => Promise<void>;
   /** The checked-out branch, named on the "current" side of each conflict. */
   currentBranch?: string;
+  /** The repo's submodules: gitlink rows get a glyph and their diff a pointer card. */
+  submodules?: Submodule[];
+  onOpenSubmodule?: (fullPath: string) => void;
   onClose: () => void;
   onHeightChange: (height: number) => void;
 }
@@ -91,9 +94,15 @@ export function DetailsPanel({
   onResolveConflict,
   onWriteConflictText,
   currentBranch = "",
+  submodules,
+  onOpenSubmodule,
   onClose,
   onHeightChange,
 }: DetailsPanelProps) {
+  const submodulePaths = useMemo(
+    () => new Set((submodules ?? []).map((item) => item.path)),
+    [submodules],
+  );
   const [sidebarWidth, setSidebarWidth] = useState(DEFAULT_SIDEBAR_WIDTH);
   const sidebarRef = useRef<HTMLDivElement>(null);
   const sectionRef = useRef<HTMLElement>(null);
@@ -162,6 +171,8 @@ export function DetailsPanel({
       commitHash={commit.hash}
       onPatchNeeded={onPatchNeeded}
       hunkActions={hunkActions}
+      submodules={submodules}
+      onOpenSubmodule={onOpenSubmodule}
     />
   );
 
@@ -307,6 +318,7 @@ export function DetailsPanel({
               onToggleCollapse={() => setFilesCollapsed((collapsed) => !collapsed)}
               view={fileView}
               onViewChange={setFileView}
+              submodulePaths={submodulePaths}
             />
           </div>
           <div className="flex min-h-0 min-w-0 flex-1 flex-col">{diffViewer}</div>

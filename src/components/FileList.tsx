@@ -2,7 +2,7 @@ import { Fragment, useMemo, useState } from "react";
 import type { ChangedFile } from "../types";
 import { buildFileTree, type FileTreeNode } from "../lib/fileTree";
 import { STATUS_TONES, fileDirTone, fileNameTone, fileTitle, statusLetter } from "../lib/format";
-import { ChevronDownIcon } from "./icons";
+import { ChevronDownIcon, SubmoduleIcon } from "./icons";
 
 /** How the changed-file list is shaped: a flat path list, or GitHub's folder tree. */
 export type FileView = "list" | "tree";
@@ -19,6 +19,8 @@ interface FileListProps {
   /** Flat paths or the folder tree; defaults to the flat list when the owner does not care. */
   view?: FileView;
   onViewChange?: (view: FileView) => void;
+  /** Paths that are submodules of this repo: their rows wear the submodule glyph. */
+  submodulePaths?: ReadonlySet<string>;
 }
 
 function splitPath(path: string): { dir: string; base: string } {
@@ -43,12 +45,14 @@ function FileRow({
   onSelect,
   depth,
   showDir,
+  submodule = false,
 }: {
   file: ChangedFile;
   selected: boolean;
   onSelect: (path: string) => void;
   depth: number;
   showDir: boolean;
+  submodule?: boolean;
 }) {
   const { dir, base } = splitPath(file.path);
 
@@ -68,7 +72,8 @@ function FileRow({
       >
         {statusLetter(file.status)}
       </span>
-      <span className="truncate text-[12px]" title={fileTitle(file)}>
+      <span className="flex min-w-0 items-center gap-1.5 truncate text-[12px]" title={fileTitle(file)}>
+        {submodule && <SubmoduleIcon size={12} className="shrink-0 text-ink-dim" />}
         {file.oldPath ? (
           <span className="flex min-w-0 items-center gap-1.5">
             <span className="min-w-0 truncate text-ink-dim">{file.oldPath}</span>
@@ -106,6 +111,7 @@ function TreeBranch({
   onSelect,
   collapsedDirs,
   onToggleDir,
+  submodulePaths,
 }: {
   node: FileTreeNode;
   depth: number;
@@ -113,6 +119,7 @@ function TreeBranch({
   onSelect: (path: string) => void;
   collapsedDirs: Set<string>;
   onToggleDir: (path: string) => void;
+  submodulePaths?: ReadonlySet<string>;
 }) {
   return (
     <>
@@ -142,6 +149,7 @@ function TreeBranch({
                 onSelect={onSelect}
                 collapsedDirs={collapsedDirs}
                 onToggleDir={onToggleDir}
+                submodulePaths={submodulePaths}
               />
             )}
           </Fragment>
@@ -155,6 +163,7 @@ function TreeBranch({
           onSelect={onSelect}
           depth={depth}
           showDir={false}
+          submodule={submodulePaths?.has(file.path)}
         />
       ))}
     </>
@@ -211,6 +220,7 @@ export function FileList({
   onToggleCollapse,
   view = "list",
   onViewChange,
+  submodulePaths,
 }: FileListProps) {
   const additions = files.reduce((total, file) => total + file.additions, 0);
   const deletions = files.reduce((total, file) => total + file.deletions, 0);
@@ -282,6 +292,7 @@ export function FileList({
             onSelect={onSelect}
             collapsedDirs={collapsedDirs}
             onToggleDir={toggleDir}
+            submodulePaths={submodulePaths}
           />
         ) : (
           files.map((file) => (
@@ -292,6 +303,7 @@ export function FileList({
               onSelect={onSelect}
               depth={0}
               showDir
+              submodule={submodulePaths?.has(file.path)}
             />
           ))
         )}
