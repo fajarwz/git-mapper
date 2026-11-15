@@ -220,23 +220,67 @@
   }
 }
 
-/* The failure toast: it springs in from the corner, and a bar drains over its 6s lifetime.
-   Reduced motion drops the travel and the drain but keeps the toast fully visible. */
-@utility toast-in {
-  animation: toast-in 380ms cubic-bezier(0.16, 1, 0.3, 1) both;
+/* Pop-ups spring in from a smaller, lower start: `pop-in` for toasts and dialogs, `pop-in-fast`
+   (no overshoot) for menus and the staging rail. --pop-x / --pop-y / --pop-scale tune the travel,
+   transform-origin the anchor.
+   Reduced motion drops the travel but keeps the surface fully visible. */
+@utility pop-in {
+  animation: pop-in 420ms cubic-bezier(0.34, 1.35, 0.64, 1) both;
 
   @media (prefers-reduced-motion: reduce) {
     animation: none;
   }
 }
 
-@keyframes toast-in {
-  from {
-    opacity: 0;
-    transform: translateY(14px) scale(0.96);
+@utility pop-in-fast {
+  animation: pop-in 150ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
   }
 }
 
+@keyframes pop-in {
+  from {
+    opacity: 0;
+    transform: translate(var(--pop-x, 0px), var(--pop-y, 12px)) scale(var(--pop-scale, 0.94));
+  }
+}
+
+/* The way out: quicker than the way in, half the travel, no overshoot. `fade-out` is for a
+   dialog's scrim. Both block pointers so a closing surface cannot be clicked twice. */
+@utility pop-out {
+  pointer-events: none;
+  animation: pop-out 150ms cubic-bezier(0.4, 0, 1, 1) both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@utility fade-out {
+  pointer-events: none;
+  animation: fade-out 150ms linear both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
+@keyframes pop-out {
+  to {
+    opacity: 0;
+    transform: translateY(calc(var(--pop-y, 12px) * 0.5)) scale(0.97);
+  }
+}
+
+@keyframes fade-out {
+  to {
+    opacity: 0;
+  }
+}
+
+/* The failure toast also drains a bar over its 6s lifetime; reduced motion hides it. */
 @utility toast-drain {
   transform-origin: left;
   animation: toast-drain 6s linear forwards;

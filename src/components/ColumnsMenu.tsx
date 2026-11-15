@@ -42,7 +42,7 @@ export function ColumnsMenu({ x, y, visible, onToggle, onClose }: ColumnsMenuPro
       role="menu"
       aria-label="Columns"
       onPointerDown={(event) => event.stopPropagation()}
-      className="fixed z-50 flex w-44 flex-col gap-0.5 rounded-xl border border-hairline bg-glass p-1.5 panel-shadow backdrop-blur-sm"
+      className="fixed z-50 flex w-44 flex-col gap-0.5 rounded-xl border border-hairline bg-glass p-1.5 panel-shadow backdrop-blur-sm origin-top-left [--pop-scale:0.96] [--pop-y:0px] pop-in-fast"
       style={{ left: Math.max(4, Math.min(x, window.innerWidth - 184)), top: Math.max(4, Math.min(y, window.innerHeight - 160)) }}
     >
       <label className={`${ITEM} opacity-60`}>

@@ -2,11 +2,15 @@
 // @vitest-environment jsdom
 import assert from "node:assert/strict";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";
-import { afterEach, test } from "vitest";
+import { afterEach, beforeEach, test, vi } from "vitest";
 
 import { StarPrompt } from "./StarPrompt";
 
-afterEach(cleanup);
+beforeEach(() => vi.useFakeTimers());
+afterEach(() => {
+  cleanup();
+  vi.useRealTimers();
+});
 
 function setup(last = false) {
   const calls: string[] = [];
@@ -23,15 +27,22 @@ function setup(last = false) {
 test("each action reports itself", () => {
   const calls = setup();
   fireEvent.click(screen.getByRole("button", { name: "Star on GitHub" }));
+  assert.deepEqual(calls, ["star"], "starring reports at once");
   fireEvent.click(screen.getByRole("button", { name: "Later" }));
-  assert.deepEqual(calls, ["star", "later"]);
+  vi.advanceTimersByTime(150);
+  assert.deepEqual(calls, ["star", "later"], "later reports once the card has faded");
 });
 
 test("Esc and the close button count as later", () => {
-  const calls = setup();
+  let calls = setup();
   fireEvent.keyDown(window, { key: "Escape" });
+  vi.advanceTimersByTime(150);
+  assert.deepEqual(calls, ["later"]);
+  cleanup();
+  calls = setup();
   fireEvent.click(screen.getByRole("button", { name: "Dismiss notice" }));
-  assert.deepEqual(calls, ["later", "later"]);
+  vi.advanceTimersByTime(150);
+  assert.deepEqual(calls, ["later"]);
 });
 
 test("only the final ask says so", () => {

@@ -1,4 +1,5 @@
 import { useEffect, useRef } from "react";
+import { useExit } from "../hooks/useExit";
 import { openExternal } from "../lib/external";
 import type { SyntaxScheme } from "../lib/highlight";
 import { GITHUB_URL, type UpdateMode, type UpdateStatus } from "../lib/updater";
@@ -122,6 +123,7 @@ export function SettingsModal({
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  const { leaving, close } = useExit(onClose);
 
   // Move focus into the dialog, and hand it back to the trigger when the dialog closes.
   useEffect(() => {
@@ -134,7 +136,7 @@ export function SettingsModal({
     function handleKeyDown(event: globalThis.KeyboardEvent) {
       if (event.key === "Escape") {
         event.preventDefault();
-        onClose();
+        close();
         return;
       }
 
@@ -159,13 +161,13 @@ export function SettingsModal({
 
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [close]);
 
   return (
     <div
-      className="fixed inset-0 z-40 grid place-items-center bg-scrim p-6 backdrop-blur-md"
+      className={`fixed inset-0 z-40 grid place-items-center bg-scrim p-6 backdrop-blur-md ${leaving ? "fade-out" : ""}`}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget) close();
       }}
     >
       <div
@@ -173,7 +175,7 @@ export function SettingsModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className={`${PANEL} w-full max-w-md p-5`}
+        className={`${PANEL} w-full max-w-md p-5 ${leaving ? "pop-out" : "pop-in"}`}
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -184,7 +186,7 @@ export function SettingsModal({
           <button
             ref={closeRef}
             type="button"
-            onClick={onClose}
+            onClick={close}
             aria-label="Close settings"
             className="grid shrink-0 place-items-center rounded-full text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-7"
           >
