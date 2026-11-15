@@ -44,6 +44,7 @@ export function useStarPrompt(calm: boolean) {
 
   return {
     visible,
+    last: state.asks >= 1,
     star: () => {
       openExternal(GITHUB_URL);
       setState(markDone);
@@ -51,10 +52,6 @@ export function useStarPrompt(calm: boolean) {
     },
     later: () => {
       setState((s) => dismissLater(s, Date.now()));
-      setVisible(false);
-    },
-    never: () => {
-      setState(markDone);
       setVisible(false);
     },
   };

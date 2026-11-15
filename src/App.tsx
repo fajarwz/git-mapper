@@ -1329,7 +1329,7 @@ function App() {
       )}
 
       {starPrompt.visible && !notice && (
-        <StarPrompt onStar={starPrompt.star} onLater={starPrompt.later} onNever={starPrompt.never} />
+        <StarPrompt onStar={starPrompt.star} onLater={starPrompt.later} last={starPrompt.last} />
       )}
 
       {notice && (

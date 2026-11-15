@@ -8,13 +8,13 @@ import { StarPrompt } from "./StarPrompt";
 
 afterEach(cleanup);
 
-function setup() {
+function setup(last = false) {
   const calls: string[] = [];
   render(
     <StarPrompt
       onStar={() => calls.push("star")}
       onLater={() => calls.push("later")}
-      onNever={() => calls.push("never")}
+      last={last}
     />,
   );
   return calls;
@@ -24,8 +24,7 @@ test("each action reports itself", () => {
   const calls = setup();
   fireEvent.click(screen.getByRole("button", { name: "Star on GitHub" }));
   fireEvent.click(screen.getByRole("button", { name: "Later" }));
-  fireEvent.click(screen.getByRole("button", { name: "Never" }));
-  assert.deepEqual(calls, ["star", "later", "never"]);
+  assert.deepEqual(calls, ["star", "later"]);
 });
 
 test("Esc and the close button count as later", () => {
@@ -33,4 +32,12 @@ test("Esc and the close button count as later", () => {
   fireEvent.keyDown(window, { key: "Escape" });
   fireEvent.click(screen.getByRole("button", { name: "Dismiss notice" }));
   assert.deepEqual(calls, ["later", "later"]);
+});
+
+test("only the final ask says so", () => {
+  setup();
+  assert.equal(screen.queryByText(/Last time/), null);
+  cleanup();
+  setup(true);
+  assert.ok(screen.getByText(/Last time we'll ask/));
 });

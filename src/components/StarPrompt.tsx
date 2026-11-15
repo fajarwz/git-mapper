@@ -6,11 +6,12 @@ import { Toast } from "./Toast";
 export function StarPrompt({
   onStar,
   onLater,
-  onNever,
+  last,
 }: {
   onStar: () => void;
   onLater: () => void;
-  onNever: () => void;
+  /** The second and final ask says so. */
+  last: boolean;
 }) {
   const laterRef = useRef(onLater);
   laterRef.current = onLater;
@@ -25,7 +26,7 @@ export function StarPrompt({
   return (
     <Toast
       title="Enjoying Git Mapper?"
-      detail="If it is useful, a star on GitHub helps a lot."
+      detail={`${last ? "Last time we'll ask. " : ""}If it is useful, a star on GitHub helps a lot.`}
       icon={<StarIcon size={14} />}
       onClose={onLater}
     >
@@ -43,14 +44,6 @@ export function StarPrompt({
           className="whitespace-nowrap rounded text-[12px] font-medium text-surface/75 hover:text-surface focus-visible:underline focus-visible:outline-none"
         >
           Later
-        </button>
-        <button
-          type="button"
-          onClick={onNever}
-          title="Don't ask again"
-          className="ml-auto whitespace-nowrap rounded text-[12px] text-surface/55 underline-offset-2 hover:text-surface hover:underline focus-visible:underline focus-visible:outline-none"
-        >
-          Never
         </button>
       </div>
     </Toast>
