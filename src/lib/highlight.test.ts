@@ -19,6 +19,7 @@ test("languageForPath maps extensions, basename files and dotfiles", () => {
     ["config/app.yaml", "yaml"],
     ["README.md", "markdown"],
     ["assets/logo.svg", "xml"],
+    ["lib/features/reports/reports_screen.dart", "dart"],
   ] as const;
   for (const [path, language] of want) {
     assert.equal(languageForPath(path), language, path);
@@ -35,6 +36,12 @@ test("highlighting is lazy: nothing before the load, tokens after, unknown gramm
   assert.ok(html !== null && html.includes("hljs-keyword"), "const is tokenized");
   assert.equal(await loadHighlighter("definitely-not-a-grammar"), false,
     "a grammar we do not ship stays plain, no throw");
+});
+
+test("a Dart file gets real tokens", async () => {
+  assert.equal(await loadHighlighter("dart"), true);
+  const html = highlightSync("final ctx = _keys[p]?.currentContext;", "dart");
+  assert.ok(html !== null && html.includes("hljs-keyword"), "final is tokenized");
 });
 
 test("token HTML is escaped, so diff text can never inject markup", async () => {

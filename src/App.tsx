@@ -8,6 +8,7 @@ import { DetailsPanel } from "./components/DetailsPanel";
 import type { DiffLayout, DiffScope } from "./components/DiffViewer";
 import { EmptyState } from "./components/EmptyState";
 import { TitleBar } from "./components/TitleBar";
+import { SubmoduleStrip } from "./components/SubmoduleStrip";
 import { Toast } from "./components/Toast";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { SettingsModal } from "./components/SettingsModal";
@@ -66,7 +67,8 @@ import {
 } from "./components/StagePanel";
 import { ResizeHandle } from "./components/ResizeHandle";
 import type { WorktreeFile } from "./lib/staging";
-import type { Repository } from "./types";
+import type { Repository, Submodule } from "./types";
+import { submoduleParents } from "./lib/submodule";
 import { useCommitFiles } from "./hooks/useCommitFiles";
 import { useWipSide } from "./hooks/useWipSide";
 
@@ -245,15 +247,21 @@ function App() {
   // Persist the open tab list; the data itself is reloaded on launch.
   // Skipped until the first load lands: React calls this with an empty list on mount,
   // which would otherwise wipe the stored paths before they are read back.
+  // Submodules opened from the strip are repos too, but they live inside their parent's tab:
+  // the title bar lists only the top level and a launch reopens only those.
+  const parentOf = useMemo(() => submoduleParents(repos), [repos]);
+  const topRepos = useMemo(() => repos.filter((item) => !parentOf.has(item.id)), [repos, parentOf]);
   useEffect(() => {
     if (!hydratedPaths.current) return;
-    storePaths(repos.map((repo) => repo.path));
-  }, [repos]);
+    storePaths(topRepos.map((repo) => repo.path));
+  }, [topRepos]);
 
   const repo = useMemo(
     () => repos.find((item) => item.id === activeRepoId) ?? null,
     [repos, activeRepoId],
   );
+  const rootId = activeRepoId ? (parentOf.get(activeRepoId) ?? activeRepoId) : null;
+  const rootRepo = useMemo(() => repos.find((item) => item.id === rootId) ?? null, [repos, rootId]);
   const activeRepoPath = repo?.path ?? null;
 
   // During a merge the conflicted paths live in the rail's Conflicts section — the plain
@@ -365,16 +373,82 @@ function App() {
   }
 
   function handleCloseRepo(id: string) {
-    const closed = repos.find((item) => item.id === id);
-    if (closed) evictRepoFiles(closed.path);
+    // Closing a tab closes the submodules opened inside it.
+    const doomed = new Set([id]);
+    for (const [child, parent] of parentOf) if (parent === id) doomed.add(child);
+    for (const item of repos) if (doomed.has(item.id)) evictRepoFiles(item.path);
     setRepos((previous) => {
-      const next = previous.filter((item) => item.id !== id);
-      if (id === activeRepoId) {
-        setActiveRepoId(next[next.length - 1]?.id ?? null);
+      const next = previous.filter((item) => !doomed.has(item.id));
+      if (activeRepoId !== null && doomed.has(activeRepoId)) {
+        const parents = submoduleParents(next);
+        setActiveRepoId([...next].reverse().find((item) => !parents.has(item.id))?.id ?? null);
       }
       return next;
     });
   }
+
+  // A top-level tab opens on whatever it showed last (its repo or one of its submodules).
+  const lastItemByRoot = useRef<Record<string, string>>({});
+  useEffect(() => {
+    if (activeRepoId && rootId) lastItemByRoot.current[rootId] = activeRepoId;
+  }, [activeRepoId, rootId]);
+  const handleSelectTop = useCallback(
+    (id: string) => {
+      const remembered = lastItemByRoot.current[id];
+      const target =
+        id !== rootId && remembered && repos.some((item) => item.id === remembered) ? remembered : id;
+      handleSelectRepo(target);
+    },
+    [rootId, repos, handleSelectRepo],
+  );
+
+  // The title bar reorders its own (top-level) list; the full list only needs the same two
+  // repos swapped places.
+  const handleReorderTop = useCallback(
+    (from: number, to: number) => {
+      const fromIndex = repos.findIndex((item) => item.id === topRepos[from]?.id);
+      const toIndex = repos.findIndex((item) => item.id === topRepos[to]?.id);
+      if (fromIndex !== -1 && toIndex !== -1) handleReorderRepos(fromIndex, toIndex);
+    },
+    [repos, topRepos, handleReorderRepos],
+  );
+
+  // A submodule's first visit reads it and adds it to the repo list; later visits just switch.
+  const [openingSubId, setOpeningSubId] = useState<string | null>(null);
+  const handleSelectSubItem = useCallback(
+    async (id: string, submodule?: Submodule) => {
+      if (!submodule || repos.some((item) => item.id === id)) {
+        handleSelectRepo(id);
+        return;
+      }
+      setOpeningSubId(id);
+      try {
+        const loaded = await loadRepository(submodule.fullPath);
+        setRepos((previous) =>
+          previous.some((item) => item.path === loaded.path) ? previous : [...previous, loaded],
+        );
+        setActiveRepoId(loaded.id);
+        setQuery("");
+        void fetchAndRefresh(loaded);
+      } catch (openError) {
+        setNotice({
+          title: `Could not open ${submodule.name}`,
+          detail: openError instanceof Error ? openError.message : String(openError),
+          id: Date.now(),
+        });
+      } finally {
+        setOpeningSubId(null);
+      }
+    },
+    [repos, handleSelectRepo],
+  );
+  const handleOpenSubmodule = useCallback(
+    (fullPath: string) => {
+      const target = repo?.submodules?.find((item) => item.fullPath === fullPath);
+      if (target) void handleSelectSubItem(fullPath, target);
+    },
+    [repo, handleSelectSubItem],
+  );
 
   const handleSelectCommit = useCallback((hash: string) => {
     if (!activeRepoId) return;
@@ -1104,17 +1178,17 @@ function App() {
   return (
     <div className="flex h-screen flex-col overflow-hidden">
       <TitleBar
-        repos={repos}
-        activeId={repo?.id ?? null}
+        repos={topRepos}
+        activeId={rootId}
         repo={repo}
         adding={opening}
         refreshing={refreshing}
         query={query}
         onQueryChange={setQuery}
-        onSelect={handleSelectRepo}
+        onSelect={handleSelectTop}
         onAdd={handleAdd}
         onClose={handleCloseRepo}
-        onReorder={handleReorderRepos}
+        onReorder={handleReorderTop}
         onRefresh={() => void handleRefresh()}
         onFetch={() => void handleFetch()}
         fetching={fetching}
@@ -1128,6 +1202,16 @@ function App() {
         stageOpen={stageOpen}
         onToggleStage={handleToggleStage}
       />
+
+      {rootRepo !== null && (rootRepo.submodules?.length ?? 0) > 0 && (
+        <SubmoduleStrip
+          root={rootRepo}
+          repos={repos}
+          activeId={activeRepoId}
+          openingId={openingSubId}
+          onSelect={(id, submodule) => void handleSelectSubItem(id, submodule)}
+        />
+      )}
 
       <div className="flex min-h-0 flex-1 flex-col px-2.5 pb-2.5 pt-1">
         {noRepo || repo === null ? (
@@ -1243,6 +1327,8 @@ function App() {
                 onResolveConflict={handleResolveConflicts}
                 onWriteConflictText={handleWriteConflictText}
                 currentBranch={repo.branch}
+                submodules={repo.submodules}
+                onOpenSubmodule={handleOpenSubmodule}
                 onClose={() => setDetailsOpen(false)}
                 onHeightChange={setDetailsHeight}
               />

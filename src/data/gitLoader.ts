@@ -1,6 +1,7 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open as pickDirectory } from "@tauri-apps/plugin-dialog";
-import type { ChangedFile, Commit, CommitRef, DiffLine, Repository } from "../types";
+import type { ChangedFile, Commit, CommitRef, DiffLine, Repository, Submodule } from "../types";
+import { sameSubmodules, shapeSubmodules, type RawSubmodule } from "../lib/submodule";
 import { STORAGE_KEYS } from "../lib/persisted";
 import { orderRefs } from "../lib/refOrder";
 import { layoutGraph } from "../lib/graphLanes";
@@ -233,6 +234,17 @@ async function readStashes(dir: string): Promise<string> {
     : ((await devApi("read_stashes", { dir })) as { text: string }).text;
 }
 
+/** Direct submodules; a failed read (a gitlink without a .gitmodules entry) reads as none. */
+async function readSubmodules(root: string): Promise<Submodule[]> {
+  try {
+    const raw = await call("read_submodules", { dir: root }, (value) => value as RawSubmodule[]);
+    return shapeSubmodules(root, raw);
+  } catch (readError) {
+    console.debug("Could not read submodules", readError);
+    return [];
+  }
+}
+
 function uncommittedCommit(commits: Commit[], changed: number, head: string): Commit {
   // The working tree grows out of the checked-out HEAD, not the newest row: with `log --all`
   // another branch's tip can sit above it. Fall back to the tip only when HEAD is unloaded.
@@ -291,11 +303,12 @@ function sameRefs(a: CommitRef[], b: CommitRef[]): boolean {
 
 export async function loadRepository(dir: string): Promise<Repository> {
   const info = await call<RepoInfo>("open_repository", { dir }, (raw) => raw as RepoInfo);
-  const [status, log, refsRaw, stashesRaw] = await Promise.all([
+  const [status, log, refsRaw, stashesRaw, submodules] = await Promise.all([
     call<StatusInfo>("read_status", { dir: info.path }, (raw) => raw as StatusInfo),
     readLog(info.path, LOG_LIMIT, 0),
     readRefs(info.path),
     readStashes(info.path),
+    readSubmodules(info.path),
   ]);
   const tipRefs = parseForEachRef(refsRaw, status.branch || "");
   const history = toCommits(parseLog(log)).map((commit) => ({
@@ -324,6 +337,7 @@ export async function loadRepository(dir: string): Promise<Repository> {
     conflicts: status.conflicts ?? [],
     refsDigest: hashText(refsRaw),
     stashDigest: hashText(stashesRaw),
+    submodules,
     commits: finalCommits,
     defaultCommitHash: history[0]?.hash ?? "",
   };
@@ -386,6 +400,12 @@ export async function refreshRepository(
     return null;
   }
 
+  // A submodule moving shows up in the parent's status, so the worktree digest already got us
+  // past the early exit; reuse the old list when nothing about it changed.
+  const freshSubmodules = await readSubmodules(repo.path);
+  const submodules = sameSubmodules(repo.submodules, freshSubmodules)
+    ? (repo.submodules ?? freshSubmodules)
+    : freshSubmodules;
   const tipRefs = parseForEachRef(refsRaw, branch);
   const headMoved = status.head !== repo.head;
   // A fetch that only adds a branch leaves HEAD alone, but its commits are new to this window,
@@ -490,6 +510,7 @@ export async function refreshRepository(
       conflicts: status.conflicts ?? [],
       refsDigest,
       stashDigest,
+      submodules,
       commits: withLanes(commits),
       defaultCommitHash:
         history.find((commit) => commit.hash === status.head)?.hash ?? repo.defaultCommitHash,

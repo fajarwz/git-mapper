@@ -34,7 +34,7 @@ const EXTENSIONS: Record<string, string> = {
   sh: "bash", bash: "bash", zsh: "bash", ps1: "powershell", psd1: "powershell", psm1: "powershell",
   yml: "yaml", yaml: "yaml", toml: "ini", ini: "ini", env: "ini", properties: "ini",
   md: "markdown", markdown: "markdown",
-  sql: "sql", lua: "lua",
+  sql: "sql", lua: "lua", dart: "dart",
 };
 
 /** Extension-less names that still map ("Dockerfile", "Makefile", ".env"). */
@@ -79,6 +79,7 @@ const GRAMMARS: Record<string, () => Promise<{ default: LanguageFn }>> = {
   markdown: () => import("highlight.js/lib/languages/markdown"),
   sql: () => import("highlight.js/lib/languages/sql"),
   lua: () => import("highlight.js/lib/languages/lua"),
+  dart: () => import("highlight.js/lib/languages/dart"),
   dockerfile: () => import("highlight.js/lib/languages/dockerfile"),
   makefile: () => import("highlight.js/lib/languages/makefile"),
   powershell: () => import("highlight.js/lib/languages/powershell"),

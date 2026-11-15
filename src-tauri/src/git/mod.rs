@@ -6,6 +6,7 @@ mod merge;
 mod shell;
 mod staging;
 mod status;
+mod submodules;
 #[cfg(test)]
 mod actions_tests;
 #[cfg(test)]
@@ -21,6 +22,8 @@ mod staging_tests;
 #[cfg(test)]
 mod status_tests;
 #[cfg(test)]
+mod submodules_tests;
+#[cfg(test)]
 mod sync_tests;
 #[cfg(test)]
 mod test_support;
@@ -33,7 +36,13 @@ pub use merge::*;
 pub use shell::*;
 pub use staging::*;
 pub use status::*;
+pub use submodules::*;
 
+/// Direct submodules of the repository with their state; empty without a `.gitmodules`.
+#[tauri::command]
+pub async fn read_submodules(dir: String) -> Result<Vec<SubmoduleInfo>, String> {
+    run_blocking("submodules read", move || read_submodules_in(&dir)).await
+}
 #[tauri::command]
 pub async fn open_repository(dir: String) -> Result<RepoInfo, String> {
     run_blocking("open", move || open_repository_in(&dir)).await
