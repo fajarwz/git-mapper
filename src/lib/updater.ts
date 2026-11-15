@@ -60,7 +60,7 @@ export function onUpdateStatus(listener: (status: UpdateStatus) => void): () => 
   return () => listeners.delete(listener);
 }
 
-/** Checks the feed. `auto` also downloads and installs in the background; `manual` stops at "available". */
+/** Checks the feed. `auto` also downloads in the background; `manual` stops at "available". Neither installs. */
 export async function checkForUpdates(mode: UpdateMode): Promise<void> {
   if (!updaterSupported()) return;
   set({ phase: "checking" });
@@ -80,7 +80,7 @@ export async function checkForUpdates(mode: UpdateMode): Promise<void> {
   }
 }
 
-/** Downloads (and on Windows installs) the update the check found; the relaunch applies it. */
+/** Downloads the update the check found and stops there: installing waits for `restartToUpdate`. */
 export async function downloadUpdate(): Promise<void> {
   if (!current) return;
   const version = current.version;
@@ -89,7 +89,7 @@ export async function downloadUpdate(): Promise<void> {
   let lastTick = 0;
   set({ phase: "downloading", version, received: 0, total });
   try {
-    await current.downloadAndInstall((event) => {
+    await current.download((event) => {
       if (event.event === "Started") {
         total = event.data.contentLength ?? null;
       } else if (event.event === "Progress") {
@@ -108,7 +108,11 @@ export async function downloadUpdate(): Promise<void> {
   }
 }
 
-/** Restarts the app into the installed update. */
+/**
+ * Installs the downloaded update, then relaunches. Windows cannot replace a running exe, so
+ * there the installer closes the app itself and relaunch is never reached.
+ */
 export async function restartToUpdate(): Promise<void> {
+  if (current) await current.install();
   await relaunch();
 }
