@@ -1209,6 +1209,7 @@ function App() {
         fetching={fetching}
         onOpenSettings={() => setSettingsOpen(true)}
         updateReady={updateStatus.phase === "ready"}
+        onRestartToUpdate={handleRestartToUpdate}
         onPull={handlePull}
         onPush={handlePush}
         syncing={syncing}

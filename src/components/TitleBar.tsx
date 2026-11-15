@@ -104,6 +104,8 @@ interface TitleBarProps {
   onOpenSettings: () => void;
   /** True when an update is downloaded and waiting: the settings gear shows a dot. */
   updateReady?: boolean;
+  /** Installs the downloaded update and restarts; the pill beside the gear calls it. */
+  onRestartToUpdate?: () => void;
   /** Pull/push the checked-out branch; `syncing` while either is in flight. */
   onPull: () => void;
   onPush: () => void;
@@ -207,6 +209,7 @@ export function TitleBar({
   fetching,
   onOpenSettings,
   updateReady = false,
+  onRestartToUpdate,
   onPull,
   onPush,
   syncing,
@@ -497,6 +500,16 @@ export function TitleBar({
           </>
         )}
 
+        {updateReady && onRestartToUpdate && (
+          <button
+            type="button"
+            onClick={onRestartToUpdate}
+            title="A new version is downloaded. Restart to install it."
+            className="h-7 shrink-0 whitespace-nowrap rounded-full bg-primary px-3 text-[11px] font-semibold text-white soft-shadow hover:brightness-110 focus-visible:ring-2 focus-visible:ring-primary/70 focus-visible:ring-offset-2"
+          >
+            Restart to update
+          </button>
+        )}
         <button
           type="button"
           onClick={onRefresh}
@@ -515,10 +528,6 @@ export function TitleBar({
           className={`${GLASS_CONTROL} relative grid place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-7`}
         >
           <SettingsIcon size={13} />
-          {updateReady && (
-            // An update is downloaded and waiting: a nudge toward the "restart to apply" button.
-            <span aria-hidden="true" className="absolute right-1 top-1 size-1.5 rounded-full bg-success" />
-          )}
         </button>
       </div>
 
