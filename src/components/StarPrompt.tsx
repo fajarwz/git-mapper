@@ -33,23 +33,24 @@ export function StarPrompt({
         <button
           type="button"
           onClick={onStar}
-          className="rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white hover:opacity-90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
+          className="whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white hover:opacity-90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
         >
           Star on GitHub
         </button>
         <button
           type="button"
           onClick={onLater}
-          className="rounded text-[12px] font-medium text-surface/75 hover:text-surface focus-visible:underline focus-visible:outline-none"
+          className="whitespace-nowrap rounded text-[12px] font-medium text-surface/75 hover:text-surface focus-visible:underline focus-visible:outline-none"
         >
-          Maybe later
+          Later
         </button>
         <button
           type="button"
           onClick={onNever}
-          className="ml-auto rounded text-[11px] text-surface/55 underline-offset-2 hover:text-surface hover:underline focus-visible:underline focus-visible:outline-none"
+          title="Don't ask again"
+          className="ml-auto whitespace-nowrap rounded text-[12px] text-surface/55 underline-offset-2 hover:text-surface hover:underline focus-visible:underline focus-visible:outline-none"
         >
-          Don&apos;t ask again
+          Never
         </button>
       </div>
     </Toast>

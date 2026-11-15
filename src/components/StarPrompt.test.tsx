@@ -23,8 +23,8 @@ function setup() {
 test("each action reports itself", () => {
   const calls = setup();
   fireEvent.click(screen.getByRole("button", { name: "Star on GitHub" }));
-  fireEvent.click(screen.getByRole("button", { name: "Maybe later" }));
-  fireEvent.click(screen.getByRole("button", { name: "Don't ask again" }));
+  fireEvent.click(screen.getByRole("button", { name: "Later" }));
+  fireEvent.click(screen.getByRole("button", { name: "Never" }));
   assert.deepEqual(calls, ["star", "later", "never"]);
 });
 
