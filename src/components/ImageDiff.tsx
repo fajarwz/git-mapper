@@ -256,6 +256,7 @@ export function ImageDiff({ file, repoPath, commitHash }: ImageDiffProps) {
       onPointerMove={(event) => {
         if (dragging.current) moveFraction(event.clientX);
       }}
+      onDragStart={(event) => event.preventDefault()}
       onPointerUp={() => {
         dragging.current = false;
       }}
@@ -270,7 +271,8 @@ export function ImageDiff({ file, repoPath, commitHash }: ImageDiffProps) {
         data-image-src="previous"
         loading="lazy"
         decoding="async"
-        className="absolute inset-0 size-full object-contain"
+        draggable={false}
+        className="pointer-events-none absolute inset-0 size-full object-contain"
       />
       <img
         src={current.url}
@@ -278,8 +280,9 @@ export function ImageDiff({ file, repoPath, commitHash }: ImageDiffProps) {
         data-image-src="current"
         loading="lazy"
         decoding="async"
+        draggable={false}
         style={mode === "swipe" ? { clipPath: `inset(0 ${100 - fraction}% 0 0)` } : { opacity: fraction / 100 }}
-        className="absolute inset-0 size-full object-contain"
+        className="pointer-events-none absolute inset-0 size-full object-contain"
       />
       <span className="pointer-events-none absolute left-2 top-2 rounded-full bg-sheet-strong px-2 py-0.5 font-sans text-[10.5px] font-semibold text-ink-soft backdrop-blur-md">
         Previous
