@@ -79,7 +79,7 @@ function updateStatusLine(status: UpdateStatus): string {
       return `Downloading version ${status.version}…${percent}`;
     }
     case "ready":
-      return `Version ${status.version} is ready.`;
+      return `Version ${status.version} is ready to install.`;
     case "error":
       return `Update failed: ${status.message ?? "unknown error"}`;
   }

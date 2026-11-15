@@ -1,4 +1,4 @@
-// The updater store, with the Tauri plugins mocked: check → download → ready → relaunch.
+// The updater store, with the Tauri plugins mocked: check → download → ready → install + relaunch.
 // @vitest-environment jsdom
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test, vi } from "vitest";
@@ -33,12 +33,13 @@ afterEach(() => {
 
 const update = (version: string) => ({
   version,
-  downloadAndInstall: vi.fn(async (onEvent?: (event: { event: string; data: { chunkLength?: number; contentLength?: number } }) => void) => {
+  download: vi.fn(async (onEvent?: (event: { event: string; data: { chunkLength?: number; contentLength?: number } }) => void) => {
     onEvent?.({ event: "Started", data: { contentLength: 100 } });
     onEvent?.({ event: "Progress", data: { chunkLength: 60 } });
     onEvent?.({ event: "Progress", data: { chunkLength: 40 } });
     onEvent?.({ event: "Finished", data: {} });
   }),
+  install: vi.fn(async () => {}),
 });
 
 test("manual mode stops at available and waits for the download", async () => {
@@ -57,7 +58,8 @@ test("auto mode downloads in the background and lands on ready", async () => {
 
   await checkForUpdates("auto");
 
-  assert.ok(found.downloadAndInstall.mock.calls.length > 0, "the download ran without asking");
+  assert.ok(found.download.mock.calls.length > 0, "the download ran without asking");
+  assert.equal(found.install.mock.calls.length, 0, "nothing installs until the user restarts");
   assert.equal(updateStatusSnapshot().phase, "ready");
   assert.equal(updateStatusSnapshot().version, "0.2.0");
 });

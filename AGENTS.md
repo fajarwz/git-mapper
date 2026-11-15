@@ -249,7 +249,8 @@ and the README's Tests badge points at it.
   subjects. End with `**Full changelog:** https://github.com/fajarwz/git-mapper/compare/v<prev>...v<ver>`.
   Pass the body with `--notes-file` — an inline `--notes "…"` mangles the markdown and backticks. The private signing key lives OUTSIDE the repo and never gets
   committed. The app checks that feed at launch when "Update
-  automatically" is on (the default), downloads in the background, and the settings modal offers
+  automatically" is on (the default), downloads in the background (never installs on its own: `download()`, then `install()` on the click, so a
+  Windows install cannot close the app unasked; `installMode` is pinned to passive), and the settings modal offers
   "Restart to apply update" (`tauri-plugin-updater` + `tauri-plugin-process` + the gear dot).
 
 - **design references:** target look is a frosted-glass commit feed (Dribbble-style, violet/rose/warm palette). The user judges ugliness by: row density, font-scale hierarchy, background saturation. "Ours should be close to the reference" means those three.
