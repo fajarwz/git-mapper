@@ -1,5 +1,5 @@
 import { useEffect, useRef } from "react";
-import { openUrl } from "@tauri-apps/plugin-opener";
+import { openExternal } from "../lib/external";
 import type { SyntaxScheme } from "../lib/highlight";
 import { GITHUB_URL, type UpdateMode, type UpdateStatus } from "../lib/updater";
 import type { Theme } from "../lib/theme";
@@ -85,12 +85,6 @@ function updateStatusLine(status: UpdateStatus): string {
 }
 
 const DONATE_URL = "https://github.com/sponsors/fajarwz";
-
-function openExternal(url: string) {
-  const inTauri = typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
-  if (inTauri) void openUrl(url);
-  else window.open(url, "_blank", "noopener");
-}
 
 function ThemePreview({ theme }: { theme: Theme }) {
   // The previews mock a FIXED theme, so they use literal colours, not tokens: a token like

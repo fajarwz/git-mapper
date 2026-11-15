@@ -49,4 +49,5 @@ export const STORAGE_KEYS = {
   zoom: "git-mapper:zoom",
   commitColumns: "git-mapper:commit-columns",
   commitColumnOrder: "git-mapper:commit-column-order",
+  starPrompt: "git-mapper:star-prompt",
 } as const;

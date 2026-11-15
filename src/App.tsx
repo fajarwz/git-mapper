@@ -10,6 +10,8 @@ import { EmptyState } from "./components/EmptyState";
 import { TitleBar } from "./components/TitleBar";
 import { SubmoduleStrip } from "./components/SubmoduleStrip";
 import { Toast } from "./components/Toast";
+import { StarPrompt } from "./components/StarPrompt";
+import { useStarPrompt } from "./hooks/useStarPrompt";
 import { ConfirmDialog } from "./components/ConfirmDialog";
 import { SettingsModal } from "./components/SettingsModal";
 import { STORAGE_KEYS, usePersistedState } from "./lib/persisted";
@@ -812,6 +814,19 @@ function App() {
   }
   const [pendingConfirm, setPendingConfirm] = useState<PendingConfirm | null>(null);
 
+  const starPrompt = useStarPrompt(
+    !booting &&
+      repo !== null &&
+      !notice &&
+      !pendingConfirm &&
+      !settingsOpen &&
+      !contextMenu &&
+      !conflictView &&
+      !syncError &&
+      !repo.merging &&
+      !repo.conflicts?.length,
+  );
+
   // Esc closes the details panel — from a commit row (Esc undoes the summons) or inside it.
   // Top layers (menu, modal, confirm) close themselves; the rail's Esc docks the drawer; a
   // text field's Esc keeps its own story.
@@ -1397,6 +1412,10 @@ function App() {
           }}
           onClose={() => setPendingConfirm(null)}
         />
+      )}
+
+      {starPrompt.visible && !notice && (
+        <StarPrompt onStar={starPrompt.star} onLater={starPrompt.later} last={starPrompt.last} />
       )}
 
       {notice && (
