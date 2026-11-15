@@ -1,4 +1,5 @@
-import { useEffect, useRef, type ReactNode } from "react";
+import { useEffect, type ReactNode } from "react";
+import { useExit } from "../hooks/useExit";
 import { AlertIcon, CloseIcon } from "./icons";
 
 /**
@@ -12,31 +13,43 @@ export function Toast({
   detail,
   onClose,
   icon,
+  closeOnEscape = false,
   children,
 }: {
   title: string;
   detail?: string;
+  /** Fires once the exit animation has played. */
   onClose: () => void;
   /** Replaces the alert glyph and turns the toast into a persistent, non-error notice. */
   icon?: ReactNode;
-  children?: ReactNode;
+  closeOnEscape?: boolean;
+  /** A function gets `close`, which plays the exit before `onClose` fires. */
+  children?: ReactNode | ((close: () => void) => ReactNode);
 }) {
   const persistent = icon !== undefined;
-  // The timer reads the callback through a ref: parent re-renders must not restart the countdown.
-  const closeRef = useRef(onClose);
-  closeRef.current = onClose;
+  const { leaving, close } = useExit(onClose);
+  // `close` is stable, so parent re-renders never restart the countdown.
   useEffect(() => {
     if (persistent) return;
-    const timer = window.setTimeout(() => closeRef.current(), 6000);
+    const timer = window.setTimeout(close, 6000);
     return () => window.clearTimeout(timer);
-  }, [persistent]);
+  }, [persistent, close]);
+
+  useEffect(() => {
+    if (!closeOnEscape) return;
+    const onKey = (event: KeyboardEvent) => {
+      if (event.key === "Escape") close();
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [closeOnEscape, close]);
 
   const badge = persistent ? "bg-primary" : "bg-danger";
   return (
     <div
       data-toast
       role={persistent ? "status" : "alert"}
-      className="fixed right-5 bottom-5 z-50 w-96 max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-2xl bg-ink text-surface ring-1 ring-surface/20 panel-shadow toast-in"
+      className={`fixed right-5 bottom-5 z-50 w-96 max-w-[calc(100vw-2.5rem)] overflow-hidden rounded-2xl bg-ink text-surface ring-1 ring-surface/20 panel-shadow ${leaving ? "pop-out" : "pop-in-toast"}`}
     >
       <div className="flex items-start gap-3 p-4">
         <span className={`mt-px grid size-7 shrink-0 place-items-center rounded-full text-white ${badge}`}>
@@ -53,11 +66,11 @@ export function Toast({
               {detail}
             </p>
           )}
-          {children}
+          {typeof children === "function" ? children(close) : children}
         </div>
         <button
           type="button"
-          onClick={onClose}
+          onClick={close}
           title="Dismiss"
           aria-label="Dismiss notice"
           className="grid size-6 shrink-0 place-items-center rounded-full text-surface/70 hover:bg-surface/15 hover:text-surface focus-visible:ring-2 focus-visible:ring-primary"

@@ -180,11 +180,11 @@ export function DetailsPanel({
     <section
       ref={sectionRef}
       data-details
-      className={
+      className={`${
         showSidebar
           ? `${PANEL} relative grid min-h-0 grid-cols-[var(--sidebar-width)_minmax(0,1fr)] overflow-hidden`
           : `${PANEL} relative flex min-h-0 flex-col overflow-hidden`
-      }
+      } slide-in-up`}
       style={showSidebar ? layout : undefined}
       aria-label={showSidebar ? "Commit details" : "Uncommitted diff"}
     >

@@ -12,6 +12,7 @@ afterEach(() => {
 });
 
 test("Toast shows the title and detail and closes on the button", () => {
+  vi.useFakeTimers();
   let closed = 0;
   const { container } = render(
     <Toast
@@ -25,8 +26,13 @@ test("Toast shows the title and detail and closes on the button", () => {
   const toast = container.querySelector("[data-toast]") as HTMLElement;
   assert.ok(toast.textContent?.includes("Could not open that folder"));
   assert.ok(toast.textContent?.includes("is not a Git repository"));
-  fireEvent.click(container.querySelector("[aria-label='Dismiss notice']") as HTMLElement);
-  assert.equal(closed, 1, "the close button dismisses the notice");
+  const dismiss = container.querySelector("[aria-label='Dismiss notice']") as HTMLElement;
+  fireEvent.click(dismiss);
+  assert.ok(toast.classList.contains("pop-out"), "the exit animation plays first");
+  assert.equal(closed, 0, "the parent is not told until it has played");
+  fireEvent.click(dismiss);
+  vi.advanceTimersByTime(150);
+  assert.equal(closed, 1, "the close button dismisses the notice, once");
 });
 
 test("a Toast with an icon stays until dismissed", () => {
@@ -53,7 +59,7 @@ test("Toast dismisses itself after six seconds", () => {
   );
   vi.advanceTimersByTime(5999);
   assert.equal(closed, 0, "it stays up for the read");
-  vi.advanceTimersByTime(1);
-  assert.equal(closed, 1, "the timer closes it at six seconds");
+  vi.advanceTimersByTime(1 + 150);
+  assert.equal(closed, 1, "the timer closes it at six seconds, after the exit");
   unmount();
 });

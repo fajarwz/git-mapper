@@ -1,5 +1,6 @@
 import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
+import { useExit } from "../hooks/useExit";
 import { PANEL } from "../lib/ui";
 
 interface ConfirmDialogProps {
@@ -24,6 +25,8 @@ export function ConfirmDialog({ title, body, confirmLabel, danger = false, onCon
   const dialogRef = useRef<HTMLDivElement>(null);
   const closeRef = useRef<HTMLButtonElement>(null);
   const returnFocusRef = useRef<HTMLElement | null>(null);
+  // Only dismissing fades out; confirming closes at once because the action runs right away.
+  const { leaving, close } = useExit(onClose);
 
   // Focus moves to Cancel (the safe answer) and hands back to the trigger on close.
   useEffect(() => {
@@ -36,20 +39,20 @@ export function ConfirmDialog({ title, body, confirmLabel, danger = false, onCon
     function handleKeyDown(event: globalThis.KeyboardEvent) {
       if (event.key !== "Escape") return;
       event.preventDefault();
-      onClose();
+      close();
     }
     document.addEventListener("keydown", handleKeyDown);
     return () => document.removeEventListener("keydown", handleKeyDown);
-  }, [onClose]);
+  }, [close]);
 
   // Portaled to <body>: `fixed` would otherwise be trapped by the nearest glass ancestor
   // (backdrop-filter makes it the containing block), and the discard confirm rendered inside
   // the staging rail scrolled its scrim down to the rail alone instead of the window.
   return createPortal(
     <div
-      className="fixed inset-0 z-40 grid place-items-center bg-scrim p-6 backdrop-blur-md"
+      className={`fixed inset-0 z-40 grid place-items-center bg-scrim p-6 backdrop-blur-md ${leaving ? "fade-out" : ""}`}
       onMouseDown={(event) => {
-        if (event.target === event.currentTarget) onClose();
+        if (event.target === event.currentTarget) close();
       }}
     >
       <div
@@ -57,7 +60,7 @@ export function ConfirmDialog({ title, body, confirmLabel, danger = false, onCon
         role="dialog"
         aria-modal="true"
         aria-labelledby="confirm-title"
-        className={`${PANEL} w-full max-w-md p-5`}
+        className={`${PANEL} w-full max-w-md p-5 ${leaving ? "pop-out" : "pop-in"}`}
       >
         <h2 id="confirm-title" className="m-0 text-[16px] font-bold tracking-tight text-ink">
           {title}
@@ -69,7 +72,7 @@ export function ConfirmDialog({ title, body, confirmLabel, danger = false, onCon
           <button
             ref={closeRef}
             type="button"
-            onClick={onClose}
+            onClick={close}
             className="rounded-lg border border-hairline bg-glass-strong px-3 py-1.5 text-[12px] font-semibold text-ink hover:bg-hover-glass"
           >
             Cancel
