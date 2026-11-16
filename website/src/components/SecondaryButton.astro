@@ -1,0 +1,21 @@
+---
+interface Props {
+  href: string;
+  external?: boolean;
+  size?: "sm" | "md";
+}
+const { href, external = false, size = "md" } = Astro.props;
+const sizes = {
+  sm: "rounded-lg px-4 py-2 text-xs",
+  md: "rounded-lg px-5 py-2.5 text-sm",
+};
+---
+
+<a
+  href={href}
+  target={external ? "_blank" : undefined}
+  rel={external ? "noopener noreferrer" : undefined}
+  class:list={["shrink-0 border border-hairline bg-glass-strong text-center font-semibold text-ink backdrop-blur-md transition-colors hover:bg-hover-glass", sizes[size]]}
+>
+  <slot />
+</a>
