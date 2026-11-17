@@ -189,7 +189,12 @@ and the README's Tests badge points at it.
   menu's Refresh retries). State is a drawn glyph (open / draft / merged / closed, `PullRequestStateIcon`)
   plus a tone from `pullRequestTone.ts`, never colour alone; only open speaks in colour, finished
   states stay neutral or violet so a long All list is not a rainbow. The pill chip is a
-  surface-coloured capsule so it reads on any lane hue, filled pill included. **A squash or rebase
+  surface-coloured capsule so it reads on any lane hue, filled pill included. Every option here is
+  an enum (see Coding standards): `PullScope`, `PullRequestsStatus`, `PullRequestProvider`,
+  `PullRequestState`, `ChecksState`, `ReviewState` in `types.ts`, mirrored in Rust as `Scope`,
+  `Status`, `Provider` with serde — a Rust test pins each wire spelling, so a rename on one side
+  breaks the build — and GitHub's and GitLab's own spellings (`GitHubRollup`, `GitLabPipeline`, …)
+  live beside the parsers that read them. **A squash or rebase
   merge leaves no trace of the branch in history**, so a commit on main finds its request by the hash
   the merge made (`mergeCommit`, from both providers) — and, for requests not loaded, by the number its
   own message names (`(#14)`, `Merge pull request #14`, GitLab's `See merge request g/p!7`), linked
