@@ -89,6 +89,7 @@ const PULL: PullRequest = {
   checks: "passing",
   review: null,
   fromFork: false,
+  mergeCommit: null,
 };
 
 test("RefPill: a PR chip opens the PR without selecting the row or checking the branch out", () => {

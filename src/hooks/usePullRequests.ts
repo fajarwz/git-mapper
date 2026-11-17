@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadPullRequests } from "../data/gitLoader";
-import { pullRequestsByBranch } from "../lib/pullRequests";
+import { commitChip, pullLinkBase, pullRequestsByBranch, pullRequestsByCommit } from "../lib/pullRequests";
 import type { PullRequest, PullRequestProvider, PullRequestsStatus, PullScope, Repository } from "../types";
 
 /** A window focus re-reads at most this often: merged/CI state moves on the server, not in refs. */
@@ -182,6 +182,18 @@ export function usePullRequests(repo: Repository | null) {
     () => pullRequestsByBranch(SCOPES.flatMap((scope) => entry.feeds[scope].pulls)),
     [entry.feeds],
   );
+  // A commit finds its request by the hash a merge made, from every list read so far (a search's
+  // too), or by the number its message names; the link base comes off any loaded request.
+  const everyLoaded = useMemo(
+    () => SCOPES.flatMap((scope) => [...entry.feeds[scope].pulls, ...entry.found[scope].pulls]),
+    [entry.feeds, entry.found],
+  );
+  const byCommit = useMemo(() => pullRequestsByCommit(everyLoaded), [everyLoaded]);
+  const link = useMemo(() => pullLinkBase(everyLoaded), [everyLoaded]);
+  const chipFor = useCallback(
+    (commit: { hash: string; subject: string; body?: string }) => commitChip(commit, byCommit, link),
+    [byCommit, link],
+  );
   const view = entry.query === "" ? entry.feeds : entry.found;
   const loading = SCOPES.some((scope) => entry.feeds[scope].loading || entry.found[scope].loading);
 
@@ -230,6 +242,8 @@ export function usePullRequests(repo: Repository | null) {
     /** The plain lists, whatever is searched: the button's count comes from Open here. */
     feeds: entry.feeds,
     byBranch,
+    /** The chip for a commit row: its merge's request, else the one its message names. */
+    commitChip: chipFor,
     reload,
     loadMore,
     show,

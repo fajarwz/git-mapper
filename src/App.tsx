@@ -1302,6 +1302,7 @@ function App() {
               showAvatars={showAvatars}
               onNearBottom={handleNearBottom}
               pullsByBranch={pulls.byBranch}
+              commitChip={pulls.commitChip}
               onCheckoutBranch={handleCheckoutBranch}
               onContextMenu={(commit, ref, x, y) => {
                 // The uncommitted row owns no menu (empty pseudo hash, no refs): a right-click
@@ -1338,6 +1339,7 @@ function App() {
                 syntaxScheme={syntaxScheme}
                 showAvatars={showAvatars}
                 pullsByBranch={pulls.byBranch}
+                commitChip={pulls.commitChip}
                 onCheckoutBranch={handleCheckoutBranch}
                 onRefContextMenu={(ref, x, y) => {
                   // The wip row never reaches here (no sidebar), so no empty-menu guard needed.

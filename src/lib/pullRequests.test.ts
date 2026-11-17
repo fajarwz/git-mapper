@@ -2,9 +2,14 @@ import { describe, expect, it } from "vitest";
 import type { PullRequest } from "../types";
 import {
   PR_PAGE_SIZE,
+  commitChip,
   parsePullRequestPage,
+  pullLinkBase,
+  pullLinkUrl,
   pullRequestForRef,
   pullRequestsByBranch,
+  pullRequestsByCommit,
+  requestNamedInCommit,
   summarizePipeline,
   summarizeRollup,
 } from "./pullRequests";
@@ -24,6 +29,7 @@ function pr(over: Partial<PullRequest>): PullRequest {
     checks: "none",
     review: null,
     fromFork: false,
+    mergeCommit: null,
     ...over,
   };
 }
@@ -188,6 +194,7 @@ describe("GitLab merge requests", () => {
       checks: "pending",
       review: "required",
       fromFork: false,
+      mergeCommit: null,
     });
     expect(draft).toMatchObject({ state: "draft", author: "", fromFork: true, checks: "none", review: null });
     expect(merged).toMatchObject({ state: "merged", checks: "passing" });
@@ -247,5 +254,71 @@ describe("GitHub search pages", () => {
     expect(page.pullRequests[0].state).toBe("merged");
     expect(page.total).toBe(322);
     expect(page.nextCursor).toBe("Y3Vyc29yOjMw");
+  });
+});
+
+describe("the commit a request made", () => {
+  const merged = (over: Partial<PullRequest>) =>
+    pr({ state: "merged", number: 14, title: "Add chips", url: "https://github.com/o/r/pull/14", mergeCommit: "a".repeat(40), ...over });
+
+  it("reads the merge commit from either provider, preferring GitLab's squash commit", () => {
+    const github = parsePullRequestPage("github", githubPage([node({ state: "MERGED", mergeCommit: { oid: "abc123" } }), node({})]), null);
+    expect(github.pullRequests.map((item) => item.mergeCommit)).toEqual(["abc123", null]);
+
+    const gitlab = parsePullRequestPage(
+      "gitlab",
+      JSON.stringify([
+        { iid: 1, title: "t", state: "merged", source_branch: "b", target_branch: "main", web_url: "u", updated_at: "x", merge_commit_sha: "m1", squash_commit_sha: "s1" },
+        { iid: 2, title: "t", state: "merged", source_branch: "b", target_branch: "main", web_url: "u", updated_at: "x", merge_commit_sha: "m2", squash_commit_sha: null },
+        { iid: 3, title: "t", state: "opened", source_branch: "b", target_branch: "main", web_url: "u", updated_at: "x" },
+      ]),
+      null,
+    );
+    expect(gitlab.pullRequests.map((item) => item.mergeCommit)).toEqual(["s1", "m2", null]);
+  });
+
+  it("indexes merged requests by the commit they made", () => {
+    const byCommit = pullRequestsByCommit([merged({}), pr({ number: 2 })]);
+    expect([...byCommit.keys()]).toEqual(["a".repeat(40)]);
+    expect(byCommit.get("a".repeat(40))?.number).toBe(14);
+  });
+
+  it("reads the request a commit's own text names", () => {
+    expect(requestNamedInCommit("feat: add chips (#14)")).toEqual({ provider: "github", number: 14 });
+    expect(requestNamedInCommit("Merge pull request #7 from o/branch")).toEqual({ provider: "github", number: 7 });
+    expect(requestNamedInCommit("Merge branch 'x' into 'main'", "\nSee merge request g/p!21\n")).toEqual({ provider: "gitlab", number: 21 });
+    expect(requestNamedInCommit("fix (#14) typo in the middle, not a squash suffix")).toBeNull();
+    expect(requestNamedInCommit("just a commit")).toBeNull();
+  });
+
+  it("builds a link from any loaded request's address, for either provider", () => {
+    expect(pullLinkBase([pr({ url: "https://github.com/o/r/pull/9" })])).toEqual({ provider: "github", base: "https://github.com/o/r" });
+    const gitlab = pullLinkBase([pr({ provider: "gitlab", url: "https://gitlab.com/g/p/-/merge_requests/3" })]);
+    expect(gitlab).toEqual({ provider: "gitlab", base: "https://gitlab.com/g/p" });
+    expect(pullLinkUrl(gitlab!, 21)).toBe("https://gitlab.com/g/p/-/merge_requests/21");
+    expect(pullLinkUrl({ provider: "github", base: "https://github.com/o/r" }, 14)).toBe("https://github.com/o/r/pull/14");
+    expect(pullLinkBase([pr({ url: "u" })])).toBeNull();
+  });
+
+  it("chips a commit by the exact request first, then by the number its message names", () => {
+    const hash = "a".repeat(40);
+    const byCommit = pullRequestsByCommit([merged({})]);
+    const link = { provider: "github" as const, base: "https://github.com/o/r" };
+
+    const exact = commitChip({ hash, subject: "no number here" }, byCommit, link);
+    expect(exact).toMatchObject({ number: 14, state: "merged", url: "https://github.com/o/r/pull/14" });
+    expect(exact?.tooltip).toContain("Add chips");
+
+    const named = commitChip({ hash: "b".repeat(40), subject: "older work (#9)" }, byCommit, link);
+    expect(named).toMatchObject({ number: 9, state: null, url: "https://github.com/o/r/pull/9" });
+    expect(named?.tooltip).toContain("named in this commit's message");
+  });
+
+  it("chips nothing it cannot link: no known address, another provider, or no number", () => {
+    const none = new Map<string, PullRequest>();
+    const link = { provider: "github" as const, base: "https://github.com/o/r" };
+    expect(commitChip({ hash: "c", subject: "x (#9)" }, none, null)).toBeNull();
+    expect(commitChip({ hash: "c", subject: "x", body: "See merge request g/p!3" }, none, link)).toBeNull();
+    expect(commitChip({ hash: "c", subject: "plain" }, none, link)).toBeNull();
   });
 });

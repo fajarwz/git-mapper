@@ -34,7 +34,7 @@ export function compactCount(count: number): string {
 export const PROVIDER_NAME: Record<PullRequestProvider, string> = { github: "GitHub", gitlab: "GitLab" };
 
 /** GitHub writes `#13`, GitLab writes `!13` (`#` is its issue prefix). */
-export function pullRequestLabel(pull: PullRequest): string {
+export function pullRequestLabel(pull: Pick<PullRequest, "provider" | "number">): string {
   return `${pull.provider === "gitlab" ? "!" : "#"}${pull.number}`;
 }
 

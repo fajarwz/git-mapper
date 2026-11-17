@@ -101,3 +101,31 @@ test("hiding a column keeps the others' saved order", () => {
   );
   assert.deepEqual(ids, ["date", "message", "hash"]);
 });
+
+test("a row shows the request chip its commit came from, and a plain row shows none", () => {
+  const withChip = render(
+    <CommitList
+      repo={repo}
+      commits={repo.commits}
+      query=""
+      selectedHash=""
+      flashHashes={new Set()}
+      onSelect={() => {}}
+      loadingMore={false}
+      showAvatars={false}
+      onNearBottom={() => {}}
+      onCheckoutBranch={() => {}}
+      commitChip={(row) =>
+        row.hash === commit.hash
+          ? { provider: "github", number: 14, url: "u", state: "merged", tooltip: "t", ariaLabel: "Pull request #14" }
+          : null
+      }
+    />,
+  );
+  const chip = withChip.container.querySelector("[data-pr-badge]") as HTMLElement;
+  assert.equal(chip.textContent, "#14");
+  cleanup();
+
+  const plain = renderList();
+  assert.equal(plain.container.querySelector("[data-pr-badge]"), null);
+});

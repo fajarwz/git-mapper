@@ -23,6 +23,7 @@ const pull = (number: number, over: Partial<PullRequest> = {}): PullRequest => (
   checks: "none",
   review: null,
   fromFork: false,
+  mergeCommit: null,
   ...over,
 });
 

@@ -86,6 +86,12 @@ export interface PullRequest {
   review: "approved" | "changes" | "required" | null;
   /** From a fork: its head branch name says nothing about a local branch of the same name. */
   fromFork: boolean;
+  /**
+   * Full hash of the commit this request made on its base branch once merged. A squash or rebase
+   * merge leaves no trace of the branch in history, so this is the only exact link back; null
+   * while open, or when the provider does not say.
+   */
+  mergeCommit: string | null;
 }
 
 /** Why there may be no list: each non-ok state has its own explanation in the UI. */
