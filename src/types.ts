@@ -62,13 +62,36 @@ export interface Commit {
 }
 
 /** `draft` is an open PR marked as a draft. */
-export type PullRequestState = "open" | "draft" | "merged" | "closed";
-export type ChecksState = "passing" | "failing" | "pending" | "none";
+export enum PullRequestState {
+  Open = "open",
+  Draft = "draft",
+  Merged = "merged",
+  Closed = "closed",
+}
+export enum ChecksState {
+  Passing = "passing",
+  Failing = "failing",
+  Pending = "pending",
+  None = "none",
+}
 
-export type PullRequestProvider = "github" | "gitlab";
+export enum ReviewState {
+  Approved = "approved",
+  Changes = "changes",
+  Required = "required",
+}
+
+export enum PullRequestProvider {
+  GitHub = "github",
+  GitLab = "gitlab",
+}
 
 /** Which slice of a repo's requests a list shows: open (drafts included), merged, or every state. */
-export type PullScope = "open" | "merged" | "all";
+export enum PullScope {
+  Open = "open",
+  Merged = "merged",
+  All = "all",
+}
 
 /** Provider-neutral: the gh adapter (GitHub) and the glab adapter (GitLab) both fill it. */
 export interface PullRequest {
@@ -83,7 +106,7 @@ export interface PullRequest {
   url: string;
   updatedAt: string;
   checks: ChecksState;
-  review: "approved" | "changes" | "required" | null;
+  review: ReviewState | null;
   /** From a fork: its head branch name says nothing about a local branch of the same name. */
   fromFork: boolean;
   /**
@@ -95,7 +118,12 @@ export interface PullRequest {
 }
 
 /** Why there may be no list: each non-ok state has its own explanation in the UI. */
-export type PullRequestsStatus = "ok" | "cli-missing" | "cli-unauthenticated" | "unsupported-remote";
+export enum PullRequestsStatus {
+  Ok = "ok",
+  CliMissing = "cli-missing",
+  CliUnauthenticated = "cli-unauthenticated",
+  UnsupportedRemote = "unsupported-remote",
+}
 
 /** `moved`: checked out at a commit other than the one the parent records. */
 export type SubmoduleState = "ok" | "moved" | "uninitialized" | "conflict";

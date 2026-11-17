@@ -7,6 +7,7 @@ import { afterEach, beforeEach, test } from "vitest";
 import { CommitList } from "./CommitList";
 import { STORAGE_KEYS } from "../lib/persisted";
 import type { Commit, Repository } from "../types";
+import { PullRequestProvider, PullRequestState } from "../types";
 
 beforeEach(() => {
   localStorage.clear();
@@ -117,7 +118,7 @@ test("a row shows the request chip its commit came from, and a plain row shows n
       onCheckoutBranch={() => {}}
       commitChip={(row) =>
         row.hash === commit.hash
-          ? { provider: "github", number: 14, url: "u", state: "merged", tooltip: "t", ariaLabel: "Pull request #14" }
+          ? { provider: PullRequestProvider.GitHub, number: 14, url: "u", state: PullRequestState.Merged, tooltip: "t", ariaLabel: "Pull request #14" }
           : null
       }
     />,

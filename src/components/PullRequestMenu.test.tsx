@@ -7,7 +7,8 @@ import { afterEach, test, vi } from "vitest";
 import { PullRequestMenu } from "./PullRequestMenu";
 import { openExternal } from "../lib/external";
 import type { Feed, PullRequestsView } from "../hooks/usePullRequests";
-import type { PullRequest, PullScope } from "../types";
+import type { PullRequest } from "../types";
+import { ChecksState, PullRequestProvider, PullRequestState, PullRequestsStatus, PullScope, ReviewState } from "../types";
 
 vi.mock("../lib/external", () => ({ openExternal: vi.fn() }));
 
@@ -17,16 +18,16 @@ afterEach(() => {
 });
 
 const pull = (over: Partial<PullRequest>): PullRequest => ({
-  provider: "github",
+  provider: PullRequestProvider.GitHub,
   number: 1,
   title: "First",
-  state: "open",
+  state: PullRequestState.Open,
   author: "a",
   headBranch: "feat/x",
   baseBranch: "main",
   url: "https://github.com/o/r/pull/1",
   updatedAt: "2026-11-16T01:56:09Z",
-  checks: "passing",
+  checks: ChecksState.Passing,
   review: null,
   fromFork: false,
   mergeCommit: null,
@@ -63,8 +64,8 @@ const view = (
     ...(all ? { all } : {}),
   });
   return {
-    status: "ok",
-    provider: "github",
+    status: PullRequestsStatus.Ok,
+    provider: PullRequestProvider.GitHub,
     error: null,
     loading: false,
     query: "",
@@ -75,6 +76,7 @@ const view = (
     loadMore: vi.fn(),
     show: vi.fn(),
     setQuery: vi.fn(),
+    commitChip: vi.fn(() => null),
     ...rest,
   };
 };
@@ -85,13 +87,13 @@ const openMenu = (container: HTMLElement) =>
 const many = (count: number) => Array.from({ length: count }, (_, index) => pull({ number: index + 1, title: `PR ${index + 1}` }));
 
 test("counts the open requests on the button and lists only those until All is chosen", () => {
-  const live = [pull({ number: 1, title: "First" }), pull({ number: 2, title: "Draft one", state: "draft" })];
+  const live = [pull({ number: 1, title: "First" }), pull({ number: 2, title: "Draft one", state: PullRequestState.Draft })];
   const show = vi.fn();
   const { container } = render(
     <PullRequestMenu
       pulls={view({
         open: feed(live),
-        all: feed([...live, pull({ number: 3, title: "Shipped", state: "merged" })]),
+        all: feed([...live, pull({ number: 3, title: "Shipped", state: PullRequestState.Merged })]),
         show,
       })}
     />,
@@ -104,7 +106,7 @@ test("counts the open requests on the button and lists only those until All is c
   assert.equal(screen.queryByText("Shipped"), null, "merged PRs wait behind All");
 
   fireEvent.click(screen.getByRole("button", { name: /^All/ }));
-  assert.ok(show.mock.calls.some((call) => call[0] === "all"), "choosing All asks for its first page");
+  assert.ok(show.mock.calls.some((call) => call[0] === PullScope.All), "choosing All asks for its first page");
   assert.ok(screen.getByText("Shipped"));
 });
 
@@ -121,7 +123,7 @@ test("the count is the provider's total, not what has loaded so far", () => {
 
 test("without a total, a full page reads as 'at least' with a plus", () => {
   const { container } = render(
-    <PullRequestMenu pulls={view({ provider: "gitlab", open: feed(many(30), { cursor: "2" }) })} />,
+    <PullRequestMenu pulls={view({ provider: PullRequestProvider.GitLab, open: feed(many(30), { cursor: "2" }) })} />,
   );
   openMenu(container);
   assert.match(within(screen.getByRole("group", { name: /^Filter/ })).getByRole("button", { name: /^Open/ }).textContent ?? "", /30\+/);
@@ -136,40 +138,40 @@ test("a row opens its PR in the browser", () => {
 
 test("explains a missing or signed-out CLI in place and offers a refresh", () => {
   const reload = vi.fn();
-  const { container, rerender } = render(<PullRequestMenu pulls={view({ status: "cli-missing", reload })} />);
+  const { container, rerender } = render(<PullRequestMenu pulls={view({ status: PullRequestsStatus.CliMissing, reload })} />);
   openMenu(container);
   assert.ok(screen.getByText(/not installed/));
   fireEvent.click(screen.getByLabelText("Refresh"));
   assert.equal(reload.mock.calls.length, 1);
 
-  rerender(<PullRequestMenu pulls={view({ status: "cli-unauthenticated", reload })} />);
+  rerender(<PullRequestMenu pulls={view({ status: PullRequestsStatus.CliUnauthenticated, reload })} />);
   assert.ok(screen.getByText(/not signed in/));
 });
 
 test("a GitLab repo says merge requests, writes !n and points at glab", () => {
-  const gitlab = pull({ provider: "gitlab", number: 7, title: "Add runner", url: "https://gitlab.com/g/p/-/merge_requests/7" });
+  const gitlab = pull({ provider: PullRequestProvider.GitLab, number: 7, title: "Add runner", url: "https://gitlab.com/g/p/-/merge_requests/7" });
   const { container, rerender } = render(
-    <PullRequestMenu pulls={view({ provider: "gitlab", open: feed([gitlab]) })} />,
+    <PullRequestMenu pulls={view({ provider: PullRequestProvider.GitLab, open: feed([gitlab]) })} />,
   );
   assert.equal(container.querySelector("[data-pr-menu]")?.getAttribute("aria-label"), "Merge requests");
   openMenu(container);
   assert.ok(screen.getByText("!7"));
   assert.equal(document.querySelector("[data-pr-row]")?.getAttribute("title"), "Open on GitLab");
 
-  rerender(<PullRequestMenu pulls={view({ provider: "gitlab", status: "cli-missing" })} />);
+  rerender(<PullRequestMenu pulls={view({ provider: PullRequestProvider.GitLab, status: PullRequestsStatus.CliMissing })} />);
   assert.ok(screen.getByText(/GitLab CLI, which is not installed/));
-  rerender(<PullRequestMenu pulls={view({ provider: "gitlab", status: "cli-unauthenticated" })} />);
+  rerender(<PullRequestMenu pulls={view({ provider: PullRequestProvider.GitLab, status: PullRequestsStatus.CliUnauthenticated })} />);
   assert.ok(screen.getByText(/glab auth login/));
 });
 
 test("with no known provider, a missing CLI names both options", () => {
-  const { container } = render(<PullRequestMenu pulls={view({ provider: null, status: "cli-missing" })} />);
+  const { container } = render(<PullRequestMenu pulls={view({ provider: null, status: PullRequestsStatus.CliMissing })} />);
   openMenu(container);
   assert.ok(screen.getByText(/neither is installed/));
 });
 
 test("a repo with no GitHub or GitLab remote shows no button at all", () => {
-  const { container } = render(<PullRequestMenu pulls={view({ status: "unsupported-remote" })} />);
+  const { container } = render(<PullRequestMenu pulls={view({ status: PullRequestsStatus.UnsupportedRemote })} />);
   assert.equal(container.querySelector("[data-pr-menu]"), null);
 });
 
@@ -183,10 +185,10 @@ test("Escape closes the popover", () => {
 
 test("a row shows its checks and review as labelled chips, and none when it has neither", () => {
   const pulls = [
-    pull({ number: 1, title: "Green", checks: "passing", review: "approved" }),
-    pull({ number: 2, title: "Red", checks: "failing", review: "changes" }),
-    pull({ number: 3, title: "Running", checks: "pending", review: "required" }),
-    pull({ number: 4, title: "Bare", checks: "none", review: null }),
+    pull({ number: 1, title: "Green", checks: ChecksState.Passing, review: ReviewState.Approved }),
+    pull({ number: 2, title: "Red", checks: ChecksState.Failing, review: ReviewState.Changes }),
+    pull({ number: 3, title: "Running", checks: ChecksState.Pending, review: ReviewState.Required }),
+    pull({ number: 4, title: "Bare", checks: ChecksState.None, review: null }),
   ];
   const { container } = render(<PullRequestMenu pulls={view({ open: feed(pulls) })} />);
   openMenu(container);
@@ -203,10 +205,10 @@ test("a row shows its checks and review as labelled chips, and none when it has 
 
 test("a state is a labelled glyph, not just a colour", () => {
   const pulls = [
-    pull({ number: 1, state: "open" }),
-    pull({ number: 2, state: "draft" }),
-    pull({ number: 3, state: "merged" }),
-    pull({ number: 4, state: "closed" }),
+    pull({ number: 1, state: PullRequestState.Open }),
+    pull({ number: 2, state: PullRequestState.Draft }),
+    pull({ number: 3, state: PullRequestState.Merged }),
+    pull({ number: 4, state: PullRequestState.Closed }),
   ];
   const { container } = render(<PullRequestMenu pulls={view({ all: feed(pulls) })} />);
   openMenu(container);
@@ -239,7 +241,7 @@ test("without an observer, a waiting page is one click away", () => {
   );
   openMenu(container);
   fireEvent.click(screen.getByRole("button", { name: "Load more" }));
-  assert.deepEqual(loadMore.mock.calls, [["open"]]);
+  assert.deepEqual(loadMore.mock.calls, [[PullScope.Open]]);
 });
 
 test("with an observer, reaching the end of the list loads the next page by itself", () => {
@@ -264,7 +266,7 @@ test("with an observer, reaching the end of the list loads the next page by itse
   act(() => reached?.([{ isIntersecting: false }]));
   assert.equal(loadMore.mock.calls.length, 0, "an off-screen sentinel loads nothing");
   act(() => reached?.([{ isIntersecting: true }]));
-  assert.deepEqual(loadMore.mock.calls, [["open"]]);
+  assert.deepEqual(loadMore.mock.calls, [[PullScope.Open]]);
 });
 
 test("a page in flight shows a skeleton row and offers no second request", () => {
@@ -286,7 +288,7 @@ test("a failed page keeps the rows and offers a retry", () => {
   assert.equal(document.querySelectorAll("[data-pr-row]").length, 30);
   assert.ok(screen.getByText(/Could not load more pull requests: HTTP 502/));
   fireEvent.click(screen.getByRole("button", { name: "Retry" }));
-  assert.deepEqual(loadMore.mock.calls, [["open"]]);
+  assert.deepEqual(loadMore.mock.calls, [[PullScope.Open]]);
 });
 
 test("the end of a multi-page list says so; a one-page list stays quiet", () => {
@@ -302,14 +304,14 @@ const tab = (name: RegExp) => within(screen.getByRole("group", { name: /^Filter/
 
 test("a Merged tab lists the merged requests and reads them the first time it is chosen", () => {
   const show = vi.fn();
-  const merged = feed([pull({ number: 9, title: "Shipped", state: "merged" })], { total: 322 });
+  const merged = feed([pull({ number: 9, title: "Shipped", state: PullRequestState.Merged })], { total: 322 });
   const { container } = render(<PullRequestMenu pulls={view({ open: feed([pull({})]), merged, show })} />);
   openMenu(container);
   assert.equal(screen.queryByText("Shipped"), null, "Open does not list merged ones");
   fireEvent.click(tab(/^Merged/));
   assert.ok(screen.getByText("Shipped"));
   assert.match(tab(/^Merged/).textContent ?? "", /322/);
-  assert.ok(show.mock.calls.some((call) => call[0] === "merged"));
+  assert.ok(show.mock.calls.some((call) => call[0] === PullScope.Merged));
 });
 
 test("an empty Merged tab says nothing has been merged", () => {
@@ -324,18 +326,18 @@ test("a selected tab reads itself on a repo whose list was never loaded", () => 
   const { container, rerender } = render(<PullRequestMenu pulls={view({ show: first })} />);
   openMenu(container);
   fireEvent.click(tab(/^All/));
-  assert.ok(first.mock.calls.some((call) => call[0] === "all"));
+  assert.ok(first.mock.calls.some((call) => call[0] === PullScope.All));
 
   // Another repo: a new `show`, lists nobody has asked for, and the tab still on All.
   const second = vi.fn();
   rerender(<PullRequestMenu pulls={view({ show: second })} />);
-  assert.ok(second.mock.calls.some((call) => call[0] === "all"), "no click needed: the selected tab asks for its list");
+  assert.ok(second.mock.calls.some((call) => call[0] === PullScope.All), "no click needed: the selected tab asks for its list");
   assert.ok(screen.getByRole("status"), "and shows the skeleton only while that read is out");
 });
 
 test("a selected tab does not ask for a list while the CLI cannot answer", () => {
   const show = vi.fn();
-  const { container } = render(<PullRequestMenu pulls={view({ status: "cli-missing", show })} />);
+  const { container } = render(<PullRequestMenu pulls={view({ status: PullRequestsStatus.CliMissing, show })} />);
   openMenu(container);
   assert.equal(show.mock.calls.length, 0);
 });
@@ -410,7 +412,7 @@ test("a search shows its own results, counts and an empty state that names the t
 });
 
 test("there is no search box until the CLI has answered", () => {
-  const { container } = render(<PullRequestMenu pulls={view({ status: "cli-missing" })} />);
+  const { container } = render(<PullRequestMenu pulls={view({ status: PullRequestsStatus.CliMissing })} />);
   openMenu(container);
   assert.equal(screen.queryByLabelText("Search pull requests"), null);
 });

@@ -1,7 +1,13 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadPullRequests } from "../data/gitLoader";
 import { commitChip, pullLinkBase, pullRequestsByBranch, pullRequestsByCommit } from "../lib/pullRequests";
-import type { PullRequest, PullRequestProvider, PullRequestsStatus, PullScope, Repository } from "../types";
+import {
+  PullRequestsStatus,
+  PullScope,
+  type PullRequest,
+  type PullRequestProvider,
+  type Repository,
+} from "../types";
 
 /** A window focus re-reads at most this often: merged/CI state moves on the server, not in refs. */
 const FOCUS_REFRESH_MS = 60_000;
@@ -24,7 +30,11 @@ export interface Feed {
 }
 
 type Feeds = Record<PullScope, Feed>;
-type Target = "feeds" | "found";
+/** Which of an entry's two sets of lists a read belongs to; the values are the entry's keys. */
+enum Target {
+  Feeds = "feeds",
+  Found = "found",
+}
 
 interface Entry {
   /** null until the first read answers. */
@@ -32,11 +42,11 @@ interface Entry {
   provider: PullRequestProvider | null;
   error: string | null;
   /** The plain lists. Open is read on arrival; the others the first time they are shown. */
-  feeds: Feeds;
+  [Target.Feeds]: Feeds;
   /** The text being searched for; "" means the plain lists are on show. */
   query: string;
   /** Results of that search per scope, read on demand and dropped when the text changes. */
-  found: Feeds;
+  [Target.Found]: Feeds;
 }
 
 const EMPTY_FEED: Feed = {
@@ -48,9 +58,13 @@ const EMPTY_FEED: Feed = {
   loadingMore: false,
   moreError: null,
 };
-const EMPTY_FEEDS: Feeds = { open: EMPTY_FEED, merged: EMPTY_FEED, all: EMPTY_FEED };
+const EMPTY_FEEDS: Feeds = {
+  [PullScope.Open]: EMPTY_FEED,
+  [PullScope.Merged]: EMPTY_FEED,
+  [PullScope.All]: EMPTY_FEED,
+};
 const EMPTY: Entry = { status: null, provider: null, error: null, feeds: EMPTY_FEEDS, query: "", found: EMPTY_FEEDS };
-const SCOPES: PullScope[] = ["open", "merged", "all"];
+const SCOPES: PullScope[] = [PullScope.Open, PullScope.Merged, PullScope.All];
 
 function merge(older: PullRequest[], page: PullRequest[]): PullRequest[] {
   // Newest-first lists shift while someone scrolls: a PR opened meanwhile pushes the last row
@@ -97,8 +111,8 @@ export function usePullRequests(repo: Repository | null) {
   const run = useCallback(
     async (dir: string, scope: PullScope, more: boolean, target: Target) => {
       const entry = store.current[dir] ?? EMPTY;
-      const query = target === "found" ? entry.query : "";
-      if (target === "found" && query === "") return;
+      const query = target === Target.Found ? entry.query : "";
+      if (target === Target.Found && query === "") return;
       const feed = entry[target][scope];
       if (more && (feed.cursor === null || feed.loadingMore || feed.loading)) return;
       const key = `${dir}\0${target}\0${scope}\0${query}`;
@@ -106,7 +120,7 @@ export function usePullRequests(repo: Repository | null) {
       request.current[key] = id;
       patchFeed(dir, target, scope, more ? { loadingMore: true, moreError: null } : { loading: true, moreError: null });
       // An answer for text that has since changed is for a list nobody is looking at.
-      const current = () => request.current[key] === id && (target === "feeds" || store.current[dir]?.query === query);
+      const current = () => request.current[key] === id && (target === Target.Feeds || store.current[dir]?.query === query);
       try {
         const result = await loadPullRequests(dir, scope, more ? feed.cursor : null, entry.provider, query);
         if (!current()) return;
@@ -130,13 +144,13 @@ export function usePullRequests(repo: Repository | null) {
           };
         });
         // Only the plain Open list's first page speaks for whether automatic re-reads are worth it.
-        if (target === "feeds" && scope === "open" && !more) {
-          lastRead.current[dir] = { at: Date.now(), settled: result.status === "ok" };
+        if (target === Target.Feeds && scope === PullScope.Open && !more) {
+          lastRead.current[dir] = { at: Date.now(), settled: result.status === PullRequestsStatus.Ok };
         }
       } catch (readError) {
         if (!current()) return;
         const message = readError instanceof Error ? readError.message : String(readError);
-        if (target === "feeds" && scope === "open" && !more && !feed.loaded) {
+        if (target === Target.Feeds && scope === PullScope.Open && !more && !feed.loaded) {
           patchFeed(dir, target, scope, { loading: false }, { status: null, error: message });
           lastRead.current[dir] = { at: Date.now(), settled: true };
         } else {
@@ -151,10 +165,10 @@ export function usePullRequests(repo: Repository | null) {
   const refresh = useCallback(
     (dir: string) => {
       const entry = store.current[dir] ?? EMPTY;
-      void run(dir, "open", false, "feeds");
+      void run(dir, PullScope.Open, false, Target.Feeds);
       for (const scope of SCOPES) {
-        if (scope !== "open" && entry.feeds[scope].loaded) void run(dir, scope, false, "feeds");
-        if (entry.query !== "" && entry.found[scope].loaded) void run(dir, scope, false, "found");
+        if (scope !== PullScope.Open && entry.feeds[scope].loaded) void run(dir, scope, false, Target.Feeds);
+        if (entry.query !== "" && entry.found[scope].loaded) void run(dir, scope, false, Target.Found);
       }
     },
     [run],
@@ -197,7 +211,7 @@ export function usePullRequests(repo: Repository | null) {
   const view = entry.query === "" ? entry.feeds : entry.found;
   const loading = SCOPES.some((scope) => entry.feeds[scope].loading || entry.found[scope].loading);
 
-  const targetOf = (dir: string): Target => ((store.current[dir]?.query ?? "") === "" ? "feeds" : "found");
+  const targetOf = (dir: string): Target => ((store.current[dir]?.query ?? "") === "" ? Target.Feeds : Target.Found);
 
   const reload = useCallback(() => {
     if (path !== null) refresh(path);

@@ -14,19 +14,21 @@ import {
   summarizeRollup,
 } from "./pullRequests";
 import { compactCount, pullRequestLabel, requestNoun } from "./pullRequestTone";
+import { ChecksState, PullRequestProvider, PullRequestState, ReviewState } from "../types";
+import { GitHubReview, GitHubRollup, GitHubState, GitLabMergeStatus, GitLabPipeline, GitLabState } from "./pullRequests";
 
 function pr(over: Partial<PullRequest>): PullRequest {
   return {
-    provider: "github",
+    provider: PullRequestProvider.GitHub,
     number: 1,
     title: "t",
-    state: "open",
+    state: PullRequestState.Open,
     author: "a",
     headBranch: "feat/x",
     baseBranch: "main",
     url: "u",
     updatedAt: "2026-01-01T00:00:00Z",
-    checks: "none",
+    checks: ChecksState.None,
     review: null,
     fromFork: false,
     mergeCommit: null,
@@ -36,24 +38,24 @@ function pr(over: Partial<PullRequest>): PullRequest {
 
 describe("summarizeRollup", () => {
   it("reads GitHub's one-word rollup state", () => {
-    expect(summarizeRollup("SUCCESS")).toBe("passing");
-    expect(summarizeRollup("FAILURE")).toBe("failing");
-    expect(summarizeRollup("ERROR")).toBe("failing");
-    expect(summarizeRollup("PENDING")).toBe("pending");
-    expect(summarizeRollup("EXPECTED")).toBe("pending");
+    expect(summarizeRollup(GitHubRollup.Success)).toBe(ChecksState.Passing);
+    expect(summarizeRollup(GitHubRollup.Failure)).toBe(ChecksState.Failing);
+    expect(summarizeRollup(GitHubRollup.Error)).toBe(ChecksState.Failing);
+    expect(summarizeRollup(GitHubRollup.Pending)).toBe(ChecksState.Pending);
+    expect(summarizeRollup(GitHubRollup.Expected)).toBe(ChecksState.Pending);
   });
 
   it("reads a missing rollup (no checks on the head commit) as none", () => {
-    expect(summarizeRollup(undefined)).toBe("none");
-    expect(summarizeRollup(null)).toBe("none");
-    expect(summarizeRollup("SOMETHING_NEW")).toBe("none");
+    expect(summarizeRollup(undefined)).toBe(ChecksState.None);
+    expect(summarizeRollup(null)).toBe(ChecksState.None);
+    expect(summarizeRollup("SOMETHING_NEW")).toBe(ChecksState.None);
   });
 });
 
 const node = (over: Record<string, unknown>) => ({
   number: 1,
   title: "t",
-  state: "OPEN",
+  state: GitHubState.Open,
   isDraft: false,
   headRefName: "b",
   baseRefName: "main",
@@ -62,7 +64,7 @@ const node = (over: Record<string, unknown>) => ({
   updatedAt: "2026-01-01T00:00:00Z",
   reviewDecision: null,
   author: { login: "a" },
-  commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
+  commits: { nodes: [{ commit: { statusCheckRollup: { state: GitHubRollup.Success } } }] },
   ...over,
 });
 
@@ -75,28 +77,28 @@ const githubPage = (
 describe("GitHub pages", () => {
   it("maps GraphQL nodes onto the neutral shape", () => {
     const raw = githubPage([
-      node({ number: 13, title: "Add download", state: "MERGED", author: { login: "fajarwz" }, headRefName: "feat/nav" }),
+      node({ number: 13, title: "Add download", state: GitHubState.Merged, author: { login: "fajarwz" }, headRefName: "feat/nav" }),
       node({
         number: 14,
-        state: "OPEN",
+        state: GitHubState.Open,
         isDraft: true,
         author: null,
         isCrossRepository: true,
-        reviewDecision: "CHANGES_REQUESTED",
+        reviewDecision: GitHubReview.ChangesRequested,
         commits: { nodes: [] },
       }),
     ]);
     const [merged, draft] = parsePullRequestPage("github", raw, null).pullRequests;
     expect(merged).toMatchObject({
-      provider: "github",
+      provider: PullRequestProvider.GitHub,
       number: 13,
-      state: "merged",
+      state: PullRequestState.Merged,
       author: "fajarwz",
       headBranch: "feat/nav",
-      checks: "passing",
+      checks: ChecksState.Passing,
       review: null,
     });
-    expect(draft).toMatchObject({ state: "draft", author: "", review: "changes", fromFork: true, checks: "none" });
+    expect(draft).toMatchObject({ state: PullRequestState.Draft, author: "", review: ReviewState.Changes, fromFork: true, checks: ChecksState.None });
   });
 
   it("carries the cursor onward only while GitHub says there is another page", () => {
@@ -120,9 +122,9 @@ describe("GitHub pages", () => {
 describe("pullRequestsByBranch", () => {
   it("prefers a live PR over a finished one, then the newest", () => {
     const map = pullRequestsByBranch([
-      pr({ number: 5, state: "merged" }),
-      pr({ number: 9, state: "open" }),
-      pr({ number: 7, state: "open" }),
+      pr({ number: 5, state: PullRequestState.Merged }),
+      pr({ number: 9, state: PullRequestState.Open }),
+      pr({ number: 7, state: PullRequestState.Open }),
     ]);
     expect(map.get("feat/x")?.number).toBe(9);
   });
@@ -152,7 +154,7 @@ describe("GitLab merge requests", () => {
     {
       iid: 7,
       title: "Add runner",
-      state: "opened",
+      state: GitLabState.Opened,
       draft: false,
       author: { username: "fajarwz" },
       source_branch: "feat/runner",
@@ -161,13 +163,13 @@ describe("GitLab merge requests", () => {
       target_project_id: 10,
       web_url: "https://gitlab.com/g/p/-/merge_requests/7",
       updated_at: "2026-11-16T01:56:09Z",
-      head_pipeline: { status: "running" },
-      detailed_merge_status: "not_approved",
+      head_pipeline: { status: GitLabPipeline.Running },
+      detailed_merge_status: GitLabMergeStatus.NotApproved,
     },
     {
       iid: 8,
       title: "Draft: wip",
-      state: "opened",
+      state: GitLabState.Opened,
       work_in_progress: true,
       author: null,
       source_branch: "wip",
@@ -177,41 +179,41 @@ describe("GitLab merge requests", () => {
       web_url: "u8",
       updated_at: "2026-11-17T00:00:00Z",
     },
-    { iid: 9, title: "Done", state: "merged", source_branch: "a", target_branch: "main", web_url: "u9", updated_at: "x", pipeline: { status: "success" } },
-    { iid: 10, title: "Nope", state: "locked", source_branch: "b", target_branch: "main", web_url: "u10", updated_at: "x" },
+    { iid: 9, title: "Done", state: GitLabState.Merged, source_branch: "a", target_branch: "main", web_url: "u9", updated_at: "x", pipeline: { status: GitLabPipeline.Success } },
+    { iid: 10, title: "Nope", state: GitLabState.Locked, source_branch: "b", target_branch: "main", web_url: "u10", updated_at: "x" },
   ]);
 
   it("maps the API's fields onto the neutral shape, with iid as the number", () => {
     const [open, draft, merged, locked] = parsePullRequestPage("gitlab", raw, null).pullRequests;
     expect(open).toMatchObject({
-      provider: "gitlab",
+      provider: PullRequestProvider.GitLab,
       number: 7,
-      state: "open",
+      state: PullRequestState.Open,
       author: "fajarwz",
       headBranch: "feat/runner",
       baseBranch: "main",
       url: "https://gitlab.com/g/p/-/merge_requests/7",
-      checks: "pending",
-      review: "required",
+      checks: ChecksState.Pending,
+      review: ReviewState.Required,
       fromFork: false,
       mergeCommit: null,
     });
-    expect(draft).toMatchObject({ state: "draft", author: "", fromFork: true, checks: "none", review: null });
-    expect(merged).toMatchObject({ state: "merged", checks: "passing" });
-    expect(locked.state).toBe("closed");
+    expect(draft).toMatchObject({ state: PullRequestState.Draft, author: "", fromFork: true, checks: ChecksState.None, review: null });
+    expect(merged).toMatchObject({ state: PullRequestState.Merged, checks: ChecksState.Passing });
+    expect(locked.state).toBe(PullRequestState.Closed);
   });
 
   it("reads a pipeline status into a checks state", () => {
-    expect(summarizePipeline(undefined)).toBe("none");
-    expect(summarizePipeline("success")).toBe("passing");
-    expect(summarizePipeline("failed")).toBe("failing");
-    expect(summarizePipeline("canceled")).toBe("failing");
-    expect(summarizePipeline("running")).toBe("pending");
-    expect(summarizePipeline("skipped")).toBe("none");
+    expect(summarizePipeline(undefined)).toBe(ChecksState.None);
+    expect(summarizePipeline(GitLabPipeline.Success)).toBe(ChecksState.Passing);
+    expect(summarizePipeline(GitLabPipeline.Failed)).toBe(ChecksState.Failing);
+    expect(summarizePipeline(GitLabPipeline.Canceled)).toBe(ChecksState.Failing);
+    expect(summarizePipeline(GitLabPipeline.Running)).toBe(ChecksState.Pending);
+    expect(summarizePipeline(GitLabPipeline.Skipped)).toBe(ChecksState.None);
   });
 
   it("pages by number: a full page may have a successor, a short one is the last", () => {
-    const item = (iid: number) => ({ iid, title: "t", state: "opened", source_branch: "b", target_branch: "main", web_url: "u", updated_at: "x" });
+    const item = (iid: number) => ({ iid, title: "t", state: GitLabState.Opened, source_branch: "b", target_branch: "main", web_url: "u", updated_at: "x" });
     const full = JSON.stringify(Array.from({ length: PR_PAGE_SIZE }, (_, index) => item(index + 1)));
     expect(parsePullRequestPage("gitlab", full, null).nextCursor).toBe("2");
     expect(parsePullRequestPage("gitlab", full, "3").nextCursor).toBe("4");
@@ -220,8 +222,8 @@ describe("GitLab merge requests", () => {
   });
 
   it("writes !7 where GitHub writes #7, and says merge request", () => {
-    expect(pullRequestLabel(pr({ provider: "gitlab", number: 7 }))).toBe("!7");
-    expect(pullRequestLabel(pr({ provider: "github", number: 7 }))).toBe("#7");
+    expect(pullRequestLabel(pr({ provider: PullRequestProvider.GitLab, number: 7 }))).toBe("!7");
+    expect(pullRequestLabel(pr({ provider: PullRequestProvider.GitHub, number: 7 }))).toBe("#7");
     expect(requestNoun("gitlab", true)).toBe("Merge requests");
     expect(requestNoun(null)).toBe("Pull request");
   });
@@ -243,7 +245,7 @@ describe("GitHub search pages", () => {
       search: {
         issueCount: 322,
         pageInfo: { hasNextPage: true, endCursor: "Y3Vyc29yOjMw" },
-        nodes: [node({ number: 16456, state: "MERGED" }), {}],
+        nodes: [node({ number: 16456, state: GitHubState.Merged }), {}],
       },
     },
   });
@@ -251,7 +253,7 @@ describe("GitHub search pages", () => {
   it("reads the count from issueCount and ignores nodes that are not pull requests", () => {
     const page = parsePullRequestPage("github", search, null);
     expect(page.pullRequests.map((item) => item.number)).toEqual([16456]);
-    expect(page.pullRequests[0].state).toBe("merged");
+    expect(page.pullRequests[0].state).toBe(PullRequestState.Merged);
     expect(page.total).toBe(322);
     expect(page.nextCursor).toBe("Y3Vyc29yOjMw");
   });
@@ -259,18 +261,18 @@ describe("GitHub search pages", () => {
 
 describe("the commit a request made", () => {
   const merged = (over: Partial<PullRequest>) =>
-    pr({ state: "merged", number: 14, title: "Add chips", url: "https://github.com/o/r/pull/14", mergeCommit: "a".repeat(40), ...over });
+    pr({ state: PullRequestState.Merged, number: 14, title: "Add chips", url: "https://github.com/o/r/pull/14", mergeCommit: "a".repeat(40), ...over });
 
   it("reads the merge commit from either provider, preferring GitLab's squash commit", () => {
-    const github = parsePullRequestPage("github", githubPage([node({ state: "MERGED", mergeCommit: { oid: "abc123" } }), node({})]), null);
+    const github = parsePullRequestPage("github", githubPage([node({ state: GitHubState.Merged, mergeCommit: { oid: "abc123" } }), node({})]), null);
     expect(github.pullRequests.map((item) => item.mergeCommit)).toEqual(["abc123", null]);
 
     const gitlab = parsePullRequestPage(
       "gitlab",
       JSON.stringify([
-        { iid: 1, title: "t", state: "merged", source_branch: "b", target_branch: "main", web_url: "u", updated_at: "x", merge_commit_sha: "m1", squash_commit_sha: "s1" },
-        { iid: 2, title: "t", state: "merged", source_branch: "b", target_branch: "main", web_url: "u", updated_at: "x", merge_commit_sha: "m2", squash_commit_sha: null },
-        { iid: 3, title: "t", state: "opened", source_branch: "b", target_branch: "main", web_url: "u", updated_at: "x" },
+        { iid: 1, title: "t", state: GitLabState.Merged, source_branch: "b", target_branch: "main", web_url: "u", updated_at: "x", merge_commit_sha: "m1", squash_commit_sha: "s1" },
+        { iid: 2, title: "t", state: GitLabState.Merged, source_branch: "b", target_branch: "main", web_url: "u", updated_at: "x", merge_commit_sha: "m2", squash_commit_sha: null },
+        { iid: 3, title: "t", state: GitLabState.Opened, source_branch: "b", target_branch: "main", web_url: "u", updated_at: "x" },
       ]),
       null,
     );
@@ -284,29 +286,29 @@ describe("the commit a request made", () => {
   });
 
   it("reads the request a commit's own text names", () => {
-    expect(requestNamedInCommit("feat: add chips (#14)")).toEqual({ provider: "github", number: 14 });
-    expect(requestNamedInCommit("Merge pull request #7 from o/branch")).toEqual({ provider: "github", number: 7 });
-    expect(requestNamedInCommit("Merge branch 'x' into 'main'", "\nSee merge request g/p!21\n")).toEqual({ provider: "gitlab", number: 21 });
+    expect(requestNamedInCommit("feat: add chips (#14)")).toEqual({ provider: PullRequestProvider.GitHub, number: 14 });
+    expect(requestNamedInCommit("Merge pull request #7 from o/branch")).toEqual({ provider: PullRequestProvider.GitHub, number: 7 });
+    expect(requestNamedInCommit("Merge branch 'x' into 'main'", "\nSee merge request g/p!21\n")).toEqual({ provider: PullRequestProvider.GitLab, number: 21 });
     expect(requestNamedInCommit("fix (#14) typo in the middle, not a squash suffix")).toBeNull();
     expect(requestNamedInCommit("just a commit")).toBeNull();
   });
 
   it("builds a link from any loaded request's address, for either provider", () => {
-    expect(pullLinkBase([pr({ url: "https://github.com/o/r/pull/9" })])).toEqual({ provider: "github", base: "https://github.com/o/r" });
-    const gitlab = pullLinkBase([pr({ provider: "gitlab", url: "https://gitlab.com/g/p/-/merge_requests/3" })]);
-    expect(gitlab).toEqual({ provider: "gitlab", base: "https://gitlab.com/g/p" });
+    expect(pullLinkBase([pr({ url: "https://github.com/o/r/pull/9" })])).toEqual({ provider: PullRequestProvider.GitHub, base: "https://github.com/o/r" });
+    const gitlab = pullLinkBase([pr({ provider: PullRequestProvider.GitLab, url: "https://gitlab.com/g/p/-/merge_requests/3" })]);
+    expect(gitlab).toEqual({ provider: PullRequestProvider.GitLab, base: "https://gitlab.com/g/p" });
     expect(pullLinkUrl(gitlab!, 21)).toBe("https://gitlab.com/g/p/-/merge_requests/21");
-    expect(pullLinkUrl({ provider: "github", base: "https://github.com/o/r" }, 14)).toBe("https://github.com/o/r/pull/14");
+    expect(pullLinkUrl({ provider: PullRequestProvider.GitHub, base: "https://github.com/o/r" }, 14)).toBe("https://github.com/o/r/pull/14");
     expect(pullLinkBase([pr({ url: "u" })])).toBeNull();
   });
 
   it("chips a commit by the exact request first, then by the number its message names", () => {
     const hash = "a".repeat(40);
     const byCommit = pullRequestsByCommit([merged({})]);
-    const link = { provider: "github" as const, base: "https://github.com/o/r" };
+    const link = { provider: PullRequestProvider.GitHub as const, base: "https://github.com/o/r" };
 
     const exact = commitChip({ hash, subject: "no number here" }, byCommit, link);
-    expect(exact).toMatchObject({ number: 14, state: "merged", url: "https://github.com/o/r/pull/14" });
+    expect(exact).toMatchObject({ number: 14, state: PullRequestState.Merged, url: "https://github.com/o/r/pull/14" });
     expect(exact?.tooltip).toContain("Add chips");
 
     const named = commitChip({ hash: "b".repeat(40), subject: "older work (#9)" }, byCommit, link);
@@ -316,7 +318,7 @@ describe("the commit a request made", () => {
 
   it("chips nothing it cannot link: no known address, another provider, or no number", () => {
     const none = new Map<string, PullRequest>();
-    const link = { provider: "github" as const, base: "https://github.com/o/r" };
+    const link = { provider: PullRequestProvider.GitHub as const, base: "https://github.com/o/r" };
     expect(commitChip({ hash: "c", subject: "x (#9)" }, none, null)).toBeNull();
     expect(commitChip({ hash: "c", subject: "x", body: "See merge request g/p!3" }, none, link)).toBeNull();
     expect(commitChip({ hash: "c", subject: "plain" }, none, link)).toBeNull();

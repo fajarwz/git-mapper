@@ -5,12 +5,11 @@ import type {
   Commit,
   CommitRef,
   DiffLine,
-  PullRequestProvider,
-  PullRequestsStatus,
   PullScope,
   Repository,
   Submodule,
 } from "../types";
+import { PullRequestProvider, PullRequestsStatus } from "../types";
 import { parsePullRequestPage, type PullRequestPage } from "../lib/pullRequests";
 import { sameSubmodules, shapeSubmodules, type RawSubmodule } from "../lib/submodule";
 import { STORAGE_KEYS } from "../lib/persisted";
@@ -631,10 +630,10 @@ export async function loadPullRequests(
   }
 > {
   return call("read_pull_requests", { dir, scope, cursor, provider, query: query.trim() || null }, (raw) => {
-    const payload = raw as { status: PullRequestsStatus; provider: string; raw: string };
-    const answered = payload.provider === "gitlab" || payload.provider === "github" ? payload.provider : null;
+    const payload = raw as { status: PullRequestsStatus; provider: PullRequestProvider | null; raw: string };
+    const answered = Object.values(PullRequestProvider).find((known) => known === payload.provider) ?? null;
     const page: PullRequestPage =
-      payload.status === "ok" && answered
+      payload.status === PullRequestsStatus.Ok && answered
         ? parsePullRequestPage(answered, payload.raw, cursor)
         : { pullRequests: [], nextCursor: null, total: null };
     return { status: payload.status, provider: answered, ...page };

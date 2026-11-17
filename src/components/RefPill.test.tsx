@@ -7,6 +7,7 @@ import { afterEach, test, vi } from "vitest";
 import { RefPill } from "./RefPill";
 import { openExternal } from "../lib/external";
 import type { CommitRef, PullRequest } from "../types";
+import { ChecksState, PullRequestProvider, PullRequestState } from "../types";
 
 vi.mock("../lib/external", () => ({ openExternal: vi.fn() }));
 
@@ -77,16 +78,16 @@ test("RefPill: a detached HEAD fills like a marker and never offers a checkout",
 });
 
 const PULL: PullRequest = {
-  provider: "github",
+  provider: PullRequestProvider.GitHub,
   number: 13,
   title: "Add download",
-  state: "open",
+  state: PullRequestState.Open,
   author: "a",
   headBranch: "feat/x",
   baseBranch: "main",
   url: "https://github.com/o/r/pull/13",
   updatedAt: "2026-11-16T01:56:09Z",
-  checks: "passing",
+  checks: ChecksState.Passing,
   review: null,
   fromFork: false,
   mergeCommit: null,

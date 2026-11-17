@@ -1,4 +1,11 @@
-import type { ChecksState, CommitRef, PullRequest, PullRequestProvider, PullRequestState } from "../types";
+import {
+  ChecksState,
+  PullRequestProvider,
+  PullRequestState,
+  ReviewState,
+  type CommitRef,
+  type PullRequest,
+} from "../types";
 import { PROVIDER_NAME, describePullRequest, pullRequestLabel, requestNoun } from "./pullRequestTone";
 
 /** Rows per read. Must match PAGE_SIZE in src-tauri/src/git/pulls.rs: a full GitLab page is
@@ -44,24 +51,58 @@ interface RawGitHubPage {
   } | null;
 }
 
+/** What GitHub's GraphQL spells for the head commit's check rollup. */
+export enum GitHubRollup {
+  Success = "SUCCESS",
+  Failure = "FAILURE",
+  Error = "ERROR",
+  Pending = "PENDING",
+  Expected = "EXPECTED",
+}
+
+export enum GitHubState {
+  Open = "OPEN",
+  Closed = "CLOSED",
+  Merged = "MERGED",
+}
+
+export enum GitHubReview {
+  Approved = "APPROVED",
+  ChangesRequested = "CHANGES_REQUESTED",
+  ReviewRequired = "REVIEW_REQUIRED",
+}
+
 /** GitHub's rollup `state` for the head commit: one word, not the list of every check. */
 export function summarizeRollup(state: string | undefined | null): ChecksState {
-  if (state === "SUCCESS") return "passing";
-  if (state === "FAILURE" || state === "ERROR") return "failing";
-  if (state === "PENDING" || state === "EXPECTED") return "pending";
-  return "none";
+  switch (state) {
+    case GitHubRollup.Success:
+      return ChecksState.Passing;
+    case GitHubRollup.Failure:
+    case GitHubRollup.Error:
+      return ChecksState.Failing;
+    case GitHubRollup.Pending:
+    case GitHubRollup.Expected:
+      return ChecksState.Pending;
+    default:
+      return ChecksState.None;
+  }
 }
 
 function stateOf(raw: RawNode): PullRequestState {
-  if (raw.state === "MERGED") return "merged";
-  if (raw.state === "CLOSED") return "closed";
-  return raw.isDraft ? "draft" : "open";
+  switch (raw.state) {
+    case GitHubState.Merged:
+      return PullRequestState.Merged;
+    case GitHubState.Closed:
+      return PullRequestState.Closed;
+    default:
+      return raw.isDraft ? PullRequestState.Draft : PullRequestState.Open;
+  }
 }
 
-const REVIEWS: Record<string, PullRequest["review"]> = {
-  APPROVED: "approved",
-  CHANGES_REQUESTED: "changes",
-  REVIEW_REQUIRED: "required",
+const REVIEWS: Partial<Record<string, ReviewState>> = {
+  [GitHubReview.Approved]: ReviewState.Approved,
+  [GitHubReview.ChangesRequested]: ReviewState.Changes,
+  [GitHubReview.ReviewRequired]: ReviewState.Required,
 };
 
 function parseJson(raw: string): unknown {
@@ -79,7 +120,7 @@ function parseGitHub(raw: string): PullRequestPage {
   const pageInfo = page?.pageInfo;
   return {
     pullRequests: nodes.map((item) => ({
-      provider: "github",
+      provider: PullRequestProvider.GitHub,
       number: item.number,
       title: item.title,
       state: stateOf(item),
@@ -123,29 +164,65 @@ interface RawMergeRequest {
   squash_commit_sha?: string | null;
 }
 
-const PIPELINE_FAILED = new Set(["failed", "canceled", "cancelled"]);
-const PIPELINE_WAITING = new Set([
-  "created",
-  "waiting_for_resource",
-  "preparing",
-  "pending",
-  "running",
-  "manual",
-  "scheduled",
-]);
+/** What GitLab spells for a pipeline's status. */
+export enum GitLabPipeline {
+  Created = "created",
+  WaitingForResource = "waiting_for_resource",
+  Preparing = "preparing",
+  Pending = "pending",
+  Running = "running",
+  Success = "success",
+  Failed = "failed",
+  Canceled = "canceled",
+  Cancelled = "cancelled",
+  Skipped = "skipped",
+  Manual = "manual",
+  Scheduled = "scheduled",
+}
+
+export enum GitLabState {
+  Opened = "opened",
+  Closed = "closed",
+  Merged = "merged",
+  Locked = "locked",
+}
+
+export enum GitLabMergeStatus {
+  NotApproved = "not_approved",
+}
 
 /** The list endpoint may leave the pipeline out entirely; no pipeline reads as no checks. */
 export function summarizePipeline(status: string | undefined): ChecksState {
-  if (!status) return "none";
-  if (PIPELINE_FAILED.has(status)) return "failing";
-  if (PIPELINE_WAITING.has(status)) return "pending";
-  return status === "success" ? "passing" : "none";
+  switch (status) {
+    case GitLabPipeline.Failed:
+    case GitLabPipeline.Canceled:
+    case GitLabPipeline.Cancelled:
+      return ChecksState.Failing;
+    case GitLabPipeline.Created:
+    case GitLabPipeline.WaitingForResource:
+    case GitLabPipeline.Preparing:
+    case GitLabPipeline.Pending:
+    case GitLabPipeline.Running:
+    case GitLabPipeline.Manual:
+    case GitLabPipeline.Scheduled:
+      return ChecksState.Pending;
+    case GitLabPipeline.Success:
+      return ChecksState.Passing;
+    default:
+      return ChecksState.None;
+  }
 }
 
 function gitlabState(raw: RawMergeRequest): PullRequestState {
-  if (raw.state === "merged") return "merged";
-  if (raw.state === "closed" || raw.state === "locked") return "closed";
-  return raw.draft === true || raw.work_in_progress === true ? "draft" : "open";
+  switch (raw.state) {
+    case GitLabState.Merged:
+      return PullRequestState.Merged;
+    case GitLabState.Closed:
+    case GitLabState.Locked:
+      return PullRequestState.Closed;
+    default:
+      return raw.draft === true || raw.work_in_progress === true ? PullRequestState.Draft : PullRequestState.Open;
+  }
 }
 
 function parseGitLab(raw: string, cursor: string | null): PullRequestPage {
@@ -154,7 +231,7 @@ function parseGitLab(raw: string, cursor: string | null): PullRequestPage {
   const page = Number.parseInt(cursor ?? "", 10);
   return {
     pullRequests: items.map((item) => ({
-      provider: "gitlab",
+      provider: PullRequestProvider.GitLab,
       number: item.iid,
       title: item.title,
       state: gitlabState(item),
@@ -165,7 +242,7 @@ function parseGitLab(raw: string, cursor: string | null): PullRequestPage {
       updatedAt: item.updated_at,
       checks: summarizePipeline((item.head_pipeline ?? item.pipeline)?.status),
       // The list carries no approvals; only "needs approval" is stated outright.
-      review: item.detailed_merge_status === "not_approved" ? "required" : null,
+      review: item.detailed_merge_status === GitLabMergeStatus.NotApproved ? ReviewState.Required : null,
       fromFork:
         item.source_project_id !== undefined &&
         item.target_project_id !== undefined &&
@@ -188,10 +265,15 @@ export function parsePullRequestPage(
   raw: string,
   cursor: string | null,
 ): PullRequestPage {
-  return provider === "gitlab" ? parseGitLab(raw, cursor) : parseGitHub(raw);
+  return provider === PullRequestProvider.GitLab ? parseGitLab(raw, cursor) : parseGitHub(raw);
 }
 
-const PRIORITY: Record<PullRequestState, number> = { open: 0, draft: 1, merged: 2, closed: 3 };
+const PRIORITY: Record<PullRequestState, number> = {
+  [PullRequestState.Open]: 0,
+  [PullRequestState.Draft]: 1,
+  [PullRequestState.Merged]: 2,
+  [PullRequestState.Closed]: 3,
+};
 
 /**
  * Branch name → the PR to wear on its pill. A branch can have several over time (a closed one,
@@ -247,7 +329,7 @@ export function pullLinkBase(pulls: PullRequest[]): PullLinkBase | null {
 }
 
 export function pullLinkUrl(link: PullLinkBase, number: number): string {
-  return `${link.base}/${link.provider === "gitlab" ? "-/merge_requests" : "pull"}/${number}`;
+  return `${link.base}/${link.provider === PullRequestProvider.GitLab ? "-/merge_requests" : "pull"}/${number}`;
 }
 
 /**
@@ -257,9 +339,9 @@ export function pullLinkUrl(link: PullLinkBase, number: number): string {
  */
 export function requestNamedInCommit(subject: string, body = ""): { provider: PullRequestProvider; number: number } | null {
   const squash = /\(#(\d+)\)\s*$/.exec(subject) ?? /^Merge pull request #(\d+)\b/.exec(subject);
-  if (squash) return { provider: "github", number: Number(squash[1]) };
+  if (squash) return { provider: PullRequestProvider.GitHub, number: Number(squash[1]) };
   const gitlab = /See merge request [^\s!]+!(\d+)/.exec(body);
-  return gitlab ? { provider: "gitlab", number: Number(gitlab[1]) } : null;
+  return gitlab ? { provider: PullRequestProvider.GitLab, number: Number(gitlab[1]) } : null;
 }
 
 /** What a chip shows: a loaded request in full, or just the number a commit's text names. */
