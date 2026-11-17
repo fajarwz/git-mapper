@@ -5,12 +5,24 @@ import type { PullRequestsView } from "../hooks/usePullRequests";
 import { openExternal } from "../lib/external";
 import { formatAbsoluteDate } from "../lib/format";
 import { GLASS_CONTROL, PANEL } from "../lib/ui";
-import { PR_STATE, describePullRequest } from "../lib/pullRequestTone";
+import {
+  PR_STATE,
+  PROVIDER_NAME,
+  describePullRequest,
+  pullRequestLabel,
+  requestNoun,
+} from "../lib/pullRequestTone";
 import { PullRequestIcon } from "./icons";
 
 type Filter = "open" | "all";
 
 const LIVE = new Set(["open", "draft"]);
+
+/** The CLI each provider's list comes from, with where to get it and how to sign in. */
+const CLI = {
+  github: { name: "GitHub CLI", program: "gh", site: "cli.github.com" },
+  gitlab: { name: "GitLab CLI", program: "glab", site: "gitlab.com/gitlab-org/cli" },
+} as const;
 
 function Row({ pull }: { pull: PullRequest }) {
   return (
@@ -18,7 +30,7 @@ function Row({ pull }: { pull: PullRequest }) {
       type="button"
       data-pr-row
       onClick={() => openExternal(pull.url)}
-      title="Open on GitHub"
+      title={`Open on ${PROVIDER_NAME[pull.provider]}`}
       className="flex w-full items-start gap-2 rounded-lg px-2.5 py-2 text-left hover:bg-hover-glass focus-visible:ring-2 focus-visible:ring-primary/60"
     >
       <span
@@ -29,7 +41,7 @@ function Row({ pull }: { pull: PullRequest }) {
       />
       <span className="flex min-w-0 flex-1 flex-col gap-0.5">
         <span className="truncate text-[12.5px] text-ink">
-          <span className="font-mono text-ink-dim">#{pull.number}</span> {pull.title}
+          <span className="font-mono text-ink-dim">{pullRequestLabel(pull)}</span> {pull.title}
         </span>
         <span className="truncate text-[11px] text-ink-dim">
           {pull.headBranch} → {pull.baseBranch}
@@ -46,9 +58,9 @@ function Notice({ children }: { children: ReactNode }) {
 }
 
 /**
- * The title-bar door to the repo's pull requests: a button with the open count and a popover
- * listing them. Read-only on purpose — a row opens the PR on GitHub. A repository gh cannot
- * speak for (no GitHub remote) shows nothing at all.
+ * The title-bar door to the repo's pull (GitLab: merge) requests: a button with the open count
+ * and a popover listing them. Read-only on purpose — a row opens the request on its site. A
+ * repository with no GitHub or GitLab remote shows nothing at all.
  */
 export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
   const [open, setOpen] = useState(false);
@@ -82,7 +94,11 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
   const live = useMemo(() => pulls.pulls.filter((pull) => LIVE.has(pull.state)), [pulls.pulls]);
   const shown = filter === "open" ? live : pulls.pulls;
 
-  if (pulls.status === "not-github") return null;
+  if (pulls.status === "unsupported-remote") return null;
+
+  const nouns = requestNoun(pulls.provider, true);
+  const lower = nouns.toLowerCase();
+  const cli = pulls.provider === null ? null : CLI[pulls.provider];
 
   return (
     <>
@@ -92,8 +108,12 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
         data-pr-menu
         onClick={() => setOpen((value) => !value)}
         aria-expanded={open}
-        aria-label="Pull requests"
-        title={live.length > 0 ? `${live.length} open pull request${live.length === 1 ? "" : "s"}` : "Pull requests"}
+        aria-label={nouns}
+        title={
+          live.length > 0
+            ? `${live.length} open ${requestNoun(pulls.provider, live.length !== 1).toLowerCase()}`
+            : nouns
+        }
         className={`${GLASS_CONTROL} relative grid place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-7 ${
           open ? "border-primary-ink/40 bg-glass-strong text-ink soft-shadow" : ""
         }`}
@@ -115,13 +135,13 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
         <div
           ref={panel}
           role="dialog"
-          aria-label="Pull requests"
+          aria-label={nouns}
           data-pr-panel
           style={{ top: position.top, right: position.right }}
           className={`${PANEL} fixed z-50 flex max-h-[70vh] w-96 max-w-[calc(100vw-16px)] flex-col p-1.5`}
         >
           <div className="flex items-center justify-between gap-2 px-2.5 py-1">
-            <div role="group" aria-label="Filter pull requests" className="flex gap-1">
+            <div role="group" aria-label={`Filter ${lower}`} className="flex gap-1">
               {(["open", "all"] as const).map((value) => (
                 <button
                   key={value}
@@ -145,23 +165,37 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
           </div>
 
           <div className="min-h-0 flex-1 overflow-y-auto">
-            {pulls.status === "gh-missing" && (
+            {pulls.status === "cli-missing" && (
               <Notice>
-                Pull requests come from the GitHub CLI, which is not installed. Install <b>gh</b> from
-                cli.github.com, then refresh.
+                {cli ? (
+                  <>
+                    {nouns} come from the {cli.name}, which is not installed. Install <b>{cli.program}</b>{" "}
+                    from {cli.site}, then refresh.
+                  </>
+                ) : (
+                  <>
+                    {nouns} come from the GitHub CLI (<b>gh</b>) or the GitLab CLI (<b>glab</b>), and
+                    neither is installed. Install the one for your host, then refresh.
+                  </>
+                )}
               </Notice>
             )}
-            {pulls.status === "gh-unauthenticated" && (
+            {pulls.status === "cli-unauthenticated" && (
               <Notice>
-                The GitHub CLI is not signed in. Run <code className="font-mono">gh auth login</code> in a
-                terminal, then refresh.
+                The {cli?.name ?? "provider CLI"} is not signed in for this repository&apos;s host. Run{" "}
+                <code className="font-mono">{cli?.program ?? "gh"} auth login</code> in a terminal, then
+                refresh.
               </Notice>
             )}
-            {pulls.error !== null && <Notice>Could not read pull requests: {pulls.error}</Notice>}
+            {pulls.error !== null && (
+              <Notice>
+                Could not read {lower}: {pulls.error}
+              </Notice>
+            )}
             {pulls.status === "ok" && shown.length === 0 && (
-              <Notice>{filter === "open" ? "No open pull requests." : "No pull requests."}</Notice>
+              <Notice>{filter === "open" ? `No open ${lower}.` : `No ${lower}.`}</Notice>
             )}
-            {pulls.status === null && pulls.error === null && <Notice>Loading pull requests…</Notice>}
+            {pulls.status === null && pulls.error === null && <Notice>Loading {lower}…</Notice>}
             {pulls.status === "ok" && shown.map((pull) => <Row key={pull.number} pull={pull} />)}
           </div>
         </div>,

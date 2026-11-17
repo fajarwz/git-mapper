@@ -65,8 +65,12 @@ export interface Commit {
 export type PullRequestState = "open" | "draft" | "merged" | "closed";
 export type ChecksState = "passing" | "failing" | "pending" | "none";
 
-/** Provider-neutral: the GitHub adapter (gh CLI) fills it today; a GitLab one would too. */
+export type PullRequestProvider = "github" | "gitlab";
+
+/** Provider-neutral: the gh adapter (GitHub) and the glab adapter (GitLab) both fill it. */
 export interface PullRequest {
+  provider: PullRequestProvider;
+  /** GitHub's number, GitLab's iid. */
   number: number;
   title: string;
   state: PullRequestState;
@@ -82,7 +86,7 @@ export interface PullRequest {
 }
 
 /** Why there may be no list: each non-ok state has its own explanation in the UI. */
-export type PullRequestsStatus = "ok" | "gh-missing" | "gh-unauthenticated" | "not-github";
+export type PullRequestsStatus = "ok" | "cli-missing" | "cli-unauthenticated" | "unsupported-remote";
 
 /** `moved`: checked out at a commit other than the one the parent records. */
 export type SubmoduleState = "ok" | "moved" | "uninitialized" | "conflict";

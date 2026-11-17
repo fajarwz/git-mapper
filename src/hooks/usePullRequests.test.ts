@@ -11,6 +11,7 @@ import type { PullRequest, Repository } from "../types";
 vi.mock("../data/gitLoader", () => ({ loadPullRequests: vi.fn() }));
 
 const pull: PullRequest = {
+  provider: "github",
   number: 1,
   title: "t",
   state: "open",
@@ -31,7 +32,7 @@ beforeEach(() => {
 });
 
 test("reads once for a repo and exposes the branch lookup", async () => {
-  vi.mocked(loadPullRequests).mockResolvedValue({ status: "ok", pullRequests: [pull] });
+  vi.mocked(loadPullRequests).mockResolvedValue({ status: "ok", provider: "github", pullRequests: [pull] });
   const { result } = renderHook(({ r }) => usePullRequests(r), { initialProps: { r: repo() } });
   await waitFor(() => assert.equal(result.current.status, "ok"));
   assert.equal(result.current.byBranch.get("feat/x")?.number, 1);
@@ -39,7 +40,7 @@ test("reads once for a repo and exposes the branch lookup", async () => {
 });
 
 test("a ref change re-reads while gh answers", async () => {
-  vi.mocked(loadPullRequests).mockResolvedValue({ status: "ok", pullRequests: [pull] });
+  vi.mocked(loadPullRequests).mockResolvedValue({ status: "ok", provider: "github", pullRequests: [pull] });
   const { result, rerender } = renderHook(({ r }) => usePullRequests(r), { initialProps: { r: repo() } });
   await waitFor(() => assert.equal(result.current.status, "ok"));
   rerender({ r: repo({ refsDigest: "d2" }) });
@@ -47,9 +48,9 @@ test("a ref change re-reads while gh answers", async () => {
 });
 
 test("a ref change does not retry a gh that is missing; reload does", async () => {
-  vi.mocked(loadPullRequests).mockResolvedValue({ status: "gh-missing", pullRequests: [] });
+  vi.mocked(loadPullRequests).mockResolvedValue({ status: "cli-missing", provider: "github", pullRequests: [] });
   const { result, rerender } = renderHook(({ r }) => usePullRequests(r), { initialProps: { r: repo() } });
-  await waitFor(() => assert.equal(result.current.status, "gh-missing"));
+  await waitFor(() => assert.equal(result.current.status, "cli-missing"));
   rerender({ r: repo({ refsDigest: "d2" }) });
   assert.equal(vi.mocked(loadPullRequests).mock.calls.length, 1);
   act(() => result.current.reload());

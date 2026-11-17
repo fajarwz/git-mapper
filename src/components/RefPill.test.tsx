@@ -77,6 +77,7 @@ test("RefPill: a detached HEAD fills like a marker and never offers a checkout",
 });
 
 const PULL: PullRequest = {
+  provider: "github",
   number: 13,
   title: "Add download",
   state: "open",

@@ -1,12 +1,18 @@
 import type { CommitRef, PullRequest } from "../types";
 import { openExternal } from "../lib/external";
 import { branchColor } from "../lib/graphGeometry";
-import { PR_STATE, describePullRequest } from "../lib/pullRequestTone";
+import {
+  PR_STATE,
+  PROVIDER_NAME,
+  describePullRequest,
+  pullRequestLabel,
+  requestNoun,
+} from "../lib/pullRequestTone";
 import { BranchIcon, RemoteIcon, StashIcon, TagIcon } from "./icons";
 
 interface RefPillProps {
   ref: CommitRef;
-  /** The branch's pull request, when it has one: a #number chip that opens it in the browser. */
+  /** The branch's pull/merge request, when it has one: a chip that opens it in the browser. */
   pullRequest?: PullRequest;
   /** The commit's branch colour index, so the pill matches its node. */
   color: number;
@@ -87,8 +93,8 @@ export function RefPill({ ref, pullRequest, color, onCheckout, onContextMenu }: 
         <span
           role="link"
           data-pr-badge
-          aria-label={`Pull request #${pullRequest.number}: ${pullRequest.title}`}
-          title={`#${pullRequest.number} ${pullRequest.title}\n${describePullRequest(pullRequest)}\nClick to open on GitHub`}
+          aria-label={`${requestNoun(pullRequest.provider)} ${pullRequestLabel(pullRequest)}: ${pullRequest.title}`}
+          title={`${pullRequestLabel(pullRequest)} ${pullRequest.title}\n${describePullRequest(pullRequest)}\nClick to open on ${PROVIDER_NAME[pullRequest.provider]}`}
           onClick={(event) => {
             event.stopPropagation();
             openExternal(pullRequest.url);
@@ -104,7 +110,7 @@ export function RefPill({ ref, pullRequest, color, onCheckout, onContextMenu }: 
             className="size-1.5 rounded-full ring-1 ring-surface"
             style={{ backgroundColor: PR_STATE[pullRequest.state].color }}
           />
-          #{pullRequest.number}
+          {pullRequestLabel(pullRequest)}
         </span>
       )}
     </span>

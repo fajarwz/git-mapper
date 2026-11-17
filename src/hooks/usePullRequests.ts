@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadPullRequests } from "../data/gitLoader";
 import { pullRequestsByBranch } from "../lib/pullRequests";
-import type { PullRequest, PullRequestsStatus, Repository } from "../types";
+import type { PullRequest, PullRequestProvider, PullRequestsStatus, Repository } from "../types";
 
 /** A window focus re-reads at most this often: merged/CI state moves on the server, not in refs. */
 const FOCUS_REFRESH_MS = 60_000;
@@ -9,17 +9,18 @@ const FOCUS_REFRESH_MS = 60_000;
 interface Entry {
   /** null until the first read answers. */
   status: PullRequestsStatus | null;
+  provider: PullRequestProvider | null;
   pulls: PullRequest[];
   loading: boolean;
   error: string | null;
 }
 
-const EMPTY: Entry = { status: null, pulls: [], loading: false, error: null };
+const EMPTY: Entry = { status: null, provider: null, pulls: [], loading: false, error: null };
 
 /**
  * The active repo's pull requests, kept per repo path so a tab switch shows the last answer
  * at once. Re-read when the refs change (a fetch or push), on window focus (throttled) and on
- * demand. Once gh is known to be missing, signed out or pointless for this repo the automatic
+ * demand. Once the CLI is known to be missing, signed out or pointless for this repo the automatic
  * re-reads stop; only `reload` (the menu's "Check again") tries again.
  */
 export function usePullRequests(repo: Repository | null) {
@@ -36,10 +37,17 @@ export function usePullRequests(repo: Repository | null) {
     let next: Entry;
     try {
       const result = await loadPullRequests(dir);
-      next = { status: result.status, pulls: result.pullRequests, loading: false, error: null };
+      next = {
+        status: result.status,
+        provider: result.provider,
+        pulls: result.pullRequests,
+        loading: false,
+        error: null,
+      };
     } catch (readError) {
       next = {
         status: null,
+        provider: null,
         pulls: [],
         loading: false,
         error: readError instanceof Error ? readError.message : String(readError),

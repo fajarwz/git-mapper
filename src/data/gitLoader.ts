@@ -6,6 +6,7 @@ import type {
   CommitRef,
   DiffLine,
   PullRequest,
+  PullRequestProvider,
   PullRequestsStatus,
   Repository,
   Submodule,
@@ -610,18 +611,23 @@ export async function fetchRemote(dir: string): Promise<void> {
 
 /**
  * The repo's pull requests through the `gh` CLI. Not part of load/refresh: it is a network
- * call, so the usePullRequests hook asks for it on its own schedule. A non-ok status (gh
- * missing, signed out, no GitHub remote) is an answer, not an error — it rejects only on a
- * real failure.
+ * call, so the usePullRequests hook asks for it on its own schedule. A non-ok status (CLI
+ * missing, signed out, no GitHub/GitLab remote) is an answer, not an error — it rejects only
+ * on a real failure.
  */
-export async function loadPullRequests(
-  dir: string,
-): Promise<{ status: PullRequestsStatus; pullRequests: PullRequest[] }> {
+export async function loadPullRequests(dir: string): Promise<{
+  status: PullRequestsStatus;
+  /** Whose CLI answered or should have; null when the remote's host does not say. */
+  provider: PullRequestProvider | null;
+  pullRequests: PullRequest[];
+}> {
   return call("read_pull_requests", { dir }, (raw) => {
-    const payload = raw as { status: PullRequestsStatus; raw: string };
+    const payload = raw as { status: PullRequestsStatus; provider: string; raw: string };
+    const provider = payload.provider === "gitlab" || payload.provider === "github" ? payload.provider : null;
     return {
       status: payload.status,
-      pullRequests: payload.status === "ok" ? parsePullRequests(payload.raw) : [],
+      provider,
+      pullRequests: payload.status === "ok" && provider ? parsePullRequests(provider, payload.raw) : [],
     };
   });
 }

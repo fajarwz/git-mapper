@@ -16,6 +16,7 @@ afterEach(() => {
 });
 
 const pull = (over: Partial<PullRequest>): PullRequest => ({
+  provider: "github",
   number: 1,
   title: "First",
   state: "open",
@@ -32,6 +33,7 @@ const pull = (over: Partial<PullRequest>): PullRequest => ({
 
 const view = (over: Partial<PullRequestsView>): PullRequestsView => ({
   status: "ok",
+  provider: "github",
   pulls: [],
   loading: false,
   error: null,
@@ -67,18 +69,40 @@ test("a row opens its PR in the browser", () => {
 
 test("explains a missing or signed-out gh in place and offers a refresh", () => {
   const reload = vi.fn();
-  const { container, rerender } = render(<PullRequestMenu pulls={view({ status: "gh-missing", reload })} />);
+  const { container, rerender } = render(<PullRequestMenu pulls={view({ status: "cli-missing", reload })} />);
   fireEvent.click(container.querySelector("[data-pr-menu]") as HTMLElement);
   assert.ok(screen.getByText(/not installed/));
   fireEvent.click(screen.getByText("Refresh"));
   assert.equal(reload.mock.calls.length, 1);
 
-  rerender(<PullRequestMenu pulls={view({ status: "gh-unauthenticated", reload })} />);
+  rerender(<PullRequestMenu pulls={view({ status: "cli-unauthenticated", reload })} />);
   assert.ok(screen.getByText(/not signed in/));
 });
 
-test("a repo with no GitHub remote shows no button at all", () => {
-  const { container } = render(<PullRequestMenu pulls={view({ status: "not-github" })} />);
+test("a GitLab repo says merge requests, writes !n and points at glab", () => {
+  const gitlab = pull({ provider: "gitlab", number: 7, title: "Add runner", url: "https://gitlab.com/g/p/-/merge_requests/7" });
+  const { container, rerender } = render(
+    <PullRequestMenu pulls={view({ provider: "gitlab", pulls: [gitlab] })} />,
+  );
+  assert.equal(container.querySelector("[data-pr-menu]")?.getAttribute("aria-label"), "Merge requests");
+  fireEvent.click(container.querySelector("[data-pr-menu]") as HTMLElement);
+  assert.ok(screen.getByText("!7"));
+  assert.equal(document.querySelector("[data-pr-row]")?.getAttribute("title"), "Open on GitLab");
+
+  rerender(<PullRequestMenu pulls={view({ provider: "gitlab", status: "cli-missing", pulls: [] })} />);
+  assert.ok(screen.getByText(/GitLab CLI, which is not installed/));
+  rerender(<PullRequestMenu pulls={view({ provider: "gitlab", status: "cli-unauthenticated", pulls: [] })} />);
+  assert.ok(screen.getByText(/glab auth login/));
+});
+
+test("with no known provider, a missing CLI names both options", () => {
+  const { container } = render(<PullRequestMenu pulls={view({ provider: null, status: "cli-missing" })} />);
+  fireEvent.click(container.querySelector("[data-pr-menu]") as HTMLElement);
+  assert.ok(screen.getByText(/neither is installed/));
+});
+
+test("a repo with no GitHub or GitLab remote shows no button at all", () => {
+  const { container } = render(<PullRequestMenu pulls={view({ status: "unsupported-remote" })} />);
   assert.equal(container.querySelector("[data-pr-menu]"), null);
 });
 

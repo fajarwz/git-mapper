@@ -1,9 +1,17 @@
 import { describe, expect, it } from "vitest";
 import type { PullRequest } from "../types";
-import { parsePullRequests, pullRequestForRef, pullRequestsByBranch, summarizeChecks } from "./pullRequests";
+import {
+  parsePullRequests,
+  pullRequestForRef,
+  pullRequestsByBranch,
+  summarizeChecks,
+  summarizePipeline,
+} from "./pullRequests";
+import { pullRequestLabel, requestNoun } from "./pullRequestTone";
 
 function pr(over: Partial<PullRequest>): PullRequest {
   return {
+    provider: "github",
     number: 1,
     title: "t",
     state: "open",
@@ -83,15 +91,15 @@ describe("parsePullRequests", () => {
   ]);
 
   it("maps gh's fields onto the neutral shape", () => {
-    const [merged, draft] = parsePullRequests(raw);
+    const [merged, draft] = parsePullRequests("github", raw);
     expect(merged).toMatchObject({ number: 13, state: "merged", author: "fajarwz", checks: "passing", review: null });
     expect(draft).toMatchObject({ state: "draft", author: "", review: "changes", fromFork: true, checks: "none" });
   });
 
   it("returns nothing for output that is not a list", () => {
-    expect(parsePullRequests("")).toEqual([]);
-    expect(parsePullRequests("{}")).toEqual([]);
-    expect(parsePullRequests("not json")).toEqual([]);
+    expect(parsePullRequests("github", "")).toEqual([]);
+    expect(parsePullRequests("gitlab", "{}")).toEqual([]);
+    expect(parsePullRequests("gitlab", "not json")).toEqual([]);
   });
 });
 
@@ -122,5 +130,75 @@ describe("pullRequestForRef", () => {
   it("leaves tags, stashes and unknown branches bare", () => {
     expect(pullRequestForRef({ type: "tag", name: "feat/x" }, map)).toBeUndefined();
     expect(pullRequestForRef({ type: "branch", name: "other" }, map)).toBeUndefined();
+  });
+});
+
+describe("GitLab merge requests", () => {
+  const raw = JSON.stringify([
+    {
+      iid: 7,
+      title: "Add runner",
+      state: "opened",
+      draft: false,
+      author: { username: "fajarwz" },
+      source_branch: "feat/runner",
+      target_branch: "main",
+      source_project_id: 10,
+      target_project_id: 10,
+      web_url: "https://gitlab.com/g/p/-/merge_requests/7",
+      updated_at: "2026-11-16T01:56:09Z",
+      head_pipeline: { status: "running" },
+      detailed_merge_status: "not_approved",
+    },
+    {
+      iid: 8,
+      title: "Draft: wip",
+      state: "opened",
+      work_in_progress: true,
+      author: null,
+      source_branch: "wip",
+      target_branch: "main",
+      source_project_id: 99,
+      target_project_id: 10,
+      web_url: "u8",
+      updated_at: "2026-11-17T00:00:00Z",
+    },
+    { iid: 9, title: "Done", state: "merged", source_branch: "a", target_branch: "main", web_url: "u9", updated_at: "x", pipeline: { status: "success" } },
+    { iid: 10, title: "Nope", state: "locked", source_branch: "b", target_branch: "main", web_url: "u10", updated_at: "x" },
+  ]);
+
+  it("maps the API's fields onto the neutral shape, with iid as the number", () => {
+    const [open, draft, merged, locked] = parsePullRequests("gitlab", raw);
+    expect(open).toMatchObject({
+      provider: "gitlab",
+      number: 7,
+      state: "open",
+      author: "fajarwz",
+      headBranch: "feat/runner",
+      baseBranch: "main",
+      url: "https://gitlab.com/g/p/-/merge_requests/7",
+      checks: "pending",
+      review: "required",
+      fromFork: false,
+    });
+    expect(draft).toMatchObject({ state: "draft", author: "", fromFork: true, checks: "none", review: null });
+    expect(merged).toMatchObject({ state: "merged", checks: "passing" });
+    expect(locked.state).toBe("closed");
+  });
+
+  it("reads a pipeline status into a checks state", () => {
+    expect(summarizePipeline(undefined)).toBe("none");
+    expect(summarizePipeline("success")).toBe("passing");
+    expect(summarizePipeline("failed")).toBe("failing");
+    expect(summarizePipeline("canceled")).toBe("failing");
+    expect(summarizePipeline("running")).toBe("pending");
+    expect(summarizePipeline("skipped")).toBe("none");
+  });
+
+  it("writes !7 where GitHub writes #7, and says merge request", () => {
+    expect(pullRequestLabel(pr({ provider: "gitlab", number: 7 }))).toBe("!7");
+    expect(pullRequestLabel(pr({ provider: "github", number: 7 }))).toBe("#7");
+    expect(requestNoun("gitlab", true)).toBe("Merge requests");
+    expect(requestNoun(null)).toBe("Pull request");
   });
 });

@@ -1,4 +1,4 @@
-import type { ChecksState, CommitRef, PullRequest, PullRequestState } from "../types";
+import type { ChecksState, CommitRef, PullRequest, PullRequestProvider, PullRequestState } from "../types";
 
 interface RawCheck {
   status?: string;
@@ -49,16 +49,87 @@ const REVIEWS: Record<string, PullRequest["review"]> = {
   REVIEW_REQUIRED: "required",
 };
 
-/** Shapes `gh pr list --json` output. Garbage in (a gh that printed something else) → none out. */
-export function parsePullRequests(raw: string): PullRequest[] {
-  let list: unknown;
+function parseList(raw: string): unknown[] {
   try {
-    list = JSON.parse(raw);
+    const list: unknown = JSON.parse(raw);
+    return Array.isArray(list) ? list : [];
   } catch {
     return [];
   }
-  if (!Array.isArray(list)) return [];
-  return (list as RawPullRequest[]).map((item) => ({
+}
+
+interface RawMergeRequest {
+  iid: number;
+  title: string;
+  state: string;
+  draft?: boolean;
+  work_in_progress?: boolean;
+  author?: { username?: string } | null;
+  source_branch: string;
+  target_branch: string;
+  source_project_id?: number;
+  target_project_id?: number;
+  web_url: string;
+  updated_at: string;
+  head_pipeline?: { status?: string } | null;
+  pipeline?: { status?: string } | null;
+  detailed_merge_status?: string;
+}
+
+const PIPELINE_FAILED = new Set(["failed", "canceled", "cancelled"]);
+const PIPELINE_WAITING = new Set([
+  "created",
+  "waiting_for_resource",
+  "preparing",
+  "pending",
+  "running",
+  "manual",
+  "scheduled",
+]);
+
+/** The list endpoint may leave the pipeline out entirely; no pipeline reads as no checks. */
+export function summarizePipeline(status: string | undefined): ChecksState {
+  if (!status) return "none";
+  if (PIPELINE_FAILED.has(status)) return "failing";
+  if (PIPELINE_WAITING.has(status)) return "pending";
+  return status === "success" ? "passing" : "none";
+}
+
+function gitlabState(raw: RawMergeRequest): PullRequestState {
+  if (raw.state === "merged") return "merged";
+  if (raw.state === "closed" || raw.state === "locked") return "closed";
+  return raw.draft === true || raw.work_in_progress === true ? "draft" : "open";
+}
+
+function parseGitLab(raw: string): PullRequest[] {
+  return (parseList(raw) as RawMergeRequest[]).map((item) => ({
+    provider: "gitlab",
+    number: item.iid,
+    title: item.title,
+    state: gitlabState(item),
+    author: item.author?.username ?? "",
+    headBranch: item.source_branch,
+    baseBranch: item.target_branch,
+    url: item.web_url,
+    updatedAt: item.updated_at,
+    checks: summarizePipeline((item.head_pipeline ?? item.pipeline)?.status),
+    // The list carries no approvals; only "needs approval" is stated outright.
+    review: item.detailed_merge_status === "not_approved" ? "required" : null,
+    fromFork:
+      item.source_project_id !== undefined &&
+      item.target_project_id !== undefined &&
+      item.source_project_id !== item.target_project_id,
+  }));
+}
+
+/**
+ * Shapes the provider CLI's JSON (`gh pr list` / `glab mr list`) into one PullRequest type.
+ * Garbage in (a CLI that printed something else) → none out.
+ */
+export function parsePullRequests(provider: PullRequestProvider, raw: string): PullRequest[] {
+  if (provider === "gitlab") return parseGitLab(raw);
+  return (parseList(raw) as RawPullRequest[]).map((item) => ({
+    provider: "github",
     number: item.number,
     title: item.title,
     state: stateOf(item),
