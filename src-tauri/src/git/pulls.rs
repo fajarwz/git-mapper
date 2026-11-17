@@ -2,8 +2,19 @@ use serde::Serialize;
 
 use super::*;
 
-const GITHUB_FIELDS: &str = "number,title,state,isDraft,author,headRefName,baseRefName,isCrossRepository,\
-url,updatedAt,reviewDecision,statusCheckRollup";
+/// One page of the list. The TS side (`PR_PAGE_SIZE`) infers "is there a next GitLab page" from
+/// a full page, so the two constants must agree.
+pub const PAGE_SIZE: u32 = 30;
+
+/// One GraphQL query instead of `gh pr list --json`: that command's `statusCheckRollup` pulls
+/// every individual check of every PR, which 504s on a busy repo (tauri-apps/tauri: ~12s, then a
+/// gateway timeout). The rollup's one-word `state` is all the UI needs and costs almost nothing.
+/// `{owner}`/`{repo}` (passed below) are gh's placeholders for the working directory's remote.
+const GITHUB_QUERY: &str = "query($owner: String!, $name: String!, $states: [PullRequestState!], $after: String) { \
+repository(owner: $owner, name: $name) { pullRequests(first: __PAGE__, states: $states, after: $after, \
+orderBy: {field: CREATED_AT, direction: DESC}) { totalCount pageInfo { hasNextPage endCursor } nodes { \
+number title state isDraft headRefName baseRefName isCrossRepository url updatedAt reviewDecision \
+author { login } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }";
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Provider {
@@ -26,10 +37,44 @@ impl Provider {
         }
     }
 
-    fn args(self) -> Vec<&'static str> {
+    fn from_name(name: &str) -> Option<Provider> {
+        match name {
+            "github" => Some(Provider::GitHub),
+            "gitlab" => Some(Provider::GitLab),
+            _ => None,
+        }
+    }
+
+    /// CLI arguments for one page. `scope` is "open" (open and draft only) or "all"; `cursor` is
+    /// GitHub's `endCursor` or GitLab's page number, and `None` asks for the first page.
+    pub fn args(self, scope: &str, cursor: Option<&str>) -> Vec<String> {
+        let open_only = scope == "open";
         match self {
-            Provider::GitHub => vec!["pr", "list", "--state", "all", "--limit", "100", "--json", GITHUB_FIELDS],
-            Provider::GitLab => vec!["mr", "list", "--all", "--per-page", "100", "--output", "json"],
+            Provider::GitHub => {
+                let mut args: Vec<String> = ["api", "graphql", "-F", "owner={owner}", "-F", "name={repo}"]
+                    .map(String::from)
+                    .to_vec();
+                if open_only {
+                    args.extend(["-F".to_string(), "states[]=OPEN".to_string()]);
+                }
+                if let Some(cursor) = cursor {
+                    // -f, not -F: -F would coerce a cursor that happens to look like a number.
+                    args.extend(["-f".to_string(), format!("after={cursor}")]);
+                }
+                let query = GITHUB_QUERY.replace("__PAGE__", &PAGE_SIZE.to_string());
+                args.extend(["-f".to_string(), format!("query={query}")]);
+                args
+            }
+            Provider::GitLab => {
+                let page = cursor.and_then(|c| c.parse::<u32>().ok()).unwrap_or(1);
+                let mut args: Vec<String> = ["mr", "list", "--per-page"].map(String::from).to_vec();
+                args.extend([PAGE_SIZE.to_string(), "--page".to_string(), page.to_string()]);
+                if !open_only {
+                    args.push("--all".to_string());
+                }
+                args.extend(["--output".to_string(), "json".to_string()]);
+                args
+            }
         }
     }
 }
@@ -73,6 +118,7 @@ pub fn classify_failure(stderr: &str) -> Option<Attempt> {
         || text.contains("no github remotes")
         || text.contains("no gitlab remotes")
         || text.contains("could not determine base repo")
+        || text.contains("no git remotes found")
         || text.contains("not a github")
         || text.contains("not a gitlab")
     {
@@ -151,8 +197,8 @@ fn remote_host(dir: &str) -> Option<String> {
     url.ok().and_then(|url| host_of(&url))
 }
 
-fn attempt(dir: &str, provider: Provider) -> Attempt {
-    let out = match cli_command(provider.program(), dir).args(provider.args()).output() {
+fn attempt(dir: &str, provider: Provider, scope: &str, cursor: Option<&str>) -> Attempt {
+    let out = match cli_command(provider.program(), dir).args(provider.args(scope, cursor)).output() {
         Ok(out) => out,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Attempt::Missing,
         Err(error) => return Attempt::Failed(format!("failed to run {}: {error}", provider.program())),
@@ -164,14 +210,24 @@ fn attempt(dir: &str, provider: Provider) -> Attempt {
     classify_failure(&stderr).unwrap_or(Attempt::Failed(stderr))
 }
 
-/// The repository's pull/merge requests (open, closed and merged, newest 100) through the
-/// provider's own CLI: `gh` for GitHub, `glab` for GitLab, picked from the origin remote's host.
-pub fn read_pull_requests_in(dir: &str) -> Result<PullRequestsPayload, String> {
+/// One page of the repository's pull/merge requests (`scope` "open" or "all", newest first)
+/// through the provider's own CLI: `gh` for GitHub, `glab` for GitLab, picked from the origin
+/// remote's host. A follow-up page names the provider that answered the first one: a cursor means
+/// nothing to the other CLI, and an unknown host would otherwise ask both again.
+pub fn read_pull_requests_in(
+    dir: &str,
+    scope: &str,
+    cursor: Option<&str>,
+    provider: Option<&str>,
+) -> Result<PullRequestsPayload, String> {
     let host = remote_host(dir);
-    let (providers, matched) = providers_for(host.as_deref());
+    let (providers, matched) = match provider.and_then(Provider::from_name) {
+        Some(known) => (vec![known], true),
+        None => providers_for(host.as_deref()),
+    };
     let mut attempts = Vec::new();
     for provider in providers {
-        let result = attempt(dir, provider);
+        let result = attempt(dir, provider, scope, cursor);
         let done = matches!(result, Attempt::Ok(_));
         attempts.push((provider, result));
         if done {

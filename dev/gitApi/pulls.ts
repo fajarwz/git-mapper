@@ -9,19 +9,35 @@ type Attempt =
   | { kind: "missing" | "unauthenticated" | "no-remote" }
   | { kind: "failed"; message: string };
 
-const GITHUB_FIELDS =
-  "number,title,state,isDraft,author,headRefName,baseRefName,isCrossRepository,url,updatedAt,reviewDecision,statusCheckRollup";
+// Keep in step with PAGE_SIZE and GITHUB_QUERY in src-tauri/src/git/pulls.rs.
+const PAGE_SIZE = 30;
+const GITHUB_QUERY = `query($owner: String!, $name: String!, $states: [PullRequestState!], $after: String) { repository(owner: $owner, name: $name) { pullRequests(first: ${PAGE_SIZE}, states: $states, after: $after, orderBy: {field: CREATED_AT, direction: DESC}) { totalCount pageInfo { hasNextPage endCursor } nodes { number title state isDraft headRefName baseRefName isCrossRepository url updatedAt reviewDecision author { login } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }`;
 
-const CLI: Record<Provider, { program: string; args: string[] }> = {
-  github: { program: "gh", args: ["pr", "list", "--state", "all", "--limit", "100", "--json", GITHUB_FIELDS] },
-  gitlab: { program: "glab", args: ["mr", "list", "--all", "--per-page", "100", "--output", "json"] },
-};
+const PROGRAM: Record<Provider, string> = { github: "gh", gitlab: "glab" };
+
+function cliArgs(provider: Provider, scope: string, cursor: string | null): string[] {
+  const openOnly = scope === "open";
+  if (provider === "github") {
+    return [
+      "api", "graphql", "-F", "owner={owner}", "-F", "name={repo}",
+      ...(openOnly ? ["-F", "states[]=OPEN"] : []),
+      ...(cursor ? ["-f", `after=${cursor}`] : []),
+      "-f", `query=${GITHUB_QUERY}`,
+    ];
+  }
+  const page = Number.parseInt(cursor ?? "", 10);
+  return [
+    "mr", "list", "--per-page", String(PAGE_SIZE), "--page", String(Number.isFinite(page) && page > 0 ? page : 1),
+    ...(openOnly ? [] : ["--all"]),
+    "--output", "json",
+  ];
+}
 
 // "No remote" first: its message ends with a hint to `auth login`.
 function classify(stderr: string): Attempt | null {
   const text = stderr.toLowerCase();
   if (
-    ["none of the git remotes", "no github remotes", "no gitlab remotes", "could not determine base repo", "not a github", "not a gitlab"].some(
+    ["none of the git remotes", "no github remotes", "no gitlab remotes", "could not determine base repo", "no git remotes found", "not a github", "not a gitlab"].some(
       (needle) => text.includes(needle),
     )
   ) {
@@ -54,9 +70,9 @@ function remoteHost(dir: string): string | null {
   }
 }
 
-function attempt(dir: string, provider: Provider): Attempt {
-  const { program, args } = CLI[provider];
-  const result = spawnSync(program, args, {
+function attempt(dir: string, provider: Provider, scope: string, cursor: string | null): Attempt {
+  const program = PROGRAM[provider];
+  const result = spawnSync(program, cliArgs(provider, scope, cursor), {
     cwd: dir,
     encoding: "utf8",
     env: { ...process.env, GH_PROMPT_DISABLED: "1", GH_NO_UPDATE_NOTIFIER: "1", NO_PROMPT: "1", GLAB_CHECK_UPDATE: "false", NO_COLOR: "1" },
@@ -70,15 +86,21 @@ function attempt(dir: string, provider: Provider): Attempt {
 const answer = (status: string, provider: Provider | "", raw = "") => ({ status, provider, raw });
 
 export const pullsHandlers: Handlers = {
-  read_pull_requests: ({ dir }) => {
+  read_pull_requests: ({ dir, scope, cursor, provider: asked }) => {
     const host = remoteHost(String(dir));
-    const matched = host !== null && (host.includes("gitlab") || host.includes("github"));
-    const providers: Provider[] =
-      host?.includes("gitlab") ? ["gitlab"] : host?.includes("github") ? ["github"] : ["github", "gitlab"];
+    const named = asked === "github" || asked === "gitlab" ? (asked as Provider) : null;
+    const matched = named !== null || (host !== null && (host.includes("gitlab") || host.includes("github")));
+    const providers: Provider[] = named
+      ? [named]
+      : host?.includes("gitlab")
+        ? ["gitlab"]
+        : host?.includes("github")
+          ? ["github"]
+          : ["github", "gitlab"];
 
     const attempts: Array<[Provider, Attempt]> = [];
     for (const provider of providers) {
-      const result = attempt(String(dir), provider);
+      const result = attempt(String(dir), provider, scope === "all" ? "all" : "open", typeof cursor === "string" ? cursor : null);
       attempts.push([provider, result]);
       if (result.kind === "ok") return answer("ok", provider, result.raw);
     }

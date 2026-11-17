@@ -1,4 +1,4 @@
-use super::pulls::{classify_failure, host_of, providers_for, settle, Attempt, Provider};
+use super::pulls::{classify_failure, host_of, providers_for, settle, Attempt, Provider, PAGE_SIZE};
 use super::test_support::*;
 use super::*;
 
@@ -114,8 +114,45 @@ fn a_repository_without_a_known_remote_never_panics() {
     // and nothing is listed for a repo that has no remote at all.
     let repo = TempRepo::new("pulls-none");
     repo.commit("a.txt", "a\n", "first");
-    if let Ok(payload) = read_pull_requests_in(repo.path()) {
+    if let Ok(payload) = read_pull_requests_in(repo.path(), "open", None, None) {
         assert_ne!(payload.status, "ok");
         assert!(payload.raw.is_empty());
     }
+}
+
+#[test]
+fn a_repo_with_no_remotes_at_all_is_no_remote_not_an_error() {
+    assert_eq!(classify_failure("error parsing \"owner\" value: no git remotes found"), Some(Attempt::NoRemote));
+}
+
+#[test]
+fn github_pages_ask_a_light_query_and_only_name_what_they_need() {
+    let first = Provider::GitHub.args("open", None);
+    assert_eq!(&first[..2], ["api", "graphql"]);
+    assert!(first.contains(&"owner={owner}".to_string()), "gh fills in the repo from the working directory");
+    assert!(first.contains(&"states[]=OPEN".to_string()), "the open scope filters server-side");
+    assert!(!first.iter().any(|arg| arg.starts_with("after=")), "no cursor on the first page");
+    let query = first.last().unwrap();
+    assert!(query.starts_with("query="));
+    assert!(query.contains(&format!("first: {PAGE_SIZE}")), "the page size reaches the query");
+    assert!(query.contains("statusCheckRollup { state }"), "only the rollup's one-word state is asked for");
+    assert!(!query.contains("contexts"), "never the per-check list: that is what times out");
+
+    let all = Provider::GitHub.args("all", Some("Y3Vyc29y"));
+    assert!(!all.contains(&"states[]=OPEN".to_string()), "all states means no filter");
+    assert!(all.contains(&"after=Y3Vyc29y".to_string()), "a follow-up page carries its cursor");
+}
+
+#[test]
+fn gitlab_pages_by_number_and_all_means_all_states() {
+    let open = Provider::GitLab.args("open", None);
+    let joined = open.join(" ");
+    assert_eq!(joined, format!("mr list --per-page {PAGE_SIZE} --page 1 --output json"));
+
+    let all = Provider::GitLab.args("all", Some("3")).join(" ");
+    assert_eq!(all, format!("mr list --per-page {PAGE_SIZE} --page 3 --all --output json"));
+    assert!(
+        Provider::GitLab.args("open", Some("junk")).join(" ").contains("--page 1"),
+        "a cursor that is not a number falls back to the first page"
+    );
 }

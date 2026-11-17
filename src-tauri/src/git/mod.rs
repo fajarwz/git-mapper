@@ -45,8 +45,16 @@ pub use submodules::*;
 /// Pull requests through the `gh` CLI. Not part of open/refresh: it is a network call, so the
 /// UI asks for it on its own schedule.
 #[tauri::command]
-pub async fn read_pull_requests(dir: String) -> Result<PullRequestsPayload, String> {
-    run_blocking("pull requests read", move || read_pull_requests_in(&dir)).await
+pub async fn read_pull_requests(
+    dir: String,
+    scope: String,
+    cursor: Option<String>,
+    provider: Option<String>,
+) -> Result<PullRequestsPayload, String> {
+    run_blocking("pull requests read", move || {
+        read_pull_requests_in(&dir, &scope, cursor.as_deref(), provider.as_deref())
+    })
+    .await
 }
 /// Direct submodules of the repository with their state; empty without a `.gitmodules`.
 #[tauri::command]
