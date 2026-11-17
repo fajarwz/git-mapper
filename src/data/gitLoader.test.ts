@@ -20,6 +20,9 @@ import {
   resolveConflictSides,
   type Repository,
 } from "./gitLoader";
+import { PullRequestProvider, PullRequestsStatus, PullScope } from "../types";
+import { GitHubReview, GitHubRollup, GitHubState, GitLabState } from "../lib/pullRequests";
+import { PullRequestState, ReviewState, ChecksState } from "../types";
 
 // gitLoader is one of the callers that sense `window.__TAURI_INTERNALS__` to pick
 // invoke over the dev middleware; stand that global up so the mock is served.
@@ -478,34 +481,65 @@ test("merge verbs pass through op names and the snake_case payload folds", async
   });
 });
 
-test("loadPullRequests shapes gh's list when ok, and carries a non-ok status with nothing", async () => {
-  const raw = JSON.stringify([
-    {
-      number: 3,
-      title: "t",
-      state: "OPEN",
-      isDraft: false,
-      author: { login: "a" },
-      headRefName: "feat/x",
-      baseRefName: "main",
-      isCrossRepository: false,
-      url: "u",
-      updatedAt: "2026-01-01T00:00:00Z",
-      reviewDecision: "APPROVED",
-      statusCheckRollup: [],
+const ghPage = JSON.stringify({
+  data: {
+    repository: {
+      pullRequests: {
+        totalCount: 199,
+        pageInfo: { hasNextPage: true, endCursor: "c1" },
+        nodes: [
+          {
+            number: 3,
+            title: "t",
+            state: GitHubState.Open,
+            isDraft: false,
+            headRefName: "feat/x",
+            baseRefName: "main",
+            isCrossRepository: false,
+            url: "u",
+            updatedAt: "2026-01-01T00:00:00Z",
+            reviewDecision: GitHubReview.Approved,
+            author: { login: "a" },
+            commits: { nodes: [{ commit: { statusCheckRollup: { state: GitHubRollup.Success } } }] },
+          },
+        ],
+      },
     },
-  ]);
-  vi.mocked(invoke).mockResolvedValueOnce({ status: "ok", provider: "github", raw });
-  const ok = await loadPullRequests("/r");
-  assert.equal(ok.status, "ok");
-  assert.deepEqual(
-    ok.pullRequests.map((pull) => [pull.number, pull.state, pull.review]),
-    [[3, "open", "approved"]],
-  );
-  assert.equal(vi.mocked(invoke).mock.calls.at(-1)?.[0], "read_pull_requests");
+  },
+});
 
-  vi.mocked(invoke).mockResolvedValueOnce({ status: "cli-missing", provider: "gitlab", raw: "" });
-  assert.deepEqual(await loadPullRequests("/r"), { status: "cli-missing", provider: "gitlab", pullRequests: [] });
+test("loadPullRequests returns a shaped page, and a non-ok status with nothing", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce({ status: PullRequestsStatus.Ok, provider: PullRequestProvider.GitHub, raw: ghPage });
+  const ok = await loadPullRequests("/r", PullScope.Open);
+  assert.equal(ok.status, PullRequestsStatus.Ok);
+  assert.equal(ok.nextCursor, "c1");
+  assert.equal(ok.total, 199);
+  assert.deepEqual(
+    ok.pullRequests.map((pull) => [pull.number, pull.state, pull.review, pull.checks]),
+    [[3, PullRequestState.Open, ReviewState.Approved, ChecksState.Passing]],
+  );
+  assert.deepEqual(vi.mocked(invoke).mock.calls.at(-1), [
+    "read_pull_requests",
+    { dir: "/r", scope: PullScope.Open, cursor: null, provider: null, query: null },
+  ]);
+
+  vi.mocked(invoke).mockResolvedValueOnce({ status: PullRequestsStatus.CliMissing, provider: PullRequestProvider.GitLab, raw: "" });
+  assert.deepEqual(await loadPullRequests("/r", PullScope.Open), {
+    status: PullRequestsStatus.CliMissing,
+    provider: PullRequestProvider.GitLab,
+    pullRequests: [],
+    nextCursor: null,
+    total: null,
+  });
+});
+
+test("loadPullRequests asks the next page of the provider that answered the first", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce({ status: PullRequestsStatus.Ok, provider: PullRequestProvider.GitHub, raw: ghPage });
+  await loadPullRequests("/r", PullScope.All, "c1", "github");
+  assert.deepEqual(vi.mocked(invoke).mock.calls.at(-1), [
+    "read_pull_requests",
+    { dir: "/r", scope: PullScope.All, cursor: "c1", provider: PullRequestProvider.GitHub, query: null },
+  ]);
 });
 
 test("loadPullRequests parses GitLab's list, and an unknown provider yields no requests", async () => {
@@ -513,21 +547,33 @@ test("loadPullRequests parses GitLab's list, and an unknown provider yields no r
     {
       iid: 4,
       title: "t",
-      state: "opened",
+      state: GitLabState.Opened,
       source_branch: "feat/x",
       target_branch: "main",
       web_url: "u",
       updated_at: "2026-01-01T00:00:00Z",
     },
   ]);
-  vi.mocked(invoke).mockResolvedValueOnce({ status: "ok", provider: "gitlab", raw });
-  const gitlab = await loadPullRequests("/r");
-  assert.equal(gitlab.provider, "gitlab");
+  vi.mocked(invoke).mockResolvedValueOnce({ status: PullRequestsStatus.Ok, provider: PullRequestProvider.GitLab, raw });
+  const gitlab = await loadPullRequests("/r", PullScope.Open);
+  assert.equal(gitlab.provider, PullRequestProvider.GitLab);
+  assert.equal(gitlab.nextCursor, null, "a short page is the last one");
   assert.deepEqual(
     gitlab.pullRequests.map((pull) => [pull.provider, pull.number, pull.state]),
-    [["gitlab", 4, "open"]],
+    [[PullRequestProvider.GitLab, 4, PullRequestState.Open]],
   );
 
-  vi.mocked(invoke).mockResolvedValueOnce({ status: "cli-missing", provider: "", raw: "" });
-  assert.deepEqual(await loadPullRequests("/r"), { status: "cli-missing", provider: null, pullRequests: [] });
+  vi.mocked(invoke).mockResolvedValueOnce({ status: PullRequestsStatus.CliMissing, provider: "", raw: "" });
+  assert.equal((await loadPullRequests("/r", PullScope.Open)).provider, null);
+});
+
+test("loadPullRequests sends a trimmed search text, and nothing when it is blank", async () => {
+  vi.mocked(invoke).mockResolvedValue({ status: PullRequestsStatus.CliMissing, provider: "", raw: "" });
+  await loadPullRequests("/r", PullScope.Merged, null, null, "  webview  ");
+  assert.deepEqual(vi.mocked(invoke).mock.calls.at(-1), [
+    "read_pull_requests",
+    { dir: "/r", scope: PullScope.Merged, cursor: null, provider: null, query: "webview" },
+  ]);
+  await loadPullRequests("/r", PullScope.Open, null, null, "   ");
+  assert.equal((vi.mocked(invoke).mock.calls.at(-1)?.[1] as { query: unknown }).query, null);
 });

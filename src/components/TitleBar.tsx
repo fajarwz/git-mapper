@@ -447,7 +447,8 @@ export function TitleBar({
             {stageCount > 0 && (
               <span
                 aria-hidden="true"
-                className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-primary font-mono text-[9px] font-bold leading-none text-white soft-shadow"
+                // Amber like the uncommitted row's file pill beside it: the same count, the same colour.
+                className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full border-[1.5px] border-warning bg-surface font-mono text-[9px] font-bold leading-none text-warning-ink soft-shadow"
               >
                 {stageCount > 9 ? "9+" : stageCount}
               </span>

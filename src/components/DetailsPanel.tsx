@@ -1,7 +1,8 @@
 import { useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import type { ChangedFile, Commit, PullRequest, Submodule } from "../types";
-import { pullRequestForRef } from "../lib/pullRequests";
+import { pullRequestForRef, type PullChipData } from "../lib/pullRequests";
+import { PullRequestChip } from "./PullRequestChip";
 import { copyText } from "../lib/clipboard";
 import { formatAbsoluteDate } from "../lib/format";
 import type { SyntaxScheme } from "../lib/highlight";
@@ -47,6 +48,8 @@ interface DetailsPanelProps {
   showAvatars: boolean;
   /** Branch name → pull request, for the #number chip on this commit's branch pills. */
   pullsByBranch?: Map<string, PullRequest>;
+  /** The request this commit came from, next to its hash. */
+  commitChip?: (commit: Commit) => PullChipData | null;
   /** Double-clicking a branch pill here checks the branch out, same as in the commit list. */
   onCheckoutBranch?: (branch: string) => void;
   /** Right-clicking a pill opens the same ref menu as the commit list's pills. */
@@ -89,6 +92,7 @@ export function DetailsPanel({
   syntaxScheme,
   showAvatars,
   pullsByBranch,
+  commitChip,
   onCheckoutBranch,
   onRefContextMenu,
   isWorktree = false,
@@ -270,6 +274,10 @@ export function DetailsPanel({
                     >
                       {hashCopied ? "Copied!" : commit.hash.slice(0, 10)}
                     </button>
+                    {(() => {
+                      const chip = commit.stashIndex === undefined ? commitChip?.(commit) : null;
+                      return chip ? <PullRequestChip chip={chip} className="w-fit ring-hairline" /> : null;
+                    })()}
 
                     {commit.refs.length > 0 && (
                       <div className="flex flex-wrap justify-end gap-1.5">

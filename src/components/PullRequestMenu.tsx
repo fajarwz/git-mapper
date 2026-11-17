@@ -1,29 +1,35 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { PullRequest } from "../types";
+import { ChecksState, PullRequestProvider, PullRequestsStatus, PullScope, ReviewState, type PullRequest } from "../types";
 import type { PullRequestsView } from "../hooks/usePullRequests";
 import { openExternal } from "../lib/external";
 import { formatAbsoluteDate } from "../lib/format";
 import { GLASS_CONTROL, PANEL } from "../lib/ui";
+import { PR_PAGE_SIZE } from "../lib/pullRequests";
 import {
   CHECK_TONE,
   PR_STATE,
   PROVIDER_NAME,
   REVIEW_TONE,
+  compactCount,
   pullRequestLabel,
   requestNoun,
 } from "../lib/pullRequestTone";
-import { AlertIcon, CheckIcon, CloseIcon, ExternalIcon, PullRequestIcon, RefreshIcon } from "./icons";
+import { AlertIcon, CheckIcon, CloseIcon, ExternalIcon, PullRequestIcon, RefreshIcon, SearchIcon } from "./icons";
 import { PullRequestStateIcon } from "./PullRequestStateIcon";
 
-type Filter = "open" | "all";
+type Filter = PullScope;
 
-const LIVE = new Set(["open", "draft"]);
+const TABS: Array<{ value: Filter; label: string }> = [
+  { value: PullScope.Open, label: "Open" },
+  { value: PullScope.Merged, label: "Merged" },
+  { value: PullScope.All, label: "All" },
+];
 
 /** The CLI each provider's list comes from, with where to get it and how to sign in. */
 const CLI = {
-  github: { name: "GitHub CLI", program: "gh", site: "cli.github.com" },
-  gitlab: { name: "GitLab CLI", program: "glab", site: "gitlab.com/gitlab-org/cli" },
+  [PullRequestProvider.GitHub]: { name: "GitHub CLI", program: "gh", site: "cli.github.com" },
+  [PullRequestProvider.GitLab]: { name: "GitLab CLI", program: "glab", site: "gitlab.com/gitlab-org/cli" },
 } as const;
 
 const SEGMENT =
@@ -39,13 +45,13 @@ function Chip({ tone, children }: { tone: string; children: ReactNode }) {
   );
 }
 
-function ChecksChip({ checks }: { checks: Exclude<PullRequest["checks"], "none"> }) {
+function ChecksChip({ checks }: { checks: Exclude<ChecksState, ChecksState.None> }) {
   const tone = CHECK_TONE[checks];
   return (
     <Chip tone={tone.chip}>
-      {checks === "passing" && <CheckIcon size={9} />}
-      {checks === "failing" && <CloseIcon size={9} />}
-      {checks === "pending" && (
+      {checks === ChecksState.Passing && <CheckIcon size={9} />}
+      {checks === ChecksState.Failing && <CloseIcon size={9} />}
+      {checks === ChecksState.Pending && (
         <span aria-hidden="true" className="size-1.5 rounded-full bg-current motion-safe:animate-pulse" />
       )}
       {tone.label}
@@ -75,12 +81,12 @@ function Row({ pull }: { pull: PullRequest }) {
         <span className="truncate font-mono text-[10.5px] text-ink-dim">
           {pull.headBranch} → {pull.baseBranch}
         </span>
-        {(pull.checks !== "none" || review) && (
+        {(pull.checks !== ChecksState.None || review) && (
           <span className="flex flex-wrap items-center gap-1.5 pt-0.5">
-            {pull.checks !== "none" && <ChecksChip checks={pull.checks} />}
+            {pull.checks !== ChecksState.None && <ChecksChip checks={pull.checks} />}
             {review && (
               <Chip tone={review.chip}>
-                {pull.review === "approved" && <CheckIcon size={9} />}
+                {pull.review === ReviewState.Approved && <CheckIcon size={9} />}
                 {review.label}
               </Chip>
             )}
@@ -98,11 +104,11 @@ function Row({ pull }: { pull: PullRequest }) {
   );
 }
 
-function SkeletonRows() {
+function SkeletonRows({ count = 3 }: { count?: number }) {
   return (
     <div role="status" aria-live="polite">
       <span className="sr-only">Loading…</span>
-      {[0, 1, 2].map((index) => (
+      {Array.from({ length: count }, (_, index) => index).map((index) => (
         <div key={index} aria-hidden="true" className="flex gap-2.5 motion-safe:animate-pulse p-2.5">
           <span className="mt-0.5 size-6 shrink-0 rounded-lg bg-ink/10" />
           <span className="flex flex-1 flex-col gap-2 pt-1">
@@ -149,7 +155,7 @@ function Notice({ children, warn = false }: { children: ReactNode; warn?: boolea
  */
 export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
   const [open, setOpen] = useState(false);
-  const [filter, setFilter] = useState<Filter>("open");
+  const [filter, setFilter] = useState<Filter>(PullScope.Open);
   const button = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ top: number; right: number } | null>(null);
@@ -176,15 +182,63 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
     };
   }, [open]);
 
-  const live = useMemo(() => pulls.pulls.filter((pull) => LIVE.has(pull.state)), [pulls.pulls]);
-  const shown = filter === "open" ? live : pulls.pulls;
+  const { loadMore, show, setQuery, query } = pulls;
+  const feed = pulls.view[filter];
+  const shown = feed.pulls;
+  const canObserve = typeof IntersectionObserver !== "undefined";
+  const listRef = useRef<HTMLDivElement>(null);
+  const sentinel = useRef<HTMLDivElement>(null);
+  // The sentinel exists only while a page is waiting and nothing is in flight, so each landed
+  // page re-arms the observer: it keeps loading until the list overflows the panel, then waits.
+  const waiting = feed.cursor !== null && !feed.loadingMore && feed.moreError === null;
 
-  if (pulls.status === "unsupported-remote") return null;
+  useEffect(() => {
+    const target = sentinel.current;
+    if (!open || !waiting || !target || !canObserve) return;
+    const observer = new IntersectionObserver(
+      (hits) => {
+        if (hits.some((hit) => hit.isIntersecting)) loadMore(filter);
+      },
+      { root: listRef.current, rootMargin: "240px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+    // `position` is in the list because the panel (and so the sentinel) mounts a render after `open`.
+  }, [open, position, waiting, filter, loadMore, canObserve, shown.length]);
+
+  // What is typed is not what is searched: the query follows it after a pause, so a request goes
+  // out per word typed, not per keystroke. Clearing is immediate.
+  const [text, setText] = useState("");
+  useEffect(() => {
+    const next = text.trim();
+    if (next === query) return;
+    const timer = window.setTimeout(() => setQuery(next), next === "" ? 0 : 300);
+    return () => window.clearTimeout(timer);
+  }, [text, query, setQuery]);
+
+  // The tab and the search outlive a repo switch, so the selected list reads itself: waiting for
+  // a click that already happened would leave the skeleton up forever.
+  useEffect(() => {
+    if (open && pulls.status === PullRequestsStatus.Ok) show(filter);
+  }, [open, filter, query, pulls.status, show]);
+
+  if (pulls.status === PullRequestsStatus.UnsupportedRemote) return null;
 
   const nouns = requestNoun(pulls.provider, true);
   const lower = nouns.toLowerCase();
   const cli = pulls.provider === null ? null : CLI[pulls.provider];
-  const firstLoad = pulls.status === null && pulls.error === null;
+  // GitHub says how many there are; GitLab only whether another page may exist.
+  const countOf = (list: typeof feed) =>
+    list.loaded
+      ? `${compactCount(list.total ?? list.pulls.length)}${list.total === null && list.cursor !== null ? "+" : ""}`
+      : null;
+  const openList = pulls.feeds[PullScope.Open];
+  const openCount = openList.total ?? openList.pulls.length;
+  const openLabel = countOf(openList);
+  const firstLoad =
+    query === "" && filter === PullScope.Open
+      ? pulls.status === null && pulls.error === null
+      : pulls.status === PullRequestsStatus.Ok && !feed.loaded && feed.moreError === null;
 
   return (
     <>
@@ -196,8 +250,8 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
         aria-expanded={open}
         aria-label={nouns}
         title={
-          live.length > 0
-            ? `${live.length} open ${requestNoun(pulls.provider, live.length !== 1).toLowerCase()}`
+          openCount > 0
+            ? `${openLabel ?? openCount} open ${requestNoun(pulls.provider, openCount !== 1).toLowerCase()}`
             : nouns
         }
         className={`${GLASS_CONTROL} relative grid place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-7 ${
@@ -205,12 +259,12 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
         }`}
       >
         <PullRequestIcon size={13} className={pulls.loading ? "animate-pulse" : undefined} />
-        {live.length > 0 && (
+        {openCount > 0 && (
           <span
             aria-hidden="true"
-            className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-success font-mono text-[9px] font-bold leading-none text-white soft-shadow"
+            className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-success px-1 font-mono text-[9px] font-bold leading-none text-white soft-shadow"
           >
-            {live.length > 9 ? "9+" : live.length}
+            {openCount > 9 ? "9+" : openCount}
           </span>
         )}
       </button>
@@ -236,22 +290,23 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
                   aria-label={`Filter ${lower}`}
                   className="flex items-center gap-0.5 rounded-full border border-hairline bg-glass-soft p-0.5 backdrop-blur-md"
                 >
-                  {(["open", "all"] as const).map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      aria-pressed={filter === value}
-                      onClick={() => setFilter(value)}
-                      className={`${SEGMENT} ${
-                        filter === value ? "bg-primary text-white" : "text-ink-dim hover:bg-hover-glass hover:text-ink"
-                      }`}
-                    >
-                      {value === "open" ? "Open" : "All"}{" "}
-                      <span className="font-mono font-medium opacity-80">
-                        {value === "open" ? live.length : pulls.pulls.length}
-                      </span>
-                    </button>
-                  ))}
+                  {TABS.map(({ value, label }) => {
+                    const count = countOf(pulls.view[value]);
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={filter === value}
+                        onClick={() => setFilter(value)}
+                        className={`${SEGMENT} ${
+                          filter === value ? "bg-primary text-white" : "text-ink-dim hover:bg-hover-glass hover:text-ink"
+                        }`}
+                      >
+                        {label}
+                        {count !== null && <span className="ml-1 font-mono font-medium opacity-80">{count}</span>}
+                      </button>
+                    );
+                  })}
                 </div>
                 <button
                   type="button"
@@ -266,8 +321,43 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
               </div>
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto border-t border-rule p-1.5">
-              {pulls.status === "cli-missing" && (
+            {pulls.status === PullRequestsStatus.Ok && (
+              <div className="relative flex items-center px-3 pb-2">
+                <span aria-hidden="true" className="pointer-events-none absolute left-5 z-10 text-ink-dim">
+                  <SearchIcon size={12} />
+                </span>
+                <input
+                  type="text"
+                  value={text}
+                  onChange={(event) => setText(event.target.value)}
+                  onKeyDown={(event) => {
+                    // Esc clears what is typed first; only an empty box lets it close the popover.
+                    if (event.key === "Escape" && text !== "") {
+                      event.stopPropagation();
+                      setText("");
+                    }
+                  }}
+                  aria-label={`Search ${lower}`}
+                  placeholder={`Search ${lower}`}
+                  className={`h-7 w-full rounded-lg border border-hairline bg-glass-soft pl-7 text-[12.5px] text-ink outline-none backdrop-blur-md placeholder:text-ink-dim focus:border-primary-ink/50 focus:bg-glass-strong ${text ? "pr-7" : "pr-2"}`}
+                />
+                {text !== "" && (
+                  <button
+                    type="button"
+                    onClick={() => setText("")}
+                    aria-label="Clear search"
+                    className="absolute right-4 grid size-5 place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60"
+                  >
+                    <CloseIcon size={9} />
+                  </button>
+                )}
+              </div>
+            )}
+            <div
+              ref={listRef}
+              className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto border-t border-rule p-1.5"
+            >
+              {pulls.status === PullRequestsStatus.CliMissing && (
                 <Notice>
                   {cli ? (
                     <>
@@ -282,7 +372,7 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
                   )}
                 </Notice>
               )}
-              {pulls.status === "cli-unauthenticated" && (
+              {pulls.status === PullRequestsStatus.CliUnauthenticated && (
                 <Notice>
                   The {cli?.name ?? "provider CLI"} is not signed in for this repository&apos;s host. Run{" "}
                   <code className="font-mono">{cli?.program ?? "gh"} auth login</code> in a terminal, then
@@ -295,17 +385,59 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
                 </Notice>
               )}
               {firstLoad && <SkeletonRows />}
-              {pulls.status === "ok" && shown.length === 0 && (
+              {pulls.status === PullRequestsStatus.Ok && feed.loaded && shown.length === 0 && (
                 <Empty
-                  title={filter === "open" ? `No open ${lower}` : `No ${lower} yet`}
+                  title={
+                    query !== ""
+                      ? `No ${lower} match \u201c${query}\u201d`
+                      : filter === PullScope.Open
+                        ? `No open ${lower}`
+                        : filter === PullScope.Merged
+                          ? `No merged ${lower}`
+                          : `No ${lower} yet`
+                  }
                   hint={
-                    filter === "open" && pulls.pulls.length > 0
-                      ? "Merged and closed ones are under All."
-                      : "Nothing has been opened for this repository."
+                    query !== ""
+                      ? "Try a word from the title, or an author."
+                      : filter === PullScope.Open
+                        ? "Merged and closed ones, if any, are under All."
+                        : "Nothing has been opened for this repository."
                   }
                 />
               )}
-              {pulls.status === "ok" && shown.map((pull) => <Row key={pull.number} pull={pull} />)}
+              {pulls.status === PullRequestsStatus.Ok && shown.map((pull) => <Row key={pull.number} pull={pull} />)}
+              {feed.loadingMore && <SkeletonRows count={1} />}
+              {feed.moreError !== null && (
+                <Notice warn>
+                  Could not load {feed.loaded ? "more " : ""}
+                  {lower}: {feed.moreError}{" "}
+                  <button
+                    type="button"
+                    onClick={() => loadMore(filter)}
+                    className="font-semibold text-primary-ink underline underline-offset-2 hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60"
+                  >
+                    Retry
+                  </button>
+                </Notice>
+              )}
+              {waiting && (
+                // The marker the observer watches; without an observer (old webview, jsdom) the
+                // same page is one click away.
+                <div ref={sentinel} className="flex justify-center py-1.5">
+                  {!canObserve && (
+                    <button
+                      type="button"
+                      onClick={() => loadMore(filter)}
+                      className="rounded-full px-3 py-1 text-[11.5px] font-semibold text-ink-dim hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60"
+                    >
+                      Load more
+                    </button>
+                  )}
+                </div>
+              )}
+              {feed.loaded && feed.cursor === null && shown.length > PR_PAGE_SIZE && (
+                <p className="m-0 py-2 text-center text-[11px] text-ink-dim">That&apos;s all of them.</p>
+              )}
             </div>
           </div>,
           document.body,

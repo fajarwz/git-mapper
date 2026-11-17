@@ -1,12 +1,12 @@
-import type { PullRequestState } from "../types";
+import { PullRequestState } from "../types";
 import { PR_STATE } from "../lib/pullRequestTone";
 import { PullRequestClosedIcon, PullRequestDraftIcon, PullRequestIcon, PullRequestMergedIcon } from "./icons";
 
 const GLYPHS = {
-  open: PullRequestIcon,
-  draft: PullRequestDraftIcon,
-  merged: PullRequestMergedIcon,
-  closed: PullRequestClosedIcon,
+  [PullRequestState.Open]: PullRequestIcon,
+  [PullRequestState.Draft]: PullRequestDraftIcon,
+  [PullRequestState.Merged]: PullRequestMergedIcon,
+  [PullRequestState.Closed]: PullRequestClosedIcon,
 } as const;
 
 /** The state as a drawn glyph in its tone: shape and colour both say it, never colour alone. */

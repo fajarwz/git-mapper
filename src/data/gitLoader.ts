@@ -5,13 +5,12 @@ import type {
   Commit,
   CommitRef,
   DiffLine,
-  PullRequest,
-  PullRequestProvider,
-  PullRequestsStatus,
+  PullScope,
   Repository,
   Submodule,
 } from "../types";
-import { parsePullRequests } from "../lib/pullRequests";
+import { PullRequestProvider, PullRequestsStatus } from "../types";
+import { parsePullRequestPage, type PullRequestPage } from "../lib/pullRequests";
 import { sameSubmodules, shapeSubmodules, type RawSubmodule } from "../lib/submodule";
 import { STORAGE_KEYS } from "../lib/persisted";
 import { orderRefs } from "../lib/refOrder";
@@ -610,25 +609,34 @@ export async function fetchRemote(dir: string): Promise<void> {
 }
 
 /**
- * The repo's pull requests through the `gh` CLI. Not part of load/refresh: it is a network
- * call, so the usePullRequests hook asks for it on its own schedule. A non-ok status (CLI
- * missing, signed out, no GitHub/GitLab remote) is an answer, not an error — it rejects only
- * on a real failure.
+ * One page of the repo's pull/merge requests through the provider's CLI. `scope` is the open
+ * ones, the merged ones or every state; `query` is free text matched on the server across the
+ * whole repo; `cursor` (from the previous page) and `provider` (who answered it) ask for the
+ * page after it. Not part of load/refresh: it is a network call, so the usePullRequests
+ * hook asks for it on its own schedule. A non-ok status (CLI missing, signed out, no
+ * GitHub/GitLab remote) is an answer, not an error — it rejects only on a real failure.
  */
-export async function loadPullRequests(dir: string): Promise<{
-  status: PullRequestsStatus;
-  /** Whose CLI answered or should have; null when the remote's host does not say. */
-  provider: PullRequestProvider | null;
-  pullRequests: PullRequest[];
-}> {
-  return call("read_pull_requests", { dir }, (raw) => {
-    const payload = raw as { status: PullRequestsStatus; provider: string; raw: string };
-    const provider = payload.provider === "gitlab" || payload.provider === "github" ? payload.provider : null;
-    return {
-      status: payload.status,
-      provider,
-      pullRequests: payload.status === "ok" && provider ? parsePullRequests(provider, payload.raw) : [],
-    };
+export async function loadPullRequests(
+  dir: string,
+  scope: PullScope,
+  cursor: string | null = null,
+  provider: PullRequestProvider | null = null,
+  query = "",
+): Promise<
+  PullRequestPage & {
+    status: PullRequestsStatus;
+    /** Whose CLI answered or should have; null when the remote's host does not say. */
+    provider: PullRequestProvider | null;
+  }
+> {
+  return call("read_pull_requests", { dir, scope, cursor, provider, query: query.trim() || null }, (raw) => {
+    const payload = raw as { status: PullRequestsStatus; provider: PullRequestProvider | null; raw: string };
+    const answered = Object.values(PullRequestProvider).find((known) => known === payload.provider) ?? null;
+    const page: PullRequestPage =
+      payload.status === PullRequestsStatus.Ok && answered
+        ? parsePullRequestPage(answered, payload.raw, cursor)
+        : { pullRequests: [], nextCursor: null, total: null };
+    return { status: payload.status, provider: answered, ...page };
   });
 }
 
