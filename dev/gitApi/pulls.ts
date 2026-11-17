@@ -11,9 +11,9 @@ type Attempt =
 
 // Keep in step with PAGE_SIZE and GITHUB_QUERY in src-tauri/src/git/pulls.rs.
 const PAGE_SIZE = 30;
-const GITHUB_QUERY = `query($owner: String!, $name: String!, $states: [PullRequestState!], $after: String) { repository(owner: $owner, name: $name) { pullRequests(first: ${PAGE_SIZE}, states: $states, after: $after, orderBy: {field: CREATED_AT, direction: DESC}) { totalCount pageInfo { hasNextPage endCursor } nodes { number title state isDraft headRefName baseRefName isCrossRepository url updatedAt reviewDecision author { login } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }`;
+const GITHUB_QUERY = `query($owner: String!, $name: String!, $states: [PullRequestState!], $after: String) { repository(owner: $owner, name: $name) { pullRequests(first: ${PAGE_SIZE}, states: $states, after: $after, orderBy: {field: CREATED_AT, direction: DESC}) { totalCount pageInfo { hasNextPage endCursor } nodes { number title state isDraft headRefName baseRefName isCrossRepository url updatedAt reviewDecision mergeCommit { oid } author { login } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }`;
 
-const GITHUB_SEARCH = `query($q: String!, $after: String) { search(query: $q, type: ISSUE, first: ${PAGE_SIZE}, after: $after) { issueCount pageInfo { hasNextPage endCursor } nodes { ... on PullRequest { number title state isDraft headRefName baseRefName isCrossRepository url updatedAt reviewDecision author { login } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }`;
+const GITHUB_SEARCH = `query($q: String!, $after: String) { search(query: $q, type: ISSUE, first: ${PAGE_SIZE}, after: $after) { issueCount pageInfo { hasNextPage endCursor } nodes { ... on PullRequest { number title state isDraft headRefName baseRefName isCrossRepository url updatedAt reviewDecision mergeCommit { oid } author { login } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }`;
 
 const PROGRAM: Record<Provider, string> = { github: "gh", gitlab: "glab" };
 

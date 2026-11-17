@@ -136,6 +136,7 @@ fn github_pages_ask_a_light_query_and_only_name_what_they_need() {
     assert!(query.starts_with("query="));
     assert!(query.contains(&format!("first: {PAGE_SIZE}")), "the page size reaches the query");
     assert!(query.contains("statusCheckRollup { state }"), "only the rollup's one-word state is asked for");
+    assert!(query.contains("mergeCommit { oid }"), "a merged PR names the commit it made, which is how a squash merge is found");
     assert!(!query.contains("contexts"), "never the per-check list: that is what times out");
 
     let all = Provider::GitHub.args("all", Some("Y3Vyc29y"), None);

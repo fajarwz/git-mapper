@@ -14,7 +14,7 @@ const GITHUB_QUERY: &str = "query($owner: String!, $name: String!, $states: [Pul
 repository(owner: $owner, name: $name) { pullRequests(first: __PAGE__, states: $states, after: $after, \
 orderBy: {field: CREATED_AT, direction: DESC}) { totalCount pageInfo { hasNextPage endCursor } nodes { \
 number title state isDraft headRefName baseRefName isCrossRepository url updatedAt reviewDecision \
-author { login } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }";
+mergeCommit { oid } author { login } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }";
 
 /// The text-search twin of the query above: GitHub's search returns issues and PRs alike, so the
 /// `is:pr` qualifier in `q` narrows it and the fragment keeps only PR fields. Its count is
@@ -22,7 +22,7 @@ author { login } commits(last: 1) { nodes { commit { statusCheckRollup { state }
 const GITHUB_SEARCH: &str = "query($q: String!, $after: String) { search(query: $q, type: ISSUE, first: __PAGE__, \
 after: $after) { issueCount pageInfo { hasNextPage endCursor } nodes { ... on PullRequest { \
 number title state isDraft headRefName baseRefName isCrossRepository url updatedAt reviewDecision \
-author { login } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }";
+mergeCommit { oid } author { login } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }";
 
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Provider {
