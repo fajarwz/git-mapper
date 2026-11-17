@@ -1,15 +1,14 @@
 import { ChecksState, PullRequestProvider, PullRequestState, ReviewState, type PullRequest } from "../types";
 
 /**
- * Wording and tone per PR state, shared by the pill chip and the list rows. Only live work
- * (open) speaks in colour; finished states stay quiet, so a long All list is not a rainbow and
- * draft vs closed is told apart by glyph, not hue.
+ * Wording and tone per PR state, shared by the pill chip and the list rows. Draft stays quiet
+ * (grey); open, merged and closed each get their own hue so closed is never mistaken for draft.
  */
 export const PR_STATE: Record<PullRequestState, { label: string; text: string; tile: string }> = {
   [PullRequestState.Open]: { label: "Open", text: "text-success-ink", tile: "bg-success/15" },
   [PullRequestState.Draft]: { label: "Draft", text: "text-ink-dim", tile: "bg-ink/10" },
   [PullRequestState.Merged]: { label: "Merged", text: "text-primary-ink", tile: "bg-primary/15" },
-  [PullRequestState.Closed]: { label: "Closed", text: "text-ink-dim", tile: "bg-ink/10" },
+  [PullRequestState.Closed]: { label: "Closed", text: "text-danger-ink", tile: "bg-danger/15" },
 };
 
 /** The two status chips under a row's title: the tint pair is `bg-X/15` + `text-X-ink`. */
