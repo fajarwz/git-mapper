@@ -26,7 +26,7 @@ and DNS setup is handled out-of-band (not part of the public repo).
   A token retune in the app must be re-copied here.
 - `public/fonts/` are the same files the app ships in `public/fonts/`.
 - `public/screens/main-{light,dark}.png` are resized (2240px) copies of
-  `docs/screenshots/main-*.png`. Re-copy + resize with ImageMagick after a
+  `docs/assets/screenshots/main-*.png`. Re-copy + resize with ImageMagick after a
   fresh screenshot pair lands.
 
 Do NOT import app components into the site: different runtime, different

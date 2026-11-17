@@ -37,8 +37,8 @@ the branch names only, not the code.
 
 Open an issue and describe the situation first. "I scroll 12k commits and lose the branch I was
 following" says more than "add a filter". Ideas that make history easier to read win over ideas
-that add a mode. The honest gaps are listed at the bottom of the README, and the roadmap at the
-bottom of `AGENTS.md` shows what is already planned.
+that add a mode. The honest gaps are listed at the bottom of the README, and `docs/roadmap.md`
+shows what is already planned.
 
 ## Setting up
 
@@ -81,7 +81,7 @@ useful bug on its own.
 - `src/App.tsx` is the shell. Per-domain state lives in `src/hooks/`, pure logic in `src/lib/`.
 - `src-tauri/src/git/` holds the commands that run git. One module per domain.
 - `src/data/gitLoader.ts` is the only place that calls the backend. Components never invoke.
-- `AGENTS.md` is the full map: architecture per file, conventions, known pitfalls.
+- `AGENTS.md` indexes the full map in `docs/`: architecture per file, conventions, known pitfalls.
 
 ## House style
 
