@@ -7,7 +7,7 @@ import { afterEach, test, vi } from "vitest";
 import { PullRequestMenu } from "./PullRequestMenu";
 import { openExternal } from "../lib/external";
 import type { Feed, PullRequestsView } from "../hooks/usePullRequests";
-import type { PullRequest } from "../types";
+import type { PullRequest, PullScope } from "../types";
 
 vi.mock("../lib/external", () => ({ openExternal: vi.fn() }));
 
@@ -43,19 +43,40 @@ const feed = (pulls: PullRequest[] = [], over: Partial<Feed> = {}): Feed => ({
   ...over,
 });
 
-const view = (over: Partial<PullRequestsView> = {}): PullRequestsView => ({
-  status: "ok",
-  provider: "github",
-  error: null,
-  loading: false,
+type Feeds = Record<PullScope, Feed>;
+const feeds = (over: Partial<Feeds> = {}): Feeds => ({
   open: feed(),
+  merged: feed([], { loaded: false }),
   all: feed([], { loaded: false }),
-  byBranch: new Map(),
-  reload: vi.fn(),
-  loadMore: vi.fn(),
-  showAll: vi.fn(),
   ...over,
 });
+
+/** A view over plain lists; `open`/`merged`/`all` fill those lists, and `found` + `query` make it a search. */
+const view = (
+  over: Partial<PullRequestsView> & { open?: Feed; merged?: Feed; all?: Feed; found?: Partial<Feeds> } = {},
+): PullRequestsView => {
+  const { open, merged, all, found, ...rest } = over;
+  const plain = feeds({
+    ...(open ? { open } : {}),
+    ...(merged ? { merged } : {}),
+    ...(all ? { all } : {}),
+  });
+  return {
+    status: "ok",
+    provider: "github",
+    error: null,
+    loading: false,
+    query: "",
+    feeds: plain,
+    view: found ? feeds(found) : plain,
+    byBranch: new Map(),
+    reload: vi.fn(),
+    loadMore: vi.fn(),
+    show: vi.fn(),
+    setQuery: vi.fn(),
+    ...rest,
+  };
+};
 
 const openMenu = (container: HTMLElement) =>
   fireEvent.click(container.querySelector("[data-pr-menu]") as HTMLElement);
@@ -64,13 +85,13 @@ const many = (count: number) => Array.from({ length: count }, (_, index) => pull
 
 test("counts the open requests on the button and lists only those until All is chosen", () => {
   const live = [pull({ number: 1, title: "First" }), pull({ number: 2, title: "Draft one", state: "draft" })];
-  const showAll = vi.fn();
+  const show = vi.fn();
   const { container } = render(
     <PullRequestMenu
       pulls={view({
         open: feed(live),
         all: feed([...live, pull({ number: 3, title: "Shipped", state: "merged" })]),
-        showAll,
+        show,
       })}
     />,
   );
@@ -82,7 +103,7 @@ test("counts the open requests on the button and lists only those until All is c
   assert.equal(screen.queryByText("Shipped"), null, "merged PRs wait behind All");
 
   fireEvent.click(screen.getByRole("button", { name: /^All/ }));
-  assert.equal(showAll.mock.calls.length, 1, "opening All asks for its first page");
+  assert.ok(show.mock.calls.some((call) => call[0] === "all"), "choosing All asks for its first page");
   assert.ok(screen.getByText("Shipped"));
 });
 
@@ -276,23 +297,119 @@ test("the end of a multi-page list says so; a one-page list stays quiet", () => 
   assert.equal(screen.queryByText("That's all of them."), null);
 });
 
-test("an All tab left selected reads itself on a repo whose All list was never loaded", () => {
-  const firstRepoShowAll = vi.fn();
-  const { container, rerender } = render(<PullRequestMenu pulls={view({ showAll: firstRepoShowAll })} />);
-  openMenu(container);
-  fireEvent.click(within(screen.getByRole("group", { name: /^Filter/ })).getByRole("button", { name: /^All/ }));
-  assert.equal(firstRepoShowAll.mock.calls.length, 1);
+const tab = (name: RegExp) => within(screen.getByRole("group", { name: /^Filter/ })).getByRole("button", { name });
 
-  // Another repo: a new showAll, an All feed nobody has asked for, and the tab still on All.
-  const secondRepoShowAll = vi.fn();
-  rerender(<PullRequestMenu pulls={view({ showAll: secondRepoShowAll })} />);
-  assert.equal(secondRepoShowAll.mock.calls.length, 1, "no click needed: the selected tab asks for its list");
+test("a Merged tab lists the merged requests and reads them the first time it is chosen", () => {
+  const show = vi.fn();
+  const merged = feed([pull({ number: 9, title: "Shipped", state: "merged" })], { total: 322 });
+  const { container } = render(<PullRequestMenu pulls={view({ open: feed([pull({})]), merged, show })} />);
+  openMenu(container);
+  assert.equal(screen.queryByText("Shipped"), null, "Open does not list merged ones");
+  fireEvent.click(tab(/^Merged/));
+  assert.ok(screen.getByText("Shipped"));
+  assert.match(tab(/^Merged/).textContent ?? "", /322/);
+  assert.ok(show.mock.calls.some((call) => call[0] === "merged"));
+});
+
+test("an empty Merged tab says nothing has been merged", () => {
+  const { container } = render(<PullRequestMenu pulls={view({ merged: feed([]) })} />);
+  openMenu(container);
+  fireEvent.click(tab(/^Merged/));
+  assert.ok(screen.getByText("No merged pull requests"));
+});
+
+test("a selected tab reads itself on a repo whose list was never loaded", () => {
+  const first = vi.fn();
+  const { container, rerender } = render(<PullRequestMenu pulls={view({ show: first })} />);
+  openMenu(container);
+  fireEvent.click(tab(/^All/));
+  assert.ok(first.mock.calls.some((call) => call[0] === "all"));
+
+  // Another repo: a new `show`, lists nobody has asked for, and the tab still on All.
+  const second = vi.fn();
+  rerender(<PullRequestMenu pulls={view({ show: second })} />);
+  assert.ok(second.mock.calls.some((call) => call[0] === "all"), "no click needed: the selected tab asks for its list");
   assert.ok(screen.getByRole("status"), "and shows the skeleton only while that read is out");
 });
 
-test("a selected All does not ask for a list while the CLI cannot answer", () => {
-  const showAll = vi.fn();
-  const { container } = render(<PullRequestMenu pulls={view({ status: "cli-missing", showAll })} />);
+test("a selected tab does not ask for a list while the CLI cannot answer", () => {
+  const show = vi.fn();
+  const { container } = render(<PullRequestMenu pulls={view({ status: "cli-missing", show })} />);
   openMenu(container);
-  assert.equal(showAll.mock.calls.length, 0);
+  assert.equal(show.mock.calls.length, 0);
+});
+
+test("typing searches after a pause, one request per word rather than per keystroke", () => {
+  vi.useFakeTimers();
+  try {
+    const setQuery = vi.fn();
+    const { container } = render(<PullRequestMenu pulls={view({ setQuery })} />);
+    openMenu(container);
+    const box = screen.getByLabelText("Search pull requests");
+    fireEvent.change(box, { target: { value: "web" } });
+    fireEvent.change(box, { target: { value: "webview" } });
+    act(() => void vi.advanceTimersByTime(200));
+    assert.equal(setQuery.mock.calls.length, 0, "still typing");
+    act(() => void vi.advanceTimersByTime(200));
+    assert.deepEqual(setQuery.mock.calls, [["webview"]]);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("clearing the box goes back to the plain list at once", () => {
+  vi.useFakeTimers();
+  try {
+    const setQuery = vi.fn();
+    const { container } = render(
+      <PullRequestMenu pulls={view({ query: "webview", found: { open: feed([pull({ title: "Webview fix" })]) }, setQuery })} />,
+    );
+    openMenu(container);
+    fireEvent.change(screen.getByLabelText("Search pull requests"), { target: { value: "webview" } });
+    fireEvent.click(screen.getByLabelText("Clear search"));
+    act(() => void vi.advanceTimersByTime(0));
+    assert.deepEqual(setQuery.mock.calls.at(-1), [""]);
+  } finally {
+    vi.useRealTimers();
+  }
+});
+
+test("Escape clears the search text first, and only an empty box lets it close the popover", () => {
+  const { container } = render(<PullRequestMenu pulls={view()} />);
+  openMenu(container);
+  const box = screen.getByLabelText("Search pull requests") as HTMLInputElement;
+  fireEvent.change(box, { target: { value: "web" } });
+  fireEvent.keyDown(box, { key: "Escape" });
+  assert.equal(box.value, "");
+  assert.ok(document.querySelector("[data-pr-panel]"), "the first Escape only cleared the box");
+  fireEvent.keyDown(box, { key: "Escape" });
+  assert.equal(document.querySelector("[data-pr-panel]"), null);
+});
+
+test("a search shows its own results, counts and an empty state that names the text", () => {
+  const { container, rerender } = render(
+    <PullRequestMenu
+      pulls={view({
+        open: feed([pull({ number: 1, title: "Plain" })], { total: 199 }),
+        query: "webview",
+        found: { open: feed([pull({ number: 7, title: "Webview fix" })], { total: 12 }), all: feed([], { total: 40 }) },
+      })}
+    />,
+  );
+  openMenu(container);
+  assert.ok(screen.getByText("Webview fix"));
+  assert.equal(screen.queryByText("Plain"), null, "the plain list is not mixed into a search");
+  assert.match(tab(/^Open/).textContent ?? "", /12/, "the tab counts are the search's");
+  assert.match(tab(/^All/).textContent ?? "", /40/);
+  assert.equal(container.querySelector("[data-pr-menu]")?.textContent, "9+", "the button still counts the open list");
+
+  rerender(<PullRequestMenu pulls={view({ query: "zzz", found: { open: feed([]) } })} />);
+  assert.ok(screen.getByText(/match .zzz./));
+  assert.ok(screen.getByText(/Try a word from the title/));
+});
+
+test("there is no search box until the CLI has answered", () => {
+  const { container } = render(<PullRequestMenu pulls={view({ status: "cli-missing" })} />);
+  openMenu(container);
+  assert.equal(screen.queryByLabelText("Search pull requests"), null);
 });

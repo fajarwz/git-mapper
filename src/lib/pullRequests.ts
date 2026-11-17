@@ -27,15 +27,18 @@ interface RawNode {
   commits?: { nodes?: Array<{ commit?: { statusCheckRollup?: { state?: string } | null } | null }> } | null;
 }
 
+interface RawConnection {
+  totalCount?: number;
+  /** A search reports its count as issueCount, and its nodes may be empty objects for non-PRs. */
+  issueCount?: number;
+  pageInfo?: { hasNextPage?: boolean; endCursor?: string | null };
+  nodes?: RawNode[];
+}
+
 interface RawGitHubPage {
   data?: {
-    repository?: {
-      pullRequests?: {
-        totalCount?: number;
-        pageInfo?: { hasNextPage?: boolean; endCursor?: string | null };
-        nodes?: RawNode[];
-      };
-    } | null;
+    repository?: { pullRequests?: RawConnection } | null;
+    search?: RawConnection | null;
   } | null;
 }
 
@@ -68,8 +71,9 @@ function parseJson(raw: string): unknown {
 }
 
 function parseGitHub(raw: string): PullRequestPage {
-  const page = (parseJson(raw) as RawGitHubPage | null)?.data?.repository?.pullRequests;
-  const nodes = Array.isArray(page?.nodes) ? page.nodes : [];
+  const data = (parseJson(raw) as RawGitHubPage | null)?.data;
+  const page = data?.repository?.pullRequests ?? data?.search ?? undefined;
+  const nodes = (Array.isArray(page?.nodes) ? page.nodes : []).filter((item) => typeof item?.number === "number");
   const pageInfo = page?.pageInfo;
   return {
     pullRequests: nodes.map((item) => ({
@@ -87,7 +91,12 @@ function parseGitHub(raw: string): PullRequestPage {
       fromFork: item.isCrossRepository === true,
     })),
     nextCursor: pageInfo?.hasNextPage === true && pageInfo.endCursor ? pageInfo.endCursor : null,
-    total: typeof page?.totalCount === "number" ? page.totalCount : null,
+    total:
+      typeof page?.totalCount === "number"
+        ? page.totalCount
+        : typeof page?.issueCount === "number"
+          ? page.issueCount
+          : null,
   };
 }
 

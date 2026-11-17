@@ -67,6 +67,9 @@ export type ChecksState = "passing" | "failing" | "pending" | "none";
 
 export type PullRequestProvider = "github" | "gitlab";
 
+/** Which slice of a repo's requests a list shows: open (drafts included), merged, or every state. */
+export type PullScope = "open" | "merged" | "all";
+
 /** Provider-neutral: the gh adapter (GitHub) and the glab adapter (GitLab) both fill it. */
 export interface PullRequest {
   provider: PullRequestProvider;

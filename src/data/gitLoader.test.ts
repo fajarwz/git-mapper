@@ -517,7 +517,7 @@ test("loadPullRequests returns a shaped page, and a non-ok status with nothing",
   );
   assert.deepEqual(vi.mocked(invoke).mock.calls.at(-1), [
     "read_pull_requests",
-    { dir: "/r", scope: "open", cursor: null, provider: null },
+    { dir: "/r", scope: "open", cursor: null, provider: null, query: null },
   ]);
 
   vi.mocked(invoke).mockResolvedValueOnce({ status: "cli-missing", provider: "gitlab", raw: "" });
@@ -535,7 +535,7 @@ test("loadPullRequests asks the next page of the provider that answered the firs
   await loadPullRequests("/r", "all", "c1", "github");
   assert.deepEqual(vi.mocked(invoke).mock.calls.at(-1), [
     "read_pull_requests",
-    { dir: "/r", scope: "all", cursor: "c1", provider: "github" },
+    { dir: "/r", scope: "all", cursor: "c1", provider: "github", query: null },
   ]);
 });
 
@@ -562,4 +562,15 @@ test("loadPullRequests parses GitLab's list, and an unknown provider yields no r
 
   vi.mocked(invoke).mockResolvedValueOnce({ status: "cli-missing", provider: "", raw: "" });
   assert.equal((await loadPullRequests("/r", "open")).provider, null);
+});
+
+test("loadPullRequests sends a trimmed search text, and nothing when it is blank", async () => {
+  vi.mocked(invoke).mockResolvedValue({ status: "cli-missing", provider: "", raw: "" });
+  await loadPullRequests("/r", "merged", null, null, "  webview  ");
+  assert.deepEqual(vi.mocked(invoke).mock.calls.at(-1), [
+    "read_pull_requests",
+    { dir: "/r", scope: "merged", cursor: null, provider: null, query: "webview" },
+  ]);
+  await loadPullRequests("/r", "open", null, null, "   ");
+  assert.equal((vi.mocked(invoke).mock.calls.at(-1)?.[1] as { query: unknown }).query, null);
 });

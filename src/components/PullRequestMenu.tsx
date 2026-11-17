@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { PullRequest } from "../types";
+import type { PullRequest, PullScope } from "../types";
 import type { PullRequestsView } from "../hooks/usePullRequests";
 import { openExternal } from "../lib/external";
 import { formatAbsoluteDate } from "../lib/format";
@@ -15,10 +15,16 @@ import {
   pullRequestLabel,
   requestNoun,
 } from "../lib/pullRequestTone";
-import { AlertIcon, CheckIcon, CloseIcon, ExternalIcon, PullRequestIcon, RefreshIcon } from "./icons";
+import { AlertIcon, CheckIcon, CloseIcon, ExternalIcon, PullRequestIcon, RefreshIcon, SearchIcon } from "./icons";
 import { PullRequestStateIcon } from "./PullRequestStateIcon";
 
-type Filter = "open" | "all";
+type Filter = PullScope;
+
+const TABS: Array<{ value: Filter; label: string }> = [
+  { value: "open", label: "Open" },
+  { value: "merged", label: "Merged" },
+  { value: "all", label: "All" },
+];
 
 /** The CLI each provider's list comes from, with where to get it and how to sign in. */
 const CLI = {
@@ -176,8 +182,8 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
     };
   }, [open]);
 
-  const { loadMore, showAll } = pulls;
-  const feed = filter === "open" ? pulls.open : pulls.all;
+  const { loadMore, show, setQuery, query } = pulls;
+  const feed = pulls.view[filter];
   const shown = feed.pulls;
   const canObserve = typeof IntersectionObserver !== "undefined";
   const listRef = useRef<HTMLDivElement>(null);
@@ -200,11 +206,21 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
     // `position` is in the list because the panel (and so the sentinel) mounts a render after `open`.
   }, [open, position, waiting, filter, loadMore, canObserve, shown.length]);
 
-  // The tab outlives a repo switch: on a repo whose All list was never read, waiting for the
-  // All button's click would leave the skeleton up forever, so a selected All reads itself.
+  // What is typed is not what is searched: the query follows it after a pause, so a request goes
+  // out per word typed, not per keystroke. Clearing is immediate.
+  const [text, setText] = useState("");
   useEffect(() => {
-    if (open && filter === "all" && pulls.status === "ok") showAll();
-  }, [open, filter, pulls.status, showAll]);
+    const next = text.trim();
+    if (next === query) return;
+    const timer = window.setTimeout(() => setQuery(next), next === "" ? 0 : 300);
+    return () => window.clearTimeout(timer);
+  }, [text, query, setQuery]);
+
+  // The tab and the search outlive a repo switch, so the selected list reads itself: waiting for
+  // a click that already happened would leave the skeleton up forever.
+  useEffect(() => {
+    if (open && pulls.status === "ok") show(filter);
+  }, [open, filter, query, pulls.status, show]);
 
   if (pulls.status === "unsupported-remote") return null;
 
@@ -212,16 +228,17 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
   const lower = nouns.toLowerCase();
   const cli = pulls.provider === null ? null : CLI[pulls.provider];
   // GitHub says how many there are; GitLab only whether another page may exist.
-  const openCount = pulls.open.total ?? pulls.open.pulls.length;
-  const openMore = pulls.open.total === null && pulls.open.cursor !== null;
-  const openLabel = `${compactCount(openCount)}${openMore ? "+" : ""}`;
-  const allLabel = pulls.all.loaded
-    ? `${compactCount(pulls.all.total ?? pulls.all.pulls.length)}${pulls.all.total === null && pulls.all.cursor !== null ? "+" : ""}`
-    : null;
+  const countOf = (list: typeof feed) =>
+    list.loaded
+      ? `${compactCount(list.total ?? list.pulls.length)}${list.total === null && list.cursor !== null ? "+" : ""}`
+      : null;
+  const openList = pulls.feeds.open;
+  const openCount = openList.total ?? openList.pulls.length;
+  const openLabel = countOf(openList);
   const firstLoad =
-    filter === "open"
+    query === "" && filter === "open"
       ? pulls.status === null && pulls.error === null
-      : pulls.status === "ok" && !pulls.all.loaded && pulls.all.moreError === null;
+      : pulls.status === "ok" && !feed.loaded && feed.moreError === null;
 
   return (
     <>
@@ -234,7 +251,7 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
         aria-label={nouns}
         title={
           openCount > 0
-            ? `${openLabel} open ${requestNoun(pulls.provider, openCount !== 1).toLowerCase()}`
+            ? `${openLabel ?? openCount} open ${requestNoun(pulls.provider, openCount !== 1).toLowerCase()}`
             : nouns
         }
         className={`${GLASS_CONTROL} relative grid place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-7 ${
@@ -273,24 +290,23 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
                   aria-label={`Filter ${lower}`}
                   className="flex items-center gap-0.5 rounded-full border border-hairline bg-glass-soft p-0.5 backdrop-blur-md"
                 >
-                  {(["open", "all"] as const).map((value) => (
-                    <button
-                      key={value}
-                      type="button"
-                      aria-pressed={filter === value}
-                      onClick={() => setFilter(value)}
-                      className={`${SEGMENT} ${
-                        filter === value ? "bg-primary text-white" : "text-ink-dim hover:bg-hover-glass hover:text-ink"
-                      }`}
-                    >
-                      {value === "open" ? "Open" : "All"}
-                      {(value === "open" ? openLabel : allLabel) !== null && (
-                        <span className="ml-1 font-mono font-medium opacity-80">
-                          {value === "open" ? openLabel : allLabel}
-                        </span>
-                      )}
-                    </button>
-                  ))}
+                  {TABS.map(({ value, label }) => {
+                    const count = countOf(pulls.view[value]);
+                    return (
+                      <button
+                        key={value}
+                        type="button"
+                        aria-pressed={filter === value}
+                        onClick={() => setFilter(value)}
+                        className={`${SEGMENT} ${
+                          filter === value ? "bg-primary text-white" : "text-ink-dim hover:bg-hover-glass hover:text-ink"
+                        }`}
+                      >
+                        {label}
+                        {count !== null && <span className="ml-1 font-mono font-medium opacity-80">{count}</span>}
+                      </button>
+                    );
+                  })}
                 </div>
                 <button
                   type="button"
@@ -305,6 +321,38 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
               </div>
             </div>
 
+            {pulls.status === "ok" && (
+              <div className="relative flex items-center px-3 pb-2">
+                <span aria-hidden="true" className="pointer-events-none absolute left-5 z-10 text-ink-dim">
+                  <SearchIcon size={12} />
+                </span>
+                <input
+                  type="text"
+                  value={text}
+                  onChange={(event) => setText(event.target.value)}
+                  onKeyDown={(event) => {
+                    // Esc clears what is typed first; only an empty box lets it close the popover.
+                    if (event.key === "Escape" && text !== "") {
+                      event.stopPropagation();
+                      setText("");
+                    }
+                  }}
+                  aria-label={`Search ${lower}`}
+                  placeholder={`Search ${lower}`}
+                  className={`h-7 w-full rounded-lg border border-hairline bg-glass-soft pl-7 text-[12.5px] text-ink outline-none backdrop-blur-md placeholder:text-ink-dim focus:border-primary-ink/50 focus:bg-glass-strong ${text ? "pr-7" : "pr-2"}`}
+                />
+                {text !== "" && (
+                  <button
+                    type="button"
+                    onClick={() => setText("")}
+                    aria-label="Clear search"
+                    className="absolute right-4 grid size-5 place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60"
+                  >
+                    <CloseIcon size={9} />
+                  </button>
+                )}
+              </div>
+            )}
             <div
               ref={listRef}
               className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto border-t border-rule p-1.5"
@@ -339,11 +387,21 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
               {firstLoad && <SkeletonRows />}
               {pulls.status === "ok" && feed.loaded && shown.length === 0 && (
                 <Empty
-                  title={filter === "open" ? `No open ${lower}` : `No ${lower} yet`}
+                  title={
+                    query !== ""
+                      ? `No ${lower} match \u201c${query}\u201d`
+                      : filter === "open"
+                        ? `No open ${lower}`
+                        : filter === "merged"
+                          ? `No merged ${lower}`
+                          : `No ${lower} yet`
+                  }
                   hint={
-                    filter === "open"
-                      ? "Merged and closed ones, if any, are under All."
-                      : "Nothing has been opened for this repository."
+                    query !== ""
+                      ? "Try a word from the title, or an author."
+                      : filter === "open"
+                        ? "Merged and closed ones, if any, are under All."
+                        : "Nothing has been opened for this repository."
                   }
                 />
               )}

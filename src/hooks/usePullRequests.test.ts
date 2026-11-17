@@ -1,4 +1,4 @@
-// Per-repo PR reads: Open on arrival, All on demand, a page at a time, and no pointless retries.
+// Per-repo PR reads: Open on arrival, other scopes on demand, a page at a time, search, no pointless retries.
 // @vitest-environment jsdom
 import assert from "node:assert/strict";
 import { act, renderHook, waitFor } from "@testing-library/react";
@@ -41,6 +41,8 @@ const repo = (over: Partial<Repository> = {}) => ({ path: "/r", refsDigest: "d1"
 const mount = (initial: Repository = repo()) =>
   renderHook(({ r }) => usePullRequests(r), { initialProps: { r: initial } });
 const reads = () => vi.mocked(loadPullRequests).mock.calls;
+/** [scope, cursor, query] of each read, to say what was asked without the repeated dir/provider. */
+const asked = () => reads().map((call) => [call[1], call[2], call[4]]);
 
 beforeEach(() => {
   vi.mocked(loadPullRequests).mockReset();
@@ -50,24 +52,25 @@ test("reads the open list on arrival and exposes the branch lookup", async () =>
   vi.mocked(loadPullRequests).mockResolvedValue(page([pull(1)], { nextCursor: "c1", total: 199 }));
   const { result } = mount();
   await waitFor(() => assert.equal(result.current.status, "ok"));
-  assert.deepEqual(reads(), [["/r", "open", null, null]]);
-  assert.equal(result.current.open.total, 199);
-  assert.equal(result.current.open.cursor, "c1");
+  assert.deepEqual(reads(), [["/r", "open", null, null, ""]]);
+  assert.equal(result.current.feeds.open.total, 199);
+  assert.equal(result.current.feeds.open.cursor, "c1");
   assert.equal(result.current.byBranch.get("feat/1")?.number, 1);
-  assert.equal(result.current.all.loaded, false, "All waits until it is asked for");
+  assert.equal(result.current.feeds.merged.loaded, false, "the other scopes wait until they are shown");
+  assert.equal(result.current.feeds.all.loaded, false);
 });
 
-test("All is read the first time it is shown, and reused after", async () => {
+test("a scope is read the first time it is shown, and reused after", async () => {
   vi.mocked(loadPullRequests).mockImplementation(async (_dir, scope) =>
-    scope === "open" ? page([pull(1)]) : page([pull(1), pull(2, { state: "merged" })], { total: 7213 }),
+    scope === "open" ? page([pull(1)]) : page([pull(2, { state: "merged" })], { total: 322 }),
   );
   const { result } = mount();
-  await waitFor(() => assert.equal(result.current.open.loaded, true));
-  act(() => result.current.showAll());
-  await waitFor(() => assert.equal(result.current.all.loaded, true));
-  assert.equal(result.current.all.total, 7213);
-  act(() => result.current.showAll());
-  assert.equal(reads().filter((call) => call[1] === "all").length, 1);
+  await waitFor(() => assert.equal(result.current.feeds.open.loaded, true));
+  act(() => result.current.show("merged"));
+  await waitFor(() => assert.equal(result.current.feeds.merged.loaded, true));
+  assert.equal(result.current.feeds.merged.total, 322);
+  act(() => result.current.show("merged"));
+  assert.equal(reads().filter((call) => call[1] === "merged").length, 1);
 });
 
 test("loadMore asks for the next page of the same provider and appends it without repeats", async () => {
@@ -77,22 +80,22 @@ test("loadMore asks for the next page of the same provider and appends it withou
       : page([pull(2), pull(1)], { nextCursor: null, total: 4 }),
   );
   const { result } = mount();
-  await waitFor(() => assert.equal(result.current.open.loaded, true));
+  await waitFor(() => assert.equal(result.current.feeds.open.loaded, true));
   act(() => result.current.loadMore("open"));
-  await waitFor(() => assert.equal(result.current.open.pulls.length, 3));
+  await waitFor(() => assert.equal(result.current.feeds.open.pulls.length, 3));
   assert.deepEqual(
-    result.current.open.pulls.map((item) => item.number),
+    result.current.feeds.open.pulls.map((item) => item.number),
     [3, 2, 1],
     "the seam's repeated row is dropped",
   );
-  assert.equal(result.current.open.cursor, null);
-  assert.deepEqual(reads().at(-1), ["/r", "open", "c1", "github"]);
+  assert.equal(result.current.feeds.open.cursor, null);
+  assert.deepEqual(reads().at(-1), ["/r", "open", "c1", "github", ""]);
 });
 
 test("loadMore with nothing left asks for nothing", async () => {
   vi.mocked(loadPullRequests).mockResolvedValue(page([pull(1)]));
   const { result } = mount();
-  await waitFor(() => assert.equal(result.current.open.loaded, true));
+  await waitFor(() => assert.equal(result.current.feeds.open.loaded, true));
   act(() => result.current.loadMore("open"));
   assert.equal(reads().length, 1);
 });
@@ -104,32 +107,85 @@ test("a failed page keeps the rows, and loadMore retries it", async () => {
     return page([pull(1)]);
   });
   const { result } = mount();
-  await waitFor(() => assert.equal(result.current.open.loaded, true));
+  await waitFor(() => assert.equal(result.current.feeds.open.loaded, true));
   act(() => result.current.loadMore("open"));
-  await waitFor(() => assert.equal(result.current.open.moreError, "HTTP 502"));
-  assert.equal(result.current.open.pulls.length, 1, "what had loaded stays");
-  assert.equal(result.current.open.cursor, "c1", "and the cursor still points at the failed page");
+  await waitFor(() => assert.equal(result.current.feeds.open.moreError, "HTTP 502"));
+  assert.equal(result.current.feeds.open.pulls.length, 1, "what had loaded stays");
+  assert.equal(result.current.feeds.open.cursor, "c1", "and the cursor still points at the failed page");
   act(() => result.current.loadMore("open"));
-  await waitFor(() => assert.equal(result.current.open.pulls.length, 2));
-  assert.equal(result.current.open.moreError, null);
+  await waitFor(() => assert.equal(result.current.feeds.open.pulls.length, 2));
+  assert.equal(result.current.feeds.open.moreError, null);
 });
 
-test("a ref change re-reads from the first page, and All too once it has been shown", async () => {
+test("a search reads the scope with the text and leaves the plain lists alone", async () => {
+  vi.mocked(loadPullRequests).mockImplementation(async (_dir, _scope, _cursor, _provider, query) =>
+    query === "" ? page([pull(1)], { total: 1 }) : page([pull(7), pull(8)], { total: 322 }),
+  );
+  const { result } = mount();
+  await waitFor(() => assert.equal(result.current.feeds.open.loaded, true));
+
+  act(() => result.current.setQuery("webview"));
+  assert.equal(result.current.query, "webview");
+  assert.equal(result.current.view.open.loaded, false, "the view is the search's, which starts empty");
+  act(() => result.current.show("open"));
+  await waitFor(() => assert.equal(result.current.view.open.loaded, true));
+  assert.deepEqual(
+    result.current.view.open.pulls.map((item) => item.number),
+    [7, 8],
+  );
+  assert.equal(result.current.view.open.total, 322);
+  assert.deepEqual(asked().at(-1), ["open", null, "webview"]);
+  assert.equal(result.current.feeds.open.pulls[0].number, 1, "the plain list is untouched");
+
+  act(() => result.current.setQuery(""));
+  assert.equal(result.current.view.open.pulls[0].number, 1, "clearing the text shows the plain list again at once");
+});
+
+test("a search's next page keeps the text", async () => {
+  vi.mocked(loadPullRequests).mockImplementation(async (_dir, _scope, cursor, _provider, query) =>
+    query === "" ? page([pull(1)]) : cursor === null ? page([pull(7)], { nextCursor: "s1" }) : page([pull(6)]),
+  );
+  const { result } = mount();
+  await waitFor(() => assert.equal(result.current.feeds.open.loaded, true));
+  act(() => result.current.setQuery("x"));
+  act(() => result.current.show("merged"));
+  await waitFor(() => assert.equal(result.current.view.merged.loaded, true));
+  act(() => result.current.loadMore("merged"));
+  await waitFor(() => assert.equal(result.current.view.merged.pulls.length, 2));
+  assert.deepEqual(asked().at(-1), ["merged", "s1", "x"]);
+});
+
+test("an answer for text that has since changed is dropped", async () => {
+  let release: (value: ReturnType<typeof page>) => void = () => {};
+  vi.mocked(loadPullRequests).mockImplementation((_dir, _scope, _cursor, _provider, query) =>
+    query === "old" ? new Promise((resolve) => (release = resolve)) : Promise.resolve(page([pull(1)])),
+  );
+  const { result } = mount();
+  await waitFor(() => assert.equal(result.current.feeds.open.loaded, true));
+  act(() => result.current.setQuery("old"));
+  act(() => result.current.show("open"));
+  act(() => result.current.setQuery("new"));
+  await act(async () => release(page([pull(99)])));
+  assert.deepEqual(result.current.view.open.pulls, [], "the old text's rows never land in the new text's list");
+  assert.equal(result.current.query, "new");
+});
+
+test("a ref change re-reads from the first page, and the other scopes too once they have been shown", async () => {
   vi.mocked(loadPullRequests).mockResolvedValue(page([pull(1)]));
   const { result, rerender } = mount();
-  await waitFor(() => assert.equal(result.current.open.loaded, true));
+  await waitFor(() => assert.equal(result.current.feeds.open.loaded, true));
   rerender({ r: repo({ refsDigest: "d2" }) });
   await waitFor(() => assert.equal(reads().length, 2));
   assert.deepEqual(
-    reads().map((call) => [call[1], call[2]]),
-    [["open", null], ["open", null]],
-    "All was never shown, so it is not read",
+    asked().map((call) => call[0]),
+    ["open", "open"],
+    "Merged was never shown, so it is not read",
   );
 
-  act(() => result.current.showAll());
-  await waitFor(() => assert.equal(result.current.all.loaded, true));
+  act(() => result.current.show("merged"));
+  await waitFor(() => assert.equal(result.current.feeds.merged.loaded, true));
   rerender({ r: repo({ refsDigest: "d3" }) });
-  await waitFor(() => assert.equal(reads().filter((call) => call[1] === "all").length, 2));
+  await waitFor(() => assert.equal(reads().filter((call) => call[1] === "merged").length, 2));
 });
 
 test("a ref change does not retry a CLI that is missing; reload does", async () => {

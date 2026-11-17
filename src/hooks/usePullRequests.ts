@@ -1,12 +1,12 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import { loadPullRequests } from "../data/gitLoader";
 import { pullRequestsByBranch } from "../lib/pullRequests";
-import type { PullRequest, PullRequestProvider, PullRequestsStatus, Repository } from "../types";
+import type { PullRequest, PullRequestProvider, PullRequestsStatus, PullScope, Repository } from "../types";
 
 /** A window focus re-reads at most this often: merged/CI state moves on the server, not in refs. */
 const FOCUS_REFRESH_MS = 60_000;
 
-export type PullScope = "open" | "all";
+export type { PullScope };
 
 /** One scope's list, filled a page at a time. */
 export interface Feed {
@@ -23,13 +23,20 @@ export interface Feed {
   moreError: string | null;
 }
 
+type Feeds = Record<PullScope, Feed>;
+type Target = "feeds" | "found";
+
 interface Entry {
   /** null until the first read answers. */
   status: PullRequestsStatus | null;
   provider: PullRequestProvider | null;
   error: string | null;
-  open: Feed;
-  all: Feed;
+  /** The plain lists. Open is read on arrival; the others the first time they are shown. */
+  feeds: Feeds;
+  /** The text being searched for; "" means the plain lists are on show. */
+  query: string;
+  /** Results of that search per scope, read on demand and dropped when the text changes. */
+  found: Feeds;
 }
 
 const EMPTY_FEED: Feed = {
@@ -41,7 +48,9 @@ const EMPTY_FEED: Feed = {
   loadingMore: false,
   moreError: null,
 };
-const EMPTY: Entry = { status: null, provider: null, error: null, open: EMPTY_FEED, all: EMPTY_FEED };
+const EMPTY_FEEDS: Feeds = { open: EMPTY_FEED, merged: EMPTY_FEED, all: EMPTY_FEED };
+const EMPTY: Entry = { status: null, provider: null, error: null, feeds: EMPTY_FEEDS, query: "", found: EMPTY_FEEDS };
+const SCOPES: PullScope[] = ["open", "merged", "all"];
 
 function merge(older: PullRequest[], page: PullRequest[]): PullRequest[] {
   // Newest-first lists shift while someone scrolls: a PR opened meanwhile pushes the last row
@@ -52,46 +61,57 @@ function merge(older: PullRequest[], page: PullRequest[]): PullRequest[] {
 
 /**
  * The active repo's pull requests, kept per repo path so a tab switch shows the last answer at
- * once. The Open list is read on arrival, the All list the first time it is asked for, and each
- * grows a page at a time (`loadMore`). Re-read from the first page when the refs change (a fetch
- * or push), on window focus (throttled) and on demand. Once the CLI is known to be missing,
- * signed out or pointless for this repo the automatic re-reads stop; only `reload` (the menu's
- * Refresh) tries again.
+ * once. Each scope (open, merged, all) is a list read a page at a time (`loadMore`), and a search
+ * is the same lists asked with text, matched on the server across the whole repo. Re-read from
+ * the first page when the refs change (a fetch or push), on window focus (throttled) and on
+ * demand. Once the CLI is known to be missing, signed out or pointless for this repo the
+ * automatic re-reads stop; only `reload` (the menu's Refresh) tries again.
+ *
+ * State lives in a ref that every write updates first, so a caller that reads straight after
+ * setting something (the menu asking for a new query's page) never sees the previous value.
  */
 export function usePullRequests(repo: Repository | null) {
   const path = repo !== null && !repo.sleeping ? repo.path : null;
   const refsDigest = repo?.refsDigest ?? "";
   const [entries, setEntries] = useState<Record<string, Entry>>({});
-  const latest = useRef(entries);
+  const store = useRef(entries);
   const request = useRef<Record<string, number>>({});
   const lastRead = useRef<Record<string, { at: number; settled: boolean }>>({});
 
-  useEffect(() => {
-    latest.current = entries;
-  }, [entries]);
-
-  const patch = useCallback((dir: string, scope: PullScope, change: Partial<Feed>, entry?: Partial<Entry>) => {
-    setEntries((prev) => {
-      const base = prev[dir] ?? EMPTY;
-      return { ...prev, [dir]: { ...base, ...entry, [scope]: { ...base[scope], ...change } } };
-    });
+  const change = useCallback((dir: string, apply: (entry: Entry) => Entry) => {
+    store.current = { ...store.current, [dir]: apply(store.current[dir] ?? EMPTY) };
+    setEntries(store.current);
   }, []);
 
+  const patchFeed = useCallback(
+    (dir: string, target: Target, scope: PullScope, feedChange: Partial<Feed>, entryChange?: Partial<Entry>) => {
+      change(dir, (entry) => ({
+        ...entry,
+        ...entryChange,
+        [target]: { ...entry[target], [scope]: { ...entry[target][scope], ...feedChange } },
+      }));
+    },
+    [change],
+  );
+
   const run = useCallback(
-    async (dir: string, scope: PullScope, more: boolean) => {
-      const entry = latest.current[dir] ?? EMPTY;
-      const feed = entry[scope];
+    async (dir: string, scope: PullScope, more: boolean, target: Target) => {
+      const entry = store.current[dir] ?? EMPTY;
+      const query = target === "found" ? entry.query : "";
+      if (target === "found" && query === "") return;
+      const feed = entry[target][scope];
       if (more && (feed.cursor === null || feed.loadingMore || feed.loading)) return;
-      const key = `${dir}\0${scope}`;
+      const key = `${dir}\0${target}\0${scope}\0${query}`;
       const id = (request.current[key] ?? 0) + 1;
       request.current[key] = id;
-      patch(dir, scope, more ? { loadingMore: true, moreError: null } : { loading: true, moreError: null });
+      patchFeed(dir, target, scope, more ? { loadingMore: true, moreError: null } : { loading: true, moreError: null });
+      // An answer for text that has since changed is for a list nobody is looking at.
+      const current = () => request.current[key] === id && (target === "feeds" || store.current[dir]?.query === query);
       try {
-        const result = await loadPullRequests(dir, scope, more ? feed.cursor : null, entry.provider);
-        if (request.current[key] !== id) return;
-        setEntries((prev) => {
-          const base = prev[dir] ?? EMPTY;
-          const old = base[scope];
+        const result = await loadPullRequests(dir, scope, more ? feed.cursor : null, entry.provider, query);
+        if (!current()) return;
+        change(dir, (now) => {
+          const old = now[target][scope];
           const next: Feed = {
             pulls: more ? merge(old.pulls, result.pullRequests) : result.pullRequests,
             cursor: result.nextCursor,
@@ -102,31 +122,40 @@ export function usePullRequests(repo: Repository | null) {
             moreError: null,
           };
           return {
-            ...prev,
-            [dir]: { ...base, status: result.status, provider: result.provider ?? base.provider, error: null, [scope]: next },
+            ...now,
+            status: result.status,
+            provider: result.provider ?? now.provider,
+            error: null,
+            [target]: { ...now[target], [scope]: next },
           };
         });
-        // Only the Open read's first page speaks for whether automatic re-reads are worth it.
-        if (scope === "open" && !more) lastRead.current[dir] = { at: Date.now(), settled: result.status === "ok" };
+        // Only the plain Open list's first page speaks for whether automatic re-reads are worth it.
+        if (target === "feeds" && scope === "open" && !more) {
+          lastRead.current[dir] = { at: Date.now(), settled: result.status === "ok" };
+        }
       } catch (readError) {
-        if (request.current[key] !== id) return;
+        if (!current()) return;
         const message = readError instanceof Error ? readError.message : String(readError);
-        if (scope === "open" && !more && !feed.loaded) {
-          patch(dir, scope, { loading: false }, { status: null, error: message });
+        if (target === "feeds" && scope === "open" && !more && !feed.loaded) {
+          patchFeed(dir, target, scope, { loading: false }, { status: null, error: message });
           lastRead.current[dir] = { at: Date.now(), settled: true };
         } else {
-          patch(dir, scope, { loading: false, loadingMore: false, moreError: message });
-          if (scope === "open" && !more) lastRead.current[dir] = { at: Date.now(), settled: true };
+          patchFeed(dir, target, scope, { loading: false, loadingMore: false, moreError: message });
         }
       }
     },
-    [patch],
+    [change, patchFeed],
   );
 
+  /** Back to the first page of everything that has been read, plain lists and search results. */
   const refresh = useCallback(
     (dir: string) => {
-      void run(dir, "open", false);
-      if (latest.current[dir]?.all.loaded) void run(dir, "all", false);
+      const entry = store.current[dir] ?? EMPTY;
+      void run(dir, "open", false, "feeds");
+      for (const scope of SCOPES) {
+        if (scope !== "open" && entry.feeds[scope].loaded) void run(dir, scope, false, "feeds");
+        if (entry.query !== "" && entry.found[scope].loaded) void run(dir, scope, false, "found");
+      }
     },
     [run],
   );
@@ -148,41 +177,63 @@ export function usePullRequests(repo: Repository | null) {
   }, [path, refresh]);
 
   const entry = (path !== null ? entries[path] : undefined) ?? EMPTY;
-  // Chips come from whatever has loaded; a live PR wins over a finished one for the same branch.
+  // Chips come from the plain lists; a live PR wins over a finished one for the same branch.
   const byBranch = useMemo(
-    () => pullRequestsByBranch([...entry.open.pulls, ...entry.all.pulls]),
-    [entry.open.pulls, entry.all.pulls],
+    () => pullRequestsByBranch(SCOPES.flatMap((scope) => entry.feeds[scope].pulls)),
+    [entry.feeds],
   );
+  const view = entry.query === "" ? entry.feeds : entry.found;
+  const loading = SCOPES.some((scope) => entry.feeds[scope].loading || entry.found[scope].loading);
+
+  const targetOf = (dir: string): Target => ((store.current[dir]?.query ?? "") === "" ? "feeds" : "found");
+
   const reload = useCallback(() => {
     if (path !== null) refresh(path);
   }, [path, refresh]);
-  /** The next page of a scope, or its first page if that read never landed (a retry). */
+  /** The next page of the list on show, or its first page if that read never landed (a retry). */
   const loadMore = useCallback(
     (scope: PullScope) => {
       if (path === null) return;
-      const feed = (latest.current[path] ?? EMPTY)[scope];
-      void run(path, scope, feed.loaded);
+      const target = targetOf(path);
+      void run(path, scope, (store.current[path] ?? EMPTY)[target][scope].loaded, target);
     },
     [path, run],
   );
-  /** Reads All's first page the first time the tab is opened; later opens reuse it. */
-  const showAll = useCallback(() => {
-    if (path === null) return;
-    const feed = (latest.current[path] ?? EMPTY).all;
-    if (!feed.loaded && !feed.loading) void run(path, "all", false);
-  }, [path, run]);
+  /** Reads a scope's first page the first time it is shown; later shows reuse it. */
+  const show = useCallback(
+    (scope: PullScope) => {
+      if (path === null) return;
+      const target = targetOf(path);
+      const feed = (store.current[path] ?? EMPTY)[target][scope];
+      if (!feed.loaded && !feed.loading) void run(path, scope, false, target);
+    },
+    [path, run],
+  );
+  /** Searches for text; "" goes back to the plain lists. The new text's lists start empty. */
+  const setQuery = useCallback(
+    (query: string) => {
+      if (path === null) return;
+      if ((store.current[path]?.query ?? "") === query) return;
+      change(path, (now) => ({ ...now, query, found: EMPTY_FEEDS }));
+    },
+    [path, change],
+  );
 
   return {
     status: entry.status,
     provider: entry.provider,
     error: entry.error,
-    loading: entry.open.loading || entry.all.loading,
-    open: entry.open,
-    all: entry.all,
+    loading,
+    query: entry.query,
+    /** The lists on show: the plain ones, or the search's results while there is a query. */
+    view,
+    /** The plain lists, whatever is searched: the button's count comes from Open here. */
+    feeds: entry.feeds,
     byBranch,
     reload,
     loadMore,
-    showAll,
+    show,
+    setQuery,
   };
 }
 

@@ -229,3 +229,23 @@ describe("compactCount", () => {
     expect(compactCount(12400)).toBe("12k");
   });
 });
+
+describe("GitHub search pages", () => {
+  const search = JSON.stringify({
+    data: {
+      search: {
+        issueCount: 322,
+        pageInfo: { hasNextPage: true, endCursor: "Y3Vyc29yOjMw" },
+        nodes: [node({ number: 16456, state: "MERGED" }), {}],
+      },
+    },
+  });
+
+  it("reads the count from issueCount and ignores nodes that are not pull requests", () => {
+    const page = parsePullRequestPage("github", search, null);
+    expect(page.pullRequests.map((item) => item.number)).toEqual([16456]);
+    expect(page.pullRequests[0].state).toBe("merged");
+    expect(page.total).toBe(322);
+    expect(page.nextCursor).toBe("Y3Vyc29yOjMw");
+  });
+});

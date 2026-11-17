@@ -7,6 +7,7 @@ import type {
   DiffLine,
   PullRequestProvider,
   PullRequestsStatus,
+  PullScope,
   Repository,
   Submodule,
 } from "../types";
@@ -610,16 +611,18 @@ export async function fetchRemote(dir: string): Promise<void> {
 
 /**
  * One page of the repo's pull/merge requests through the provider's CLI. `scope` is the open
- * ones or all states; `cursor` (from the previous page) and `provider` (who answered it) ask for
- * the page after it. Not part of load/refresh: it is a network call, so the usePullRequests
+ * ones, the merged ones or every state; `query` is free text matched on the server across the
+ * whole repo; `cursor` (from the previous page) and `provider` (who answered it) ask for the
+ * page after it. Not part of load/refresh: it is a network call, so the usePullRequests
  * hook asks for it on its own schedule. A non-ok status (CLI missing, signed out, no
  * GitHub/GitLab remote) is an answer, not an error — it rejects only on a real failure.
  */
 export async function loadPullRequests(
   dir: string,
-  scope: "open" | "all",
+  scope: PullScope,
   cursor: string | null = null,
   provider: PullRequestProvider | null = null,
+  query = "",
 ): Promise<
   PullRequestPage & {
     status: PullRequestsStatus;
@@ -627,7 +630,7 @@ export async function loadPullRequests(
     provider: PullRequestProvider | null;
   }
 > {
-  return call("read_pull_requests", { dir, scope, cursor, provider }, (raw) => {
+  return call("read_pull_requests", { dir, scope, cursor, provider, query: query.trim() || null }, (raw) => {
     const payload = raw as { status: PullRequestsStatus; provider: string; raw: string };
     const answered = payload.provider === "gitlab" || payload.provider === "github" ? payload.provider : null;
     const page: PullRequestPage =
