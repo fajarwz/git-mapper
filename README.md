@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/logo.svg" alt="Git Mapper logo" width="96">
+<img src="docs/assets/logo.svg" alt="Git Mapper logo" width="96">
 
 # Git Mapper
 
@@ -42,7 +42,7 @@ Grab the latest installer from [the releases page](https://github.com/fajarwz/gi
 
 The links above always resolve to the newest release.
 
-<img src="docs/screenshot.png" alt="Commit list, light theme" width="100%">
+<img src="docs/assets/screenshot.png" alt="Commit list, light theme" width="100%">
 
 ## Features
 
