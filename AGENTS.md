@@ -169,9 +169,17 @@ and the README's Tests badge points at it.
   GitHub goes through ONE GraphQL query (`gh api graphql`), never `gh pr list --json`: that command's
   `statusCheckRollup` fetches every individual check of every PR and 504s on a busy repo
   (tauri-apps/tauri: ~12s then a gateway timeout), while the rollup's one-word `state` costs ~3s a
-  page. The hook keeps Open (read on arrival) and All (read when first shown) as separate feeds;
-  a follow-up page names the provider that answered the first, since a cursor means nothing to the
-  other CLI. The button's count is GitHub's `totalCount`, not what has loaded.
+  page. The hook keeps three scopes — Open (read on arrival), Merged and All (each read when first
+  shown) — as separate feeds; a follow-up page names the provider that answered the first, since a
+  cursor means nothing to the other CLI. The button's count is GitHub's `totalCount`, not what has
+  loaded. **Search is server-side, never a filter over loaded rows** (that would call a PR on page 40
+  "not found"): the same read takes a `query`, GitHub switches to its `search` query
+  (`repo:{owner}/{repo} is:pr is:open|is:merged <text>`, so GitHub's own qualifiers such as
+  `author:x` work in the box) and GitLab adds `--search`. The hook holds the text per repo with its
+  own result feeds, dropped when the text changes, and an answer for text that has since changed is
+  discarded. Its state lives in a ref every write updates first: a mirror refreshed after render let
+  the menu's effects read the previous query and skip the new one's read. The menu debounces typing
+  (300ms) and the selected tab reads itself, because the tab and text outlive a repo switch.
   The glab adapter was written from GitLab's documented fields without a glab to probe — check a
   live `glab mr list --all --output json` before trusting a new field. A third provider is one more
   arm in `pulls.rs` + `pullRequests.ts`; the UI only reads `provider` for wording (`#13` vs `!13`,
