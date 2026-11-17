@@ -162,8 +162,16 @@ and the README's Tests badge points at it.
   `cli-missing` / `cli-unauthenticated` / `unsupported-remote` are answers, not errors, so the menu
   explains them in place (unsupported hides the button). Classify "no remote of my kind" BEFORE
   "signed out": both CLIs end that message with a hint to `auth login`. `lib/pullRequests.ts` shapes
-  each provider's JSON into the neutral `PullRequest` (`parsePullRequests(provider, raw)`; GitLab's
-  `iid` is the number, its list carries no approvals, and the pipeline may be absent → no checks).
+  each provider's JSON into the neutral `PullRequest` (`parsePullRequestPage(provider, raw, cursor)`;
+  GitLab's `iid` is the number, its list carries no approvals, and the pipeline may be absent → no
+  checks). **A read is one page of 30** (`PAGE_SIZE` in `pulls.rs`, `PR_PAGE_SIZE` in TS — keep them
+  equal) for a scope, `open` or `all`, with a cursor: GitHub's `endCursor`, GitLab's page number.
+  GitHub goes through ONE GraphQL query (`gh api graphql`), never `gh pr list --json`: that command's
+  `statusCheckRollup` fetches every individual check of every PR and 504s on a busy repo
+  (tauri-apps/tauri: ~12s then a gateway timeout), while the rollup's one-word `state` costs ~3s a
+  page. The hook keeps Open (read on arrival) and All (read when first shown) as separate feeds;
+  a follow-up page names the provider that answered the first, since a cursor means nothing to the
+  other CLI. The button's count is GitHub's `totalCount`, not what has loaded.
   The glab adapter was written from GitLab's documented fields without a glab to probe — check a
   live `glab mr list --all --output json` before trusting a new field. A third provider is one more
   arm in `pulls.rs` + `pullRequests.ts`; the UI only reads `provider` for wording (`#13` vs `!13`,
