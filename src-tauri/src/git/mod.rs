@@ -1,6 +1,6 @@
 mod actions;
 mod files;
-mod github;
+mod pulls;
 mod hunks;
 mod log;
 mod merge;
@@ -13,7 +13,7 @@ mod actions_tests;
 #[cfg(test)]
 mod files_tests;
 #[cfg(test)]
-mod github_tests;
+mod pulls_tests;
 #[cfg(test)]
 mod hunks_tests;
 #[cfg(test)]
@@ -33,7 +33,7 @@ mod test_support;
 
 pub use actions::*;
 pub use files::*;
-pub use github::*;
+pub use pulls::*;
 pub use hunks::*;
 pub use log::*;
 pub use merge::*;
