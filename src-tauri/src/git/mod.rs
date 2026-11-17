@@ -47,13 +47,13 @@ pub use submodules::*;
 #[tauri::command]
 pub async fn read_pull_requests(
     dir: String,
-    scope: String,
+    scope: Scope,
     cursor: Option<String>,
-    provider: Option<String>,
+    provider: Option<Provider>,
     query: Option<String>,
 ) -> Result<PullRequestsPayload, String> {
     run_blocking("pull requests read", move || {
-        read_pull_requests_in(&dir, &scope, cursor.as_deref(), provider.as_deref(), query.as_deref())
+        read_pull_requests_in(&dir, scope, cursor.as_deref(), provider, query.as_deref())
     })
     .await
 }

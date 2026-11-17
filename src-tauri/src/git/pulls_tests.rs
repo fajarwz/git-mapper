@@ -1,4 +1,4 @@
-use super::pulls::{classify_failure, host_of, providers_for, settle, Attempt, Provider, PAGE_SIZE};
+use super::pulls::{classify_failure, host_of, providers_for, settle, Attempt, Provider, Scope, Status, PAGE_SIZE};
 use super::test_support::*;
 use super::*;
 
@@ -54,7 +54,7 @@ fn a_named_host_asks_only_its_own_cli_and_an_unknown_one_asks_both() {
     assert_eq!(providers_for(None), (vec![Provider::GitHub, Provider::GitLab], false));
 }
 
-fn status(attempts: Vec<(Provider, Attempt)>, matched: bool) -> (String, String) {
+fn status(attempts: Vec<(Provider, Attempt)>, matched: bool) -> (Status, Option<Provider>) {
     let payload = settle(attempts, matched).unwrap();
     (payload.status, payload.provider)
 }
@@ -66,26 +66,26 @@ fn settles_every_outcome_into_one_answer() {
     // Success from the second provider of an unknown host wins.
     assert_eq!(
         status(vec![(gh, Attempt::NoRemote), (gl, Attempt::Ok("[]".into()))], false),
-        ("ok".into(), "gitlab".into())
+        (Status::Ok, Some(Provider::GitLab))
     );
     // A GitLab host with no glab: install it. With glab that does not know the host: sign in.
-    assert_eq!(status(vec![(gl, Attempt::Missing)], true), ("cli-missing".into(), "gitlab".into()));
+    assert_eq!(status(vec![(gl, Attempt::Missing)], true), (Status::CliMissing, Some(Provider::GitLab)));
     assert_eq!(
         status(vec![(gl, Attempt::NoRemote)], true),
-        ("cli-unauthenticated".into(), "gitlab".into())
+        (Status::CliUnauthenticated, Some(Provider::GitLab))
     );
     assert_eq!(
         status(vec![(gh, Attempt::Unauthenticated)], true),
-        ("cli-unauthenticated".into(), "github".into())
+        (Status::CliUnauthenticated, Some(Provider::GitHub))
     );
     // Unknown host: neither CLI installed asks for one; a CLI that says "not mine" hides the button.
     assert_eq!(
         status(vec![(gh, Attempt::Missing), (gl, Attempt::Missing)], false),
-        ("cli-missing".into(), "".into())
+        (Status::CliMissing, None)
     );
     assert_eq!(
         status(vec![(gh, Attempt::NoRemote), (gl, Attempt::Missing)], false),
-        ("unsupported-remote".into(), "".into())
+        (Status::UnsupportedRemote, None)
     );
 }
 
@@ -104,7 +104,7 @@ fn real_failures_surface_but_glab_noise_on_an_unknown_host_does_not() {
     // A Bitbucket remote: gh says not-mine, glab prints something we do not recognise.
     assert_eq!(
         status(vec![(gh, Attempt::NoRemote), (gl, Attempt::Failed("weird".into()))], false),
-        ("unsupported-remote".into(), "".into())
+        (Status::UnsupportedRemote, None)
     );
 }
 
@@ -114,8 +114,8 @@ fn a_repository_without_a_known_remote_never_panics() {
     // and nothing is listed for a repo that has no remote at all.
     let repo = TempRepo::new("pulls-none");
     repo.commit("a.txt", "a\n", "first");
-    if let Ok(payload) = read_pull_requests_in(repo.path(), "open", None, None, None) {
-        assert_ne!(payload.status, "ok");
+    if let Ok(payload) = read_pull_requests_in(repo.path(), Scope::Open, None, None, None) {
+        assert_ne!(payload.status, Status::Ok);
         assert!(payload.raw.is_empty());
     }
 }
@@ -127,7 +127,7 @@ fn a_repo_with_no_remotes_at_all_is_no_remote_not_an_error() {
 
 #[test]
 fn github_pages_ask_a_light_query_and_only_name_what_they_need() {
-    let first = Provider::GitHub.args("open", None, None);
+    let first = Provider::GitHub.args(Scope::Open, None, None);
     assert_eq!(&first[..2], ["api", "graphql"]);
     assert!(first.contains(&"owner={owner}".to_string()), "gh fills in the repo from the working directory");
     assert!(first.contains(&"states[]=OPEN".to_string()), "the open scope filters server-side");
@@ -139,37 +139,37 @@ fn github_pages_ask_a_light_query_and_only_name_what_they_need() {
     assert!(query.contains("mergeCommit { oid }"), "a merged PR names the commit it made, which is how a squash merge is found");
     assert!(!query.contains("contexts"), "never the per-check list: that is what times out");
 
-    let all = Provider::GitHub.args("all", Some("Y3Vyc29y"), None);
+    let all = Provider::GitHub.args(Scope::All, Some("Y3Vyc29y"), None);
     assert!(!all.contains(&"states[]=OPEN".to_string()), "all states means no filter");
     assert!(all.contains(&"after=Y3Vyc29y".to_string()), "a follow-up page carries its cursor");
 }
 
 #[test]
 fn gitlab_pages_by_number_and_all_means_all_states() {
-    let open = Provider::GitLab.args("open", None, None);
+    let open = Provider::GitLab.args(Scope::Open, None, None);
     let joined = open.join(" ");
     assert_eq!(joined, format!("mr list --per-page {PAGE_SIZE} --page 1 --output json"));
 
-    let all = Provider::GitLab.args("all", Some("3"), None).join(" ");
+    let all = Provider::GitLab.args(Scope::All, Some("3"), None).join(" ");
     assert_eq!(all, format!("mr list --per-page {PAGE_SIZE} --page 3 --all --output json"));
     assert!(
-        Provider::GitLab.args("open", Some("junk"), None).join(" ").contains("--page 1"),
+        Provider::GitLab.args(Scope::Open, Some("junk"), None).join(" ").contains("--page 1"),
         "a cursor that is not a number falls back to the first page"
     );
 }
 
 #[test]
 fn the_merged_scope_filters_by_merged_state_on_both_providers() {
-    let github = Provider::GitHub.args("merged", None, None);
+    let github = Provider::GitHub.args(Scope::Merged, None, None);
     assert!(github.contains(&"states[]=MERGED".to_string()));
     assert!(!github.contains(&"states[]=OPEN".to_string()));
-    let gitlab = Provider::GitLab.args("merged", None, None).join(" ");
+    let gitlab = Provider::GitLab.args(Scope::Merged, None, None).join(" ");
     assert_eq!(gitlab, format!("mr list --per-page {PAGE_SIZE} --page 1 --merged --output json"));
 }
 
 #[test]
 fn a_github_search_is_one_query_over_the_whole_repo_in_the_scope() {
-    let args = Provider::GitHub.args("merged", Some("c9"), Some("  webview focus  "));
+    let args = Provider::GitHub.args(Scope::Merged, Some("c9"), Some("  webview focus  "));
     let q = args.iter().find(|arg| arg.starts_with("q=")).expect("the search string is passed as q");
     assert_eq!(q, "q=repo:{owner}/{repo} is:pr is:merged sort:created-desc webview focus");
     assert!(!args.contains(&"owner={owner}".to_string()), "the search names the repo inside q instead");
@@ -179,20 +179,39 @@ fn a_github_search_is_one_query_over_the_whole_repo_in_the_scope() {
     assert!(query.contains("... on PullRequest"), "and keeps only the PR fields");
     assert!(query.contains(&format!("first: {PAGE_SIZE}")));
 
-    let open = Provider::GitHub.args("open", None, Some("x"));
+    let open = Provider::GitHub.args(Scope::Open, None, Some("x"));
     assert!(open.iter().any(|arg| arg.contains("is:pr is:open sort:created-desc x")));
-    let all = Provider::GitHub.args("all", None, Some("x"));
+    let all = Provider::GitHub.args(Scope::All, None, Some("x"));
     assert!(all.iter().any(|arg| arg == "q=repo:{owner}/{repo} is:pr sort:created-desc x"), "all adds no state");
 }
 
 #[test]
 fn a_blank_search_is_the_plain_list() {
-    assert_eq!(Provider::GitHub.args("open", None, Some("   ")), Provider::GitHub.args("open", None, None));
-    assert_eq!(Provider::GitLab.args("open", None, Some("")), Provider::GitLab.args("open", None, None));
+    assert_eq!(Provider::GitHub.args(Scope::Open, None, Some("   ")), Provider::GitHub.args(Scope::Open, None, None));
+    assert_eq!(Provider::GitLab.args(Scope::Open, None, Some("")), Provider::GitLab.args(Scope::Open, None, None));
 }
 
 #[test]
 fn a_gitlab_search_adds_the_search_flag() {
-    let args = Provider::GitLab.args("all", Some("2"), Some("runner")).join(" ");
+    let args = Provider::GitLab.args(Scope::All, Some("2"), Some("runner")).join(" ");
     assert_eq!(args, format!("mr list --per-page {PAGE_SIZE} --page 2 --all --search runner --output json"));
+}
+
+#[test]
+fn options_cross_the_boundary_spelled_as_the_ts_enums_spell_them() {
+    // The wire spellings are the contract with `PullScope`, `PullRequestsStatus` and
+    // `PullRequestProvider` in types.ts: a rename on either side must break a test here.
+    let scope: Scope = serde_json::from_str("\"merged\"").unwrap();
+    assert_eq!(scope, Scope::Merged);
+    assert_eq!(serde_json::from_str::<Scope>("\"open\"").unwrap(), Scope::Open);
+    assert_eq!(serde_json::from_str::<Scope>("\"all\"").unwrap(), Scope::All);
+    assert!(serde_json::from_str::<Scope>("\"closed\"").is_err(), "an unknown scope is refused, not guessed");
+
+    assert_eq!(serde_json::from_str::<Provider>("\"gitlab\"").unwrap(), Provider::GitLab);
+    assert_eq!(serde_json::to_string(&Provider::GitHub).unwrap(), "\"github\"");
+
+    assert_eq!(serde_json::to_string(&Status::Ok).unwrap(), "\"ok\"");
+    assert_eq!(serde_json::to_string(&Status::CliMissing).unwrap(), "\"cli-missing\"");
+    assert_eq!(serde_json::to_string(&Status::CliUnauthenticated).unwrap(), "\"cli-unauthenticated\"");
+    assert_eq!(serde_json::to_string(&Status::UnsupportedRemote).unwrap(), "\"unsupported-remote\"");
 }
