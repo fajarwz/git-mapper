@@ -1,5 +1,6 @@
 mod actions;
 mod files;
+mod github;
 mod hunks;
 mod log;
 mod merge;
@@ -11,6 +12,8 @@ mod submodules;
 mod actions_tests;
 #[cfg(test)]
 mod files_tests;
+#[cfg(test)]
+mod github_tests;
 #[cfg(test)]
 mod hunks_tests;
 #[cfg(test)]
@@ -30,6 +33,7 @@ mod test_support;
 
 pub use actions::*;
 pub use files::*;
+pub use github::*;
 pub use hunks::*;
 pub use log::*;
 pub use merge::*;
@@ -38,6 +42,12 @@ pub use staging::*;
 pub use status::*;
 pub use submodules::*;
 
+/// Pull requests through the `gh` CLI. Not part of open/refresh: it is a network call, so the
+/// UI asks for it on its own schedule.
+#[tauri::command]
+pub async fn read_pull_requests(dir: String) -> Result<PullRequestsPayload, String> {
+    run_blocking("pull requests read", move || read_pull_requests_in(&dir)).await
+}
 /// Direct submodules of the repository with their state; empty without a `.gitmodules`.
 #[tauri::command]
 pub async fn read_submodules(dir: String) -> Result<Vec<SubmoduleInfo>, String> {

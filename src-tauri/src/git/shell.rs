@@ -17,6 +17,19 @@ pub fn git_command(dir: &str) -> Command {
     cmd
 }
 
+/// The `gh` twin of `git_command`: same hidden console on Windows, and no prompts or update
+/// nags — this is a background read, there is nobody to answer a TTY question.
+pub fn gh_command(dir: &str) -> Command {
+    let mut cmd = Command::new("gh");
+    cmd.current_dir(dir)
+        .env("GH_PROMPT_DISABLED", "1")
+        .env("GH_NO_UPDATE_NOTIFIER", "1")
+        .env("NO_COLOR", "1");
+    #[cfg(windows)]
+    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    cmd
+}
+
 pub fn run_git(dir: &str, args: &[&str]) -> Result<String, String> {
     git_command(dir)
         .args(args)
