@@ -13,6 +13,7 @@ import {
   loadConflictFiles,
   loadRepository,
   loadMoreCommits,
+  loadPullRequests,
   mergeBranch,
   parseForEachRef,
   refreshRepository,
@@ -475,4 +476,34 @@ test("merge verbs pass through op names and the snake_case payload folds", async
     worktreeText: "<<<<<<< HEAD\n",
     incoming: "side",
   });
+});
+
+test("loadPullRequests shapes gh's list when ok, and carries a non-ok status with nothing", async () => {
+  const raw = JSON.stringify([
+    {
+      number: 3,
+      title: "t",
+      state: "OPEN",
+      isDraft: false,
+      author: { login: "a" },
+      headRefName: "feat/x",
+      baseRefName: "main",
+      isCrossRepository: false,
+      url: "u",
+      updatedAt: "2026-01-01T00:00:00Z",
+      reviewDecision: "APPROVED",
+      statusCheckRollup: [],
+    },
+  ]);
+  vi.mocked(invoke).mockResolvedValueOnce({ status: "ok", raw });
+  const ok = await loadPullRequests("/r");
+  assert.equal(ok.status, "ok");
+  assert.deepEqual(
+    ok.pullRequests.map((pull) => [pull.number, pull.state, pull.review]),
+    [[3, "open", "approved"]],
+  );
+  assert.equal(vi.mocked(invoke).mock.calls.at(-1)?.[0], "read_pull_requests");
+
+  vi.mocked(invoke).mockResolvedValueOnce({ status: "gh-missing", raw: "" });
+  assert.deepEqual(await loadPullRequests("/r"), { status: "gh-missing", pullRequests: [] });
 });

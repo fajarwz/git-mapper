@@ -2,10 +2,13 @@
 // @vitest-environment jsdom
 import assert from "node:assert/strict";
 import { cleanup, render, fireEvent, within } from "@testing-library/react";
-import { afterEach, test } from "vitest";
+import { afterEach, test, vi } from "vitest";
 
 import { RefPill } from "./RefPill";
-import type { CommitRef } from "../types";
+import { openExternal } from "../lib/external";
+import type { CommitRef, PullRequest } from "../types";
+
+vi.mock("../lib/external", () => ({ openExternal: vi.fn() }));
 
 afterEach(() => {
   cleanup();
@@ -71,4 +74,46 @@ test("RefPill: a detached HEAD fills like a marker and never offers a checkout",
   assert.ok(within(container).getByText("HEAD (detached)"), "the pill tells the whole story");
   fireEvent.doubleClick(within(container).getByText("HEAD (detached)"));
   assert.equal(checkedOut, null, "a detached HEAD is not a branch you can check out");
+});
+
+const PULL: PullRequest = {
+  number: 13,
+  title: "Add download",
+  state: "open",
+  author: "a",
+  headBranch: "feat/x",
+  baseBranch: "main",
+  url: "https://github.com/o/r/pull/13",
+  updatedAt: "2026-11-16T01:56:09Z",
+  checks: "passing",
+  review: null,
+  fromFork: false,
+};
+
+test("RefPill: a PR chip opens the PR without selecting the row or checking the branch out", () => {
+  let rowClicks = 0;
+  let checkedOut: string | null = null;
+  const { container } = render(
+    <button type="button" onClick={() => (rowClicks += 1)}>
+      <RefPill
+        ref={{ type: "branch", name: "feat/x" }}
+        pullRequest={PULL}
+        color={0}
+        onCheckout={(name) => {
+          checkedOut = name;
+        }}
+      />
+    </button>,
+  );
+  const chip = within(container).getByText("#13");
+  fireEvent.click(chip);
+  fireEvent.doubleClick(chip);
+  assert.equal(vi.mocked(openExternal).mock.calls[0][0], PULL.url);
+  assert.equal(rowClicks, 0, "the click stays on the chip");
+  assert.equal(checkedOut, null, "a double-click on the chip is not a checkout");
+});
+
+test("RefPill: a branch without a PR wears no chip", () => {
+  const { container } = render(<RefPill ref={{ type: "branch", name: "feat/x" }} color={0} />);
+  assert.equal(container.querySelector("[data-pr-badge]"), null);
 });

@@ -1,5 +1,6 @@
 import { Fragment, memo, type ReactNode } from "react";
-import type { Commit, CommitRef } from "../types";
+import type { Commit, CommitRef, PullRequest } from "../types";
+import { pullRequestForRef } from "../lib/pullRequests";
 import { formatAbsoluteDate } from "../lib/format";
 import { UNCOMMITTED_COLOR, branchColor } from "../lib/graphGeometry";
 import {
@@ -24,6 +25,8 @@ interface CommitRowProps {
   columns?: ColumnVisibility;
   /** Column order, shared with the header; stable identity like `columns`. */
   order?: ColumnId[];
+  /** Branch name → PR; keep the map stable (the hook memoizes it) so the memo holds. */
+  pullsByBranch?: Map<string, PullRequest>;
   onSelect: (hash: string) => void;
   onCheckoutBranch?: (branch: string) => void;
   /** Right-click on the row body: the menu targets the commit and its most relevant ref. */
@@ -39,6 +42,7 @@ export const CommitRow = memo(function CommitRow({
   showAvatar = false,
   columns = DEFAULT_COLUMNS,
   order = DEFAULT_ORDER,
+  pullsByBranch,
   onSelect,
   onCheckoutBranch,
   onContextMenu,
@@ -76,6 +80,7 @@ export const CommitRow = memo(function CommitRow({
               <RefPill
                 key={`${ref.type}:${ref.name}`}
                 ref={ref}
+                pullRequest={pullsByBranch && pullRequestForRef(ref, pullsByBranch)}
                 color={commit.branchColor}
                 onCheckout={onCheckoutBranch}
                 onContextMenu={onRefContextMenu ? (pill, x, y) => onRefContextMenu(commit, pill, x, y) : undefined}

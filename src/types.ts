@@ -61,6 +61,29 @@ export interface Commit {
   /** Files+diff load lazily per selected commit (see gitLoader.loadCommitFiles). */
 }
 
+/** `draft` is an open PR marked as a draft. */
+export type PullRequestState = "open" | "draft" | "merged" | "closed";
+export type ChecksState = "passing" | "failing" | "pending" | "none";
+
+/** Provider-neutral: the GitHub adapter (gh CLI) fills it today; a GitLab one would too. */
+export interface PullRequest {
+  number: number;
+  title: string;
+  state: PullRequestState;
+  author: string;
+  headBranch: string;
+  baseBranch: string;
+  url: string;
+  updatedAt: string;
+  checks: ChecksState;
+  review: "approved" | "changes" | "required" | null;
+  /** From a fork: its head branch name says nothing about a local branch of the same name. */
+  fromFork: boolean;
+}
+
+/** Why there may be no list: each non-ok state has its own explanation in the UI. */
+export type PullRequestsStatus = "ok" | "gh-missing" | "gh-unauthenticated" | "not-github";
+
 /** `moved`: checked out at a commit other than the one the parent records. */
 export type SubmoduleState = "ok" | "moved" | "uninitialized" | "conflict";
 
