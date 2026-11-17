@@ -189,7 +189,17 @@ and the README's Tests badge points at it.
   menu's Refresh retries). State is a drawn glyph (open / draft / merged / closed, `PullRequestStateIcon`)
   plus a tone from `pullRequestTone.ts`, never colour alone; only open speaks in colour, finished
   states stay neutral or violet so a long All list is not a rainbow. The pill chip is a
-  surface-coloured capsule so it reads on any lane hue, filled pill included. Branch pills get a chip by name (`pullRequestForRef`; a local branch by
+  surface-coloured capsule so it reads on any lane hue, filled pill included. Every option here is
+  an enum (see Coding standards): `PullScope`, `PullRequestsStatus`, `PullRequestProvider`,
+  `PullRequestState`, `ChecksState`, `ReviewState` in `types.ts`, mirrored in Rust as `Scope`,
+  `Status`, `Provider` with serde — a Rust test pins each wire spelling, so a rename on one side
+  breaks the build — and GitHub's and GitLab's own spellings (`GitHubRollup`, `GitLabPipeline`, …)
+  live beside the parsers that read them. **A squash or rebase
+  merge leaves no trace of the branch in history**, so a commit on main finds its request by the hash
+  the merge made (`mergeCommit`, from both providers) — and, for requests not loaded, by the number its
+  own message names (`(#14)`, `Merge pull request #14`, GitLab's `See merge request g/p!7`), linked
+  through the address of any loaded request; the text guess carries no state. The same
+  `PullRequestChip` sits on commit rows and beside the hash in the details panel. Branch pills get a chip by name (`pullRequestForRef`; a local branch by
   name, a remote past `<remote>/`; fork PRs never match), and `PullRequestMenu` in the title bar
   lists them, read-only — a row opens the request in the browser. The popover is portaled to
   `<body>` because the title bar's backdrop blur would become the containing block of a fixed panel.
@@ -242,6 +252,29 @@ and the README's Tests badge points at it.
    in a dedicated hook (`src/hooks/<domain>.ts`), pure logic in `src/lib/`, the backend surface
    in `src/data/`. Same rule for tests: they follow the module they exercise. A file beyond
    ~300 lines or mixing domains splits the next time work touches it — not "someday".
+
+## Coding standards
+
+1. **Options are enums.** Any closed set of values — a status, a scope, a provider, a state or
+   decision an API or CLI reports (`"SUCCESS"`, `"MERGED"`) — is a TypeScript `enum` with string
+   values, never a bare string-literal union and never an inline `"literal"` compared in code.
+   *Why:* one place names every option, a rename is a compiler error instead of a silent
+   mismatch, `switch` and `Record<Enum, …>` over it are exhaustively checked, and a spelling the
+   outside world dictates lives on exactly one line.
+   *How:* `export enum PullScope { Open = "open", Merged = "merged", All = "all" }` — members
+   PascalCase, **values the exact wire spelling** (what Rust, JSON or the provider sends) so no
+   mapping layer is needed. Compare and key by member (`PullScope.Open`,
+   `{ [PullRequestState.Open]: … }`), never by the literal. An enum for a spelling an external
+   service owns (GitHub's `SUCCESS`) stays next to the parser that reads it; one the UI and the
+   backend share lives in `types.ts`. At a boundary (an `invoke` payload, parsed JSON) an unknown
+   value takes the `default` branch — the enum names what we know, the boundary decides what to do
+   with the rest.
+   *Rust side:* the same rule — an option crossing the `invoke` boundary is a Rust `enum` with
+   serde (`#[serde(rename_all = "kebab-case")]`), not a `String` or `&str` compared to literals.
+   *Not enums:* open-ended text (titles, branch names, search text) and booleans.
+   *Mechanics:* plain `enum`, not `const enum` (`isolatedModules` is on). Code that touches an
+   existing string union converts it then — like the file-size rule, not "someday". Tests build and
+   compare with the members too, so a renamed option breaks the build, not just a string match.
 
 ## Known pitfalls
 

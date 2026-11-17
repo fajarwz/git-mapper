@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
-import type { PullRequest, PullScope } from "../types";
+import { ChecksState, PullRequestProvider, PullRequestsStatus, PullScope, ReviewState, type PullRequest } from "../types";
 import type { PullRequestsView } from "../hooks/usePullRequests";
 import { openExternal } from "../lib/external";
 import { formatAbsoluteDate } from "../lib/format";
@@ -21,15 +21,15 @@ import { PullRequestStateIcon } from "./PullRequestStateIcon";
 type Filter = PullScope;
 
 const TABS: Array<{ value: Filter; label: string }> = [
-  { value: "open", label: "Open" },
-  { value: "merged", label: "Merged" },
-  { value: "all", label: "All" },
+  { value: PullScope.Open, label: "Open" },
+  { value: PullScope.Merged, label: "Merged" },
+  { value: PullScope.All, label: "All" },
 ];
 
 /** The CLI each provider's list comes from, with where to get it and how to sign in. */
 const CLI = {
-  github: { name: "GitHub CLI", program: "gh", site: "cli.github.com" },
-  gitlab: { name: "GitLab CLI", program: "glab", site: "gitlab.com/gitlab-org/cli" },
+  [PullRequestProvider.GitHub]: { name: "GitHub CLI", program: "gh", site: "cli.github.com" },
+  [PullRequestProvider.GitLab]: { name: "GitLab CLI", program: "glab", site: "gitlab.com/gitlab-org/cli" },
 } as const;
 
 const SEGMENT =
@@ -45,13 +45,13 @@ function Chip({ tone, children }: { tone: string; children: ReactNode }) {
   );
 }
 
-function ChecksChip({ checks }: { checks: Exclude<PullRequest["checks"], "none"> }) {
+function ChecksChip({ checks }: { checks: Exclude<ChecksState, ChecksState.None> }) {
   const tone = CHECK_TONE[checks];
   return (
     <Chip tone={tone.chip}>
-      {checks === "passing" && <CheckIcon size={9} />}
-      {checks === "failing" && <CloseIcon size={9} />}
-      {checks === "pending" && (
+      {checks === ChecksState.Passing && <CheckIcon size={9} />}
+      {checks === ChecksState.Failing && <CloseIcon size={9} />}
+      {checks === ChecksState.Pending && (
         <span aria-hidden="true" className="size-1.5 rounded-full bg-current motion-safe:animate-pulse" />
       )}
       {tone.label}
@@ -81,12 +81,12 @@ function Row({ pull }: { pull: PullRequest }) {
         <span className="truncate font-mono text-[10.5px] text-ink-dim">
           {pull.headBranch} → {pull.baseBranch}
         </span>
-        {(pull.checks !== "none" || review) && (
+        {(pull.checks !== ChecksState.None || review) && (
           <span className="flex flex-wrap items-center gap-1.5 pt-0.5">
-            {pull.checks !== "none" && <ChecksChip checks={pull.checks} />}
+            {pull.checks !== ChecksState.None && <ChecksChip checks={pull.checks} />}
             {review && (
               <Chip tone={review.chip}>
-                {pull.review === "approved" && <CheckIcon size={9} />}
+                {pull.review === ReviewState.Approved && <CheckIcon size={9} />}
                 {review.label}
               </Chip>
             )}
@@ -155,7 +155,7 @@ function Notice({ children, warn = false }: { children: ReactNode; warn?: boolea
  */
 export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
   const [open, setOpen] = useState(false);
-  const [filter, setFilter] = useState<Filter>("open");
+  const [filter, setFilter] = useState<Filter>(PullScope.Open);
   const button = useRef<HTMLButtonElement>(null);
   const panel = useRef<HTMLDivElement>(null);
   const [position, setPosition] = useState<{ top: number; right: number } | null>(null);
@@ -219,10 +219,10 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
   // The tab and the search outlive a repo switch, so the selected list reads itself: waiting for
   // a click that already happened would leave the skeleton up forever.
   useEffect(() => {
-    if (open && pulls.status === "ok") show(filter);
+    if (open && pulls.status === PullRequestsStatus.Ok) show(filter);
   }, [open, filter, query, pulls.status, show]);
 
-  if (pulls.status === "unsupported-remote") return null;
+  if (pulls.status === PullRequestsStatus.UnsupportedRemote) return null;
 
   const nouns = requestNoun(pulls.provider, true);
   const lower = nouns.toLowerCase();
@@ -232,13 +232,13 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
     list.loaded
       ? `${compactCount(list.total ?? list.pulls.length)}${list.total === null && list.cursor !== null ? "+" : ""}`
       : null;
-  const openList = pulls.feeds.open;
+  const openList = pulls.feeds[PullScope.Open];
   const openCount = openList.total ?? openList.pulls.length;
   const openLabel = countOf(openList);
   const firstLoad =
-    query === "" && filter === "open"
+    query === "" && filter === PullScope.Open
       ? pulls.status === null && pulls.error === null
-      : pulls.status === "ok" && !feed.loaded && feed.moreError === null;
+      : pulls.status === PullRequestsStatus.Ok && !feed.loaded && feed.moreError === null;
 
   return (
     <>
@@ -321,7 +321,7 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
               </div>
             </div>
 
-            {pulls.status === "ok" && (
+            {pulls.status === PullRequestsStatus.Ok && (
               <div className="relative flex items-center px-3 pb-2">
                 <span aria-hidden="true" className="pointer-events-none absolute left-5 z-10 text-ink-dim">
                   <SearchIcon size={12} />
@@ -357,7 +357,7 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
               ref={listRef}
               className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto border-t border-rule p-1.5"
             >
-              {pulls.status === "cli-missing" && (
+              {pulls.status === PullRequestsStatus.CliMissing && (
                 <Notice>
                   {cli ? (
                     <>
@@ -372,7 +372,7 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
                   )}
                 </Notice>
               )}
-              {pulls.status === "cli-unauthenticated" && (
+              {pulls.status === PullRequestsStatus.CliUnauthenticated && (
                 <Notice>
                   The {cli?.name ?? "provider CLI"} is not signed in for this repository&apos;s host. Run{" "}
                   <code className="font-mono">{cli?.program ?? "gh"} auth login</code> in a terminal, then
@@ -385,27 +385,27 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
                 </Notice>
               )}
               {firstLoad && <SkeletonRows />}
-              {pulls.status === "ok" && feed.loaded && shown.length === 0 && (
+              {pulls.status === PullRequestsStatus.Ok && feed.loaded && shown.length === 0 && (
                 <Empty
                   title={
                     query !== ""
                       ? `No ${lower} match \u201c${query}\u201d`
-                      : filter === "open"
+                      : filter === PullScope.Open
                         ? `No open ${lower}`
-                        : filter === "merged"
+                        : filter === PullScope.Merged
                           ? `No merged ${lower}`
                           : `No ${lower} yet`
                   }
                   hint={
                     query !== ""
                       ? "Try a word from the title, or an author."
-                      : filter === "open"
+                      : filter === PullScope.Open
                         ? "Merged and closed ones, if any, are under All."
                         : "Nothing has been opened for this repository."
                   }
                 />
               )}
-              {pulls.status === "ok" && shown.map((pull) => <Row key={pull.number} pull={pull} />)}
+              {pulls.status === PullRequestsStatus.Ok && shown.map((pull) => <Row key={pull.number} pull={pull} />)}
               {feed.loadingMore && <SkeletonRows count={1} />}
               {feed.moreError !== null && (
                 <Notice warn>

@@ -12,6 +12,8 @@ import {
   type ColumnVisibility,
 } from "../lib/tableLayout";
 import { RefPill } from "./RefPill";
+import { PullRequestChip } from "./PullRequestChip";
+import type { PullChipData } from "../lib/pullRequests";
 import { Avatar } from "./Avatar";
 
 interface CommitRowProps {
@@ -27,12 +29,19 @@ interface CommitRowProps {
   order?: ColumnId[];
   /** Branch name → PR; keep the map stable (the hook memoizes it) so the memo holds. */
   pullsByBranch?: Map<string, PullRequest>;
+  /** The request a commit came from (a squash merge's own commit, or the one its message names). */
+  commitChip?: (commit: Commit) => PullChipData | null;
   onSelect: (hash: string) => void;
   onCheckoutBranch?: (branch: string) => void;
   /** Right-click on the row body: the menu targets the commit and its most relevant ref. */
   onContextMenu?: (commit: Commit, x: number, y: number) => void;
   /** Right-click on a pill: the menu targets that exact ref. */
   onRefContextMenu?: (commit: Commit, ref: CommitRef, x: number, y: number) => void;
+}
+
+function CommitChip({ commit, commitChip }: { commit: Commit; commitChip?: (commit: Commit) => PullChipData | null }) {
+  const chip = commitChip?.(commit) ?? null;
+  return chip && <PullRequestChip chip={chip} className="ring-hairline" />;
 }
 
 export const CommitRow = memo(function CommitRow({
@@ -43,6 +52,7 @@ export const CommitRow = memo(function CommitRow({
   columns = DEFAULT_COLUMNS,
   order = DEFAULT_ORDER,
   pullsByBranch,
+  commitChip,
   onSelect,
   onCheckoutBranch,
   onContextMenu,
@@ -86,6 +96,9 @@ export const CommitRow = memo(function CommitRow({
                 onContextMenu={onRefContextMenu ? (pill, x, y) => onRefContextMenu(commit, pill, x, y) : undefined}
               />
             ))
+          )}
+          {!isWorktreeRow && commit.stashIndex === undefined && (
+            <CommitChip commit={commit} commitChip={commitChip} />
           )}
         </span>
       </Fragment>

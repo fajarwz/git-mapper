@@ -1,9 +1,8 @@
 import type { CommitRef, PullRequest } from "../types";
-import { openExternal } from "../lib/external";
 import { branchColor } from "../lib/graphGeometry";
-import { PROVIDER_NAME, describePullRequest, pullRequestLabel, requestNoun } from "../lib/pullRequestTone";
+import { chipOf } from "../lib/pullRequests";
 import { BranchIcon, RemoteIcon, StashIcon, TagIcon } from "./icons";
-import { PullRequestStateIcon } from "./PullRequestStateIcon";
+import { PullRequestChip } from "./PullRequestChip";
 
 interface RefPillProps {
   ref: CommitRef;
@@ -83,28 +82,14 @@ export function RefPill({ ref, pullRequest, color, onCheckout, onContextMenu }: 
         </span>
       )}
       {pullRequest && (
-        // A span, not a button: the pill sits inside the row's own button. Clicks stop here so
-        // opening the PR neither selects the row nor (double-click) checks the branch out.
-        <span
-          role="link"
-          data-pr-badge
-          aria-label={`${requestNoun(pullRequest.provider)} ${pullRequestLabel(pullRequest)}: ${pullRequest.title}`}
-          title={`${pullRequestLabel(pullRequest)} ${pullRequest.title}\n${describePullRequest(pullRequest)}\nClick to open on ${PROVIDER_NAME[pullRequest.provider]}`}
-          onClick={(event) => {
-            event.stopPropagation();
-            openExternal(pullRequest.url);
-          }}
-          onDoubleClick={(event) => event.stopPropagation()}
-          // A capsule on the surface colour, so it reads on any lane hue — outline or filled —
-          // and sits 2px from the pill's edge (-mr-1.5 undoes most of the pill's px-2). An outline
-          // pill has a 1.5px border the filled one lacks, so it pulls in that much more or the
-          // right gap runs wider than the top and bottom.
+        // Sits 2px from the pill's edge (-mr-1.5 undoes most of the pill's px-2). An outline pill
+        // has a 1.5px border the filled one lacks, so it pulls in that much more or the right
+        // gap runs wider than the top and bottom.
+        <PullRequestChip
+          chip={chipOf(pullRequest)}
           style={ref.isCurrent ? undefined : { marginRight: "calc(-0.375rem - 1.5px)" }}
-          className="-mr-1.5 ml-0.5 inline-flex h-4 cursor-pointer items-center gap-0.5 rounded-full bg-surface pl-1 pr-1.5 font-mono text-[10px] font-semibold leading-none text-ink ring-1 ring-transparent transition-shadow hover:ring-primary-ink/50"
-        >
-          <PullRequestStateIcon state={pullRequest.state} size={10} />
-          {pullRequestLabel(pullRequest)}
-        </span>
+          className="-mr-1.5 ml-0.5 ring-transparent"
+        />
       )}
     </span>
   );
