@@ -73,6 +73,7 @@ import type { Repository, Submodule } from "./types";
 import { submoduleParents } from "./lib/submodule";
 import { useCommitFiles } from "./hooks/useCommitFiles";
 import { useWipSide } from "./hooks/useWipSide";
+import { usePullRequests } from "./hooks/usePullRequests";
 
 /** Auto-fetch window on refocus — often enough to notice a push, rare enough to stay quiet. */
 const FETCH_ON_FOCUS_MS = 180_000;
@@ -265,6 +266,7 @@ function App() {
   const rootId = activeRepoId ? (parentOf.get(activeRepoId) ?? activeRepoId) : null;
   const rootRepo = useMemo(() => repos.find((item) => item.id === rootId) ?? null, [repos, rootId]);
   const activeRepoPath = repo?.path ?? null;
+  const pulls = usePullRequests(repo);
 
   // During a merge the conflicted paths live in the rail's Conflicts section — the plain
   // Staged/Changes sections must not echo them as ordinary modified rows.
@@ -1217,6 +1219,7 @@ function App() {
         stageCount={railFiles.length + (repo?.conflicts?.length ?? 0)}
         stageOpen={stageOpen}
         onToggleStage={handleToggleStage}
+        pulls={pulls}
       />
 
       {rootRepo !== null && (rootRepo.submodules?.length ?? 0) > 0 && (
@@ -1298,6 +1301,7 @@ function App() {
               waking={repo.id === wakingId}
               showAvatars={showAvatars}
               onNearBottom={handleNearBottom}
+              pullsByBranch={pulls.byBranch}
               onCheckoutBranch={handleCheckoutBranch}
               onContextMenu={(commit, ref, x, y) => {
                 // The uncommitted row owns no menu (empty pseudo hash, no refs): a right-click
@@ -1333,6 +1337,7 @@ function App() {
                 onDiffWrapChange={setDiffWrap}
                 syntaxScheme={syntaxScheme}
                 showAvatars={showAvatars}
+                pullsByBranch={pulls.byBranch}
                 onCheckoutBranch={handleCheckoutBranch}
                 onRefContextMenu={(ref, x, y) => {
                   // The wip row never reaches here (no sidebar), so no empty-menu guard needed.

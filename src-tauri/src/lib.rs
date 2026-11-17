@@ -16,6 +16,7 @@ pub fn run() {
             git::read_status,
             git::read_worktree_files,
             git::read_submodules,
+            git::read_pull_requests,
             git::stage_files,
             git::unstage_files,
             git::discard_files,

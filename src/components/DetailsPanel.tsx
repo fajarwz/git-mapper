@@ -1,6 +1,7 @@
 import { useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import type { ChangedFile, Commit, Submodule } from "../types";
+import type { ChangedFile, Commit, PullRequest, Submodule } from "../types";
+import { pullRequestForRef } from "../lib/pullRequests";
 import { copyText } from "../lib/clipboard";
 import { formatAbsoluteDate } from "../lib/format";
 import type { SyntaxScheme } from "../lib/highlight";
@@ -44,6 +45,8 @@ interface DetailsPanelProps {
   syntaxScheme: SyntaxScheme;
   /** The avatar toggle in settings: initials + gravatar photo beside the author here too. */
   showAvatars: boolean;
+  /** Branch name → pull request, for the #number chip on this commit's branch pills. */
+  pullsByBranch?: Map<string, PullRequest>;
   /** Double-clicking a branch pill here checks the branch out, same as in the commit list. */
   onCheckoutBranch?: (branch: string) => void;
   /** Right-clicking a pill opens the same ref menu as the commit list's pills. */
@@ -85,6 +88,7 @@ export function DetailsPanel({
   onDiffWrapChange,
   syntaxScheme,
   showAvatars,
+  pullsByBranch,
   onCheckoutBranch,
   onRefContextMenu,
   isWorktree = false,
@@ -273,6 +277,7 @@ export function DetailsPanel({
                           <RefPill
                             key={`${pillRef.type}:${pillRef.name}`}
                             ref={pillRef}
+                            pullRequest={pullsByBranch && pullRequestForRef(pillRef, pullsByBranch)}
                             color={commit.branchColor}
                             onCheckout={onCheckoutBranch}
                             onContextMenu={onRefContextMenu}

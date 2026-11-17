@@ -25,6 +25,11 @@ import RawHeartIcon from "../assets/heart.svg?react";
 import RawStarIcon from "../assets/star.svg?react";
 import RawAlertIcon from "../assets/alert.svg?react";
 import RawSubmoduleIcon from "../assets/submodule.svg?react";
+import RawPullRequestIcon from "../assets/pull-request.svg?react";
+import RawPullRequestDraftIcon from "../assets/pull-request-draft.svg?react";
+import RawPullRequestMergedIcon from "../assets/pull-request-merged.svg?react";
+import RawPullRequestClosedIcon from "../assets/pull-request-closed.svg?react";
+import RawExternalIcon from "../assets/external.svg?react";
 interface IconProps {
   size?: number;
 }
@@ -71,6 +76,10 @@ export function RepoIcon({ size = 14 }: IconProps) {
 
 export function SubmoduleIcon({ size = 12, className = "" }: GlyphProps) {
   return <SizedIcon glyph={RawSubmoduleIcon} size={size} className={className} />;
+}
+
+export function PullRequestIcon({ size = 12, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawPullRequestIcon} size={size} className={className} />;
 }
 
 export function PlusIcon({ size = 12 }: IconProps) {
@@ -129,3 +138,19 @@ export { default as WindowMinimizeIcon } from "../assets/window-minimize.svg?rea
 export { default as WindowMaximizeIcon } from "../assets/window-maximize.svg?react";
 export { default as WindowRestoreIcon } from "../assets/window-restore.svg?react";
 export { default as WindowCloseIcon } from "../assets/window-close.svg?react";
+
+export function PullRequestDraftIcon({ size = 12, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawPullRequestDraftIcon} size={size} className={className} />;
+}
+
+export function PullRequestMergedIcon({ size = 12, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawPullRequestMergedIcon} size={size} className={className} />;
+}
+
+export function PullRequestClosedIcon({ size = 12, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawPullRequestClosedIcon} size={size} className={className} />;
+}
+
+export function ExternalIcon({ size = 12, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawExternalIcon} size={size} className={className} />;
+}

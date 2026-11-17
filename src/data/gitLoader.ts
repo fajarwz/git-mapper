@@ -1,6 +1,17 @@
 import { invoke } from "@tauri-apps/api/core";
 import { open as pickDirectory } from "@tauri-apps/plugin-dialog";
-import type { ChangedFile, Commit, CommitRef, DiffLine, Repository, Submodule } from "../types";
+import type {
+  ChangedFile,
+  Commit,
+  CommitRef,
+  DiffLine,
+  PullRequest,
+  PullRequestProvider,
+  PullRequestsStatus,
+  Repository,
+  Submodule,
+} from "../types";
+import { parsePullRequests } from "../lib/pullRequests";
 import { sameSubmodules, shapeSubmodules, type RawSubmodule } from "../lib/submodule";
 import { STORAGE_KEYS } from "../lib/persisted";
 import { orderRefs } from "../lib/refOrder";
@@ -596,6 +607,29 @@ export async function stashAction(dir: string, index: number, action: "apply" | 
 /** Reads every remote into the tracking refs, so ahead/behind state includes remote commits. */
 export async function fetchRemote(dir: string): Promise<void> {
   await call("fetch_remote", { dir }, (raw) => raw as void);
+}
+
+/**
+ * The repo's pull requests through the `gh` CLI. Not part of load/refresh: it is a network
+ * call, so the usePullRequests hook asks for it on its own schedule. A non-ok status (CLI
+ * missing, signed out, no GitHub/GitLab remote) is an answer, not an error — it rejects only
+ * on a real failure.
+ */
+export async function loadPullRequests(dir: string): Promise<{
+  status: PullRequestsStatus;
+  /** Whose CLI answered or should have; null when the remote's host does not say. */
+  provider: PullRequestProvider | null;
+  pullRequests: PullRequest[];
+}> {
+  return call("read_pull_requests", { dir }, (raw) => {
+    const payload = raw as { status: PullRequestsStatus; provider: string; raw: string };
+    const provider = payload.provider === "gitlab" || payload.provider === "github" ? payload.provider : null;
+    return {
+      status: payload.status,
+      provider,
+      pullRequests: payload.status === "ok" && provider ? parsePullRequests(provider, payload.raw) : [],
+    };
+  });
 }
 
 /** Pushes the current branch to origin with `-u`, so the first push sets the upstream. */

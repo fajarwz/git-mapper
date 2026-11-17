@@ -7,6 +7,7 @@ import { hunksHandlers } from "./hunks.ts";
 import { stagingHandlers } from "./staging.ts";
 import { filesHandlers } from "./files.ts";
 import { submodulesHandlers } from "./submodules.ts";
+import { pullsHandlers } from "./pulls.ts";
 import type { Handlers } from "./git.ts";
 
 const handlers: Handlers = {
@@ -18,6 +19,7 @@ const handlers: Handlers = {
   ...stagingHandlers,
   ...filesHandlers,
   ...submodulesHandlers,
+  ...pullsHandlers,
 };
 
 // Browser-tab fallback for the Git plumbing: same command names as the Tauri commands in

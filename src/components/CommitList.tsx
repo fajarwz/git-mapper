@@ -5,7 +5,7 @@ import type { CollisionDetection, DragEndEvent } from "@dnd-kit/core";
 import { SortableContext, arrayMove, horizontalListSortingStrategy, useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { CSSProperties } from "react";
-import type { Commit, CommitRef, Repository } from "../types";
+import type { Commit, CommitRef, PullRequest, Repository } from "../types";
 import { UNCOMMITTED_HASH, isStashRow } from "../data/gitLoader";
 import { layoutGraph } from "../lib/graphLanes";
 import { graphWidth } from "../lib/graphGeometry";
@@ -59,6 +59,8 @@ interface CommitListProps {
   /** The initials avatar left of the username; a settings toggle owns this. */
   showAvatars: boolean;
   onNearBottom: () => void;
+  /** Branch name → pull request, for the #number chip on branch pills. */
+  pullsByBranch?: Map<string, PullRequest>;
   onCheckoutBranch: (branch: string) => void;
   /** Right-click on a row (or one of its pills): opens the commit context menu. */
   onContextMenu?: (commit: Commit, ref: CommitRef | undefined, x: number, y: number) => void;
@@ -117,7 +119,7 @@ function HeaderCell({
   );
 }
 
-export function CommitList({ repo, commits, query, selectedHash, flashHashes, onSelect, loadingMore, waking = false, showAvatars, onNearBottom, onCheckoutBranch, onContextMenu }: CommitListProps) {
+export function CommitList({ repo, commits, query, selectedHash, flashHashes, onSelect, loadingMore, waking = false, showAvatars, onNearBottom, pullsByBranch, onCheckoutBranch, onContextMenu }: CommitListProps) {
   // One layout for the graph column and the SVG. Sizing the column from the dot lanes alone used to
   // clip the graph whenever a line ran right of every dot.
   // Same inputs as gitLoader.withLanes (stash rows float, the uncommitted row is flagged) —
@@ -343,6 +345,7 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
               showAvatar={showAvatars}
               columns={visible}
               order={order}
+              pullsByBranch={pullsByBranch}
               onSelect={onSelect}
               onCheckoutBranch={onCheckoutBranch}
               onContextMenu={onContextMenu ? (row, x, y) => {

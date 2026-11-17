@@ -15,6 +15,8 @@ import {
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import type { Repository } from "../types";
+import type { PullRequestsView } from "../hooks/usePullRequests";
+import { PullRequestMenu } from "./PullRequestMenu";
 import { GLASS_CONTROL } from "../lib/ui";
 import {
   BranchIcon,
@@ -117,6 +119,8 @@ interface TitleBarProps {
   /** Whether the staging rail is open; the toggle carries a pressed state. */
   stageOpen: boolean;
   onToggleStage: () => void;
+  /** The active repo's pull requests (gh CLI); drives the button and its popover. */
+  pulls: PullRequestsView;
 }
 
 interface SortableTabProps {
@@ -217,6 +221,7 @@ export function TitleBar({
   stageCount,
   stageOpen,
   onToggleStage,
+  pulls,
 }: TitleBarProps) {
   const [maximized, setMaximized] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -449,6 +454,7 @@ export function TitleBar({
             )}
           </button>
         )}
+        {repo && <PullRequestMenu pulls={pulls} />}
         {repo && (
           <button
             type="button"

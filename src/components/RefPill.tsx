@@ -1,9 +1,14 @@
-import type { CommitRef } from "../types";
+import type { CommitRef, PullRequest } from "../types";
+import { openExternal } from "../lib/external";
 import { branchColor } from "../lib/graphGeometry";
+import { PROVIDER_NAME, describePullRequest, pullRequestLabel, requestNoun } from "../lib/pullRequestTone";
 import { BranchIcon, RemoteIcon, StashIcon, TagIcon } from "./icons";
+import { PullRequestStateIcon } from "./PullRequestStateIcon";
 
 interface RefPillProps {
   ref: CommitRef;
+  /** The branch's pull/merge request, when it has one: a chip that opens it in the browser. */
+  pullRequest?: PullRequest;
   /** The commit's branch colour index, so the pill matches its node. */
   color: number;
   /** Only local branches are checkout-able; double-clicking the pill switches to it. */
@@ -21,7 +26,7 @@ const ICONS: Record<CommitRef["type"], typeof BranchIcon> = {
 };
 
 /** Branch / remote / tag / stash / detached-HEAD label shown inline after a commit subject. */
-export function RefPill({ ref, color, onCheckout, onContextMenu }: RefPillProps) {
+export function RefPill({ ref, pullRequest, color, onCheckout, onContextMenu }: RefPillProps) {
   const Icon = ICONS[ref.type];
   const checkoutable = ref.type === "branch" && !ref.isCurrent && onCheckout !== undefined;
   const colorValue = branchColor(color);
@@ -75,6 +80,27 @@ export function RefPill({ ref, color, onCheckout, onContextMenu }: RefPillProps)
           }}
         >
           {ref.withRemote}
+        </span>
+      )}
+      {pullRequest && (
+        // A span, not a button: the pill sits inside the row's own button. Clicks stop here so
+        // opening the PR neither selects the row nor (double-click) checks the branch out.
+        <span
+          role="link"
+          data-pr-badge
+          aria-label={`${requestNoun(pullRequest.provider)} ${pullRequestLabel(pullRequest)}: ${pullRequest.title}`}
+          title={`${pullRequestLabel(pullRequest)} ${pullRequest.title}\n${describePullRequest(pullRequest)}\nClick to open on ${PROVIDER_NAME[pullRequest.provider]}`}
+          onClick={(event) => {
+            event.stopPropagation();
+            openExternal(pullRequest.url);
+          }}
+          onDoubleClick={(event) => event.stopPropagation()}
+          // A capsule on the surface colour, so it reads on any lane hue — outline or filled —
+          // and sits 2px from the pill's edge (-mr-1.5 undoes most of the pill's px-2).
+          className="-mr-1.5 ml-0.5 inline-flex h-4 cursor-pointer items-center gap-0.5 rounded-full bg-surface pl-1 pr-1.5 font-mono text-[10px] font-semibold leading-none text-ink ring-1 ring-transparent transition-shadow hover:ring-primary-ink/50"
+        >
+          <PullRequestStateIcon state={pullRequest.state} size={10} />
+          {pullRequestLabel(pullRequest)}
         </span>
       )}
     </span>

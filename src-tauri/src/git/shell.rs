@@ -17,6 +17,22 @@ pub fn git_command(dir: &str) -> Command {
     cmd
 }
 
+/// The provider-CLI twin of `git_command` (`gh`, `glab`): same hidden console on Windows, and
+/// no prompts or update nags — this is a background read, there is nobody to answer a TTY
+/// question. Each CLI ignores the other's variables.
+pub fn cli_command(program: &str, dir: &str) -> Command {
+    let mut cmd = Command::new(program);
+    cmd.current_dir(dir)
+        .env("GH_PROMPT_DISABLED", "1")
+        .env("GH_NO_UPDATE_NOTIFIER", "1")
+        .env("NO_PROMPT", "1")
+        .env("GLAB_CHECK_UPDATE", "false")
+        .env("NO_COLOR", "1");
+    #[cfg(windows)]
+    cmd.creation_flags(0x0800_0000); // CREATE_NO_WINDOW
+    cmd
+}
+
 pub fn run_git(dir: &str, args: &[&str]) -> Result<String, String> {
     git_command(dir)
         .args(args)
