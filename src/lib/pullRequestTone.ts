@@ -25,6 +25,12 @@ export const REVIEW_TONE = {
   required: { label: "Review required", chip: "bg-ink/10 text-ink-soft" },
 } as const;
 
+/** 412 → "412", 7213 → "7.2k": a repo's All total can be in the thousands. */
+export function compactCount(count: number): string {
+  if (count < 1000) return String(count);
+  return `${(count / 1000).toFixed(count < 10_000 ? 1 : 0).replace(/\.0$/, "")}k`;
+}
+
 export const PROVIDER_NAME: Record<PullRequestProvider, string> = { github: "GitHub", gitlab: "GitLab" };
 
 /** GitHub writes `#13`, GitLab writes `!13` (`#` is its issue prefix). */

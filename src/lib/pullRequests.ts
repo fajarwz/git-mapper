@@ -1,12 +1,18 @@
 import type { ChecksState, CommitRef, PullRequest, PullRequestProvider, PullRequestState } from "../types";
 
-interface RawCheck {
-  status?: string;
-  conclusion?: string;
-  state?: string;
+/** Rows per read. Must match PAGE_SIZE in src-tauri/src/git/pulls.rs: a full GitLab page is
+ * how "there may be another page" is told, since glab reports no total. */
+export const PR_PAGE_SIZE = 30;
+
+export interface PullRequestPage {
+  pullRequests: PullRequest[];
+  /** Opaque, provider-specific: pass it back to read the next page; null when this was the last. */
+  nextCursor: string | null;
+  /** Every request in the scope, not just this page; null when the provider does not say. */
+  total: number | null;
 }
 
-interface RawPullRequest {
+interface RawNode {
   number: number;
   title: string;
   state: string;
@@ -18,26 +24,30 @@ interface RawPullRequest {
   url: string;
   updatedAt: string;
   reviewDecision?: string | null;
-  statusCheckRollup?: RawCheck[] | null;
+  commits?: { nodes?: Array<{ commit?: { statusCheckRollup?: { state?: string } | null } | null }> } | null;
 }
 
-const FAILED = new Set(["FAILURE", "ERROR", "TIMED_OUT", "CANCELLED", "ACTION_REQUIRED", "STARTUP_FAILURE"]);
-
-/** CheckRun entries carry status + conclusion; legacy StatusContext entries carry a single state. */
-export function summarizeChecks(rollup: RawCheck[] | null | undefined): ChecksState {
-  if (!rollup || rollup.length === 0) return "none";
-  let pending = false;
-  for (const check of rollup) {
-    const verdict = check.conclusion || check.state || "";
-    if (FAILED.has(verdict)) return "failing";
-    if ((check.status && check.status !== "COMPLETED") || verdict === "PENDING" || verdict === "EXPECTED") {
-      pending = true;
-    }
-  }
-  return pending ? "pending" : "passing";
+interface RawGitHubPage {
+  data?: {
+    repository?: {
+      pullRequests?: {
+        totalCount?: number;
+        pageInfo?: { hasNextPage?: boolean; endCursor?: string | null };
+        nodes?: RawNode[];
+      };
+    } | null;
+  } | null;
 }
 
-function stateOf(raw: RawPullRequest): PullRequestState {
+/** GitHub's rollup `state` for the head commit: one word, not the list of every check. */
+export function summarizeRollup(state: string | undefined | null): ChecksState {
+  if (state === "SUCCESS") return "passing";
+  if (state === "FAILURE" || state === "ERROR") return "failing";
+  if (state === "PENDING" || state === "EXPECTED") return "pending";
+  return "none";
+}
+
+function stateOf(raw: RawNode): PullRequestState {
   if (raw.state === "MERGED") return "merged";
   if (raw.state === "CLOSED") return "closed";
   return raw.isDraft ? "draft" : "open";
@@ -49,13 +59,36 @@ const REVIEWS: Record<string, PullRequest["review"]> = {
   REVIEW_REQUIRED: "required",
 };
 
-function parseList(raw: string): unknown[] {
+function parseJson(raw: string): unknown {
   try {
-    const list: unknown = JSON.parse(raw);
-    return Array.isArray(list) ? list : [];
+    return JSON.parse(raw);
   } catch {
-    return [];
+    return null;
   }
+}
+
+function parseGitHub(raw: string): PullRequestPage {
+  const page = (parseJson(raw) as RawGitHubPage | null)?.data?.repository?.pullRequests;
+  const nodes = Array.isArray(page?.nodes) ? page.nodes : [];
+  const pageInfo = page?.pageInfo;
+  return {
+    pullRequests: nodes.map((item) => ({
+      provider: "github",
+      number: item.number,
+      title: item.title,
+      state: stateOf(item),
+      author: item.author?.login ?? "",
+      headBranch: item.headRefName,
+      baseBranch: item.baseRefName,
+      url: item.url,
+      updatedAt: item.updatedAt,
+      checks: summarizeRollup(item.commits?.nodes?.[0]?.commit?.statusCheckRollup?.state),
+      review: REVIEWS[item.reviewDecision ?? ""] ?? null,
+      fromFork: item.isCrossRepository === true,
+    })),
+    nextCursor: pageInfo?.hasNextPage === true && pageInfo.endCursor ? pageInfo.endCursor : null,
+    total: typeof page?.totalCount === "number" ? page.totalCount : null,
+  };
 }
 
 interface RawMergeRequest {
@@ -101,47 +134,46 @@ function gitlabState(raw: RawMergeRequest): PullRequestState {
   return raw.draft === true || raw.work_in_progress === true ? "draft" : "open";
 }
 
-function parseGitLab(raw: string): PullRequest[] {
-  return (parseList(raw) as RawMergeRequest[]).map((item) => ({
-    provider: "gitlab",
-    number: item.iid,
-    title: item.title,
-    state: gitlabState(item),
-    author: item.author?.username ?? "",
-    headBranch: item.source_branch,
-    baseBranch: item.target_branch,
-    url: item.web_url,
-    updatedAt: item.updated_at,
-    checks: summarizePipeline((item.head_pipeline ?? item.pipeline)?.status),
-    // The list carries no approvals; only "needs approval" is stated outright.
-    review: item.detailed_merge_status === "not_approved" ? "required" : null,
-    fromFork:
-      item.source_project_id !== undefined &&
-      item.target_project_id !== undefined &&
-      item.source_project_id !== item.target_project_id,
-  }));
+function parseGitLab(raw: string, cursor: string | null): PullRequestPage {
+  const list = parseJson(raw);
+  const items = Array.isArray(list) ? (list as RawMergeRequest[]) : [];
+  const page = Number.parseInt(cursor ?? "", 10);
+  return {
+    pullRequests: items.map((item) => ({
+      provider: "gitlab",
+      number: item.iid,
+      title: item.title,
+      state: gitlabState(item),
+      author: item.author?.username ?? "",
+      headBranch: item.source_branch,
+      baseBranch: item.target_branch,
+      url: item.web_url,
+      updatedAt: item.updated_at,
+      checks: summarizePipeline((item.head_pipeline ?? item.pipeline)?.status),
+      // The list carries no approvals; only "needs approval" is stated outright.
+      review: item.detailed_merge_status === "not_approved" ? "required" : null,
+      fromFork:
+        item.source_project_id !== undefined &&
+        item.target_project_id !== undefined &&
+        item.source_project_id !== item.target_project_id,
+    })),
+    // glab pages by number and reports no total: a full page may have a successor.
+    nextCursor: items.length >= PR_PAGE_SIZE ? String((Number.isFinite(page) && page > 0 ? page : 1) + 1) : null,
+    total: null,
+  };
 }
 
 /**
- * Shapes the provider CLI's JSON (`gh pr list` / `glab mr list`) into one PullRequest type.
- * Garbage in (a CLI that printed something else) → none out.
+ * Shapes one page of the provider CLI's output into the neutral PullRequest type. `cursor` is
+ * the one the page was requested with (GitLab's next page is derived from it). Garbage in (a
+ * CLI that printed something else) → an empty last page out.
  */
-export function parsePullRequests(provider: PullRequestProvider, raw: string): PullRequest[] {
-  if (provider === "gitlab") return parseGitLab(raw);
-  return (parseList(raw) as RawPullRequest[]).map((item) => ({
-    provider: "github",
-    number: item.number,
-    title: item.title,
-    state: stateOf(item),
-    author: item.author?.login ?? "",
-    headBranch: item.headRefName,
-    baseBranch: item.baseRefName,
-    url: item.url,
-    updatedAt: item.updatedAt,
-    checks: summarizeChecks(item.statusCheckRollup),
-    review: REVIEWS[item.reviewDecision ?? ""] ?? null,
-    fromFork: item.isCrossRepository === true,
-  }));
+export function parsePullRequestPage(
+  provider: PullRequestProvider,
+  raw: string,
+  cursor: string | null,
+): PullRequestPage {
+  return provider === "gitlab" ? parseGitLab(raw, cursor) : parseGitHub(raw);
 }
 
 const PRIORITY: Record<PullRequestState, number> = { open: 0, draft: 1, merged: 2, closed: 3 };

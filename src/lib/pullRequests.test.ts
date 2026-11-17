@@ -1,13 +1,14 @@
 import { describe, expect, it } from "vitest";
 import type { PullRequest } from "../types";
 import {
-  parsePullRequests,
+  PR_PAGE_SIZE,
+  parsePullRequestPage,
   pullRequestForRef,
   pullRequestsByBranch,
-  summarizeChecks,
   summarizePipeline,
+  summarizeRollup,
 } from "./pullRequests";
-import { pullRequestLabel, requestNoun } from "./pullRequestTone";
+import { compactCount, pullRequestLabel, requestNoun } from "./pullRequestTone";
 
 function pr(over: Partial<PullRequest>): PullRequest {
   return {
@@ -27,79 +28,86 @@ function pr(over: Partial<PullRequest>): PullRequest {
   };
 }
 
-describe("summarizeChecks", () => {
-  it("reads no rollup as none", () => {
-    expect(summarizeChecks([])).toBe("none");
-    expect(summarizeChecks(null)).toBe("none");
+describe("summarizeRollup", () => {
+  it("reads GitHub's one-word rollup state", () => {
+    expect(summarizeRollup("SUCCESS")).toBe("passing");
+    expect(summarizeRollup("FAILURE")).toBe("failing");
+    expect(summarizeRollup("ERROR")).toBe("failing");
+    expect(summarizeRollup("PENDING")).toBe("pending");
+    expect(summarizeRollup("EXPECTED")).toBe("pending");
   });
 
-  it("fails on any failed run, even with others still pending", () => {
-    expect(
-      summarizeChecks([
-        { status: "IN_PROGRESS" },
-        { status: "COMPLETED", conclusion: "FAILURE" },
-      ]),
-    ).toBe("failing");
-  });
-
-  it("is pending while any run is unfinished or a legacy status is pending", () => {
-    expect(summarizeChecks([{ status: "COMPLETED", conclusion: "SUCCESS" }, { status: "QUEUED" }])).toBe("pending");
-    expect(summarizeChecks([{ state: "PENDING" }])).toBe("pending");
-  });
-
-  it("passes when everything finished green (skipped and neutral count)", () => {
-    expect(
-      summarizeChecks([
-        { status: "COMPLETED", conclusion: "SUCCESS" },
-        { status: "COMPLETED", conclusion: "SKIPPED" },
-        { state: "SUCCESS" },
-      ]),
-    ).toBe("passing");
+  it("reads a missing rollup (no checks on the head commit) as none", () => {
+    expect(summarizeRollup(undefined)).toBe("none");
+    expect(summarizeRollup(null)).toBe("none");
+    expect(summarizeRollup("SOMETHING_NEW")).toBe("none");
   });
 });
 
-describe("parsePullRequests", () => {
-  const raw = JSON.stringify([
-    {
-      number: 13,
-      title: "Add download",
-      state: "MERGED",
-      isDraft: false,
-      author: { login: "fajarwz" },
-      headRefName: "feat/nav",
-      baseRefName: "main",
-      isCrossRepository: false,
-      url: "https://github.com/o/r/pull/13",
-      updatedAt: "2026-11-16T01:56:09Z",
-      reviewDecision: "",
-      statusCheckRollup: [{ status: "COMPLETED", conclusion: "SUCCESS" }],
-    },
-    {
-      number: 14,
-      title: "WIP",
-      state: "OPEN",
-      isDraft: true,
-      author: null,
-      headRefName: "wip",
-      baseRefName: "main",
-      isCrossRepository: true,
-      url: "https://github.com/o/r/pull/14",
-      updatedAt: "2026-11-17T00:00:00Z",
-      reviewDecision: "CHANGES_REQUESTED",
-      statusCheckRollup: null,
-    },
-  ]);
+const node = (over: Record<string, unknown>) => ({
+  number: 1,
+  title: "t",
+  state: "OPEN",
+  isDraft: false,
+  headRefName: "b",
+  baseRefName: "main",
+  isCrossRepository: false,
+  url: "u",
+  updatedAt: "2026-01-01T00:00:00Z",
+  reviewDecision: null,
+  author: { login: "a" },
+  commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
+  ...over,
+});
 
-  it("maps gh's fields onto the neutral shape", () => {
-    const [merged, draft] = parsePullRequests("github", raw);
-    expect(merged).toMatchObject({ number: 13, state: "merged", author: "fajarwz", checks: "passing", review: null });
+const githubPage = (
+  nodes: unknown[],
+  pageInfo: { hasNextPage: boolean; endCursor: string | null } = { hasNextPage: false, endCursor: null },
+  totalCount = nodes.length,
+) => JSON.stringify({ data: { repository: { pullRequests: { totalCount, pageInfo, nodes } } } });
+
+describe("GitHub pages", () => {
+  it("maps GraphQL nodes onto the neutral shape", () => {
+    const raw = githubPage([
+      node({ number: 13, title: "Add download", state: "MERGED", author: { login: "fajarwz" }, headRefName: "feat/nav" }),
+      node({
+        number: 14,
+        state: "OPEN",
+        isDraft: true,
+        author: null,
+        isCrossRepository: true,
+        reviewDecision: "CHANGES_REQUESTED",
+        commits: { nodes: [] },
+      }),
+    ]);
+    const [merged, draft] = parsePullRequestPage("github", raw, null).pullRequests;
+    expect(merged).toMatchObject({
+      provider: "github",
+      number: 13,
+      state: "merged",
+      author: "fajarwz",
+      headBranch: "feat/nav",
+      checks: "passing",
+      review: null,
+    });
     expect(draft).toMatchObject({ state: "draft", author: "", review: "changes", fromFork: true, checks: "none" });
   });
 
-  it("returns nothing for output that is not a list", () => {
-    expect(parsePullRequests("github", "")).toEqual([]);
-    expect(parsePullRequests("gitlab", "{}")).toEqual([]);
-    expect(parsePullRequests("gitlab", "not json")).toEqual([]);
+  it("carries the cursor onward only while GitHub says there is another page", () => {
+    const more = parsePullRequestPage("github", githubPage([node({})], { hasNextPage: true, endCursor: "abc" }, 199), null);
+    expect(more.nextCursor).toBe("abc");
+    expect(more.total).toBe(199);
+
+    const last = parsePullRequestPage("github", githubPage([node({})], { hasNextPage: false, endCursor: "abc" }), "abc");
+    expect(last.nextCursor).toBeNull();
+  });
+
+  it("returns an empty last page for output that is not a page", () => {
+    const empty = { pullRequests: [], nextCursor: null, total: null };
+    expect(parsePullRequestPage("github", "", null)).toEqual(empty);
+    expect(parsePullRequestPage("github", "{}", null)).toEqual(empty);
+    expect(parsePullRequestPage("github", '{"data":null}', null)).toEqual(empty);
+    expect(parsePullRequestPage("gitlab", "not json", null)).toEqual(empty);
   });
 });
 
@@ -168,7 +176,7 @@ describe("GitLab merge requests", () => {
   ]);
 
   it("maps the API's fields onto the neutral shape, with iid as the number", () => {
-    const [open, draft, merged, locked] = parsePullRequests("gitlab", raw);
+    const [open, draft, merged, locked] = parsePullRequestPage("gitlab", raw, null).pullRequests;
     expect(open).toMatchObject({
       provider: "gitlab",
       number: 7,
@@ -195,10 +203,29 @@ describe("GitLab merge requests", () => {
     expect(summarizePipeline("skipped")).toBe("none");
   });
 
+  it("pages by number: a full page may have a successor, a short one is the last", () => {
+    const item = (iid: number) => ({ iid, title: "t", state: "opened", source_branch: "b", target_branch: "main", web_url: "u", updated_at: "x" });
+    const full = JSON.stringify(Array.from({ length: PR_PAGE_SIZE }, (_, index) => item(index + 1)));
+    expect(parsePullRequestPage("gitlab", full, null).nextCursor).toBe("2");
+    expect(parsePullRequestPage("gitlab", full, "3").nextCursor).toBe("4");
+    expect(parsePullRequestPage("gitlab", JSON.stringify([item(1)]), "3").nextCursor).toBeNull();
+    expect(parsePullRequestPage("gitlab", full, null).total).toBeNull();
+  });
+
   it("writes !7 where GitHub writes #7, and says merge request", () => {
     expect(pullRequestLabel(pr({ provider: "gitlab", number: 7 }))).toBe("!7");
     expect(pullRequestLabel(pr({ provider: "github", number: 7 }))).toBe("#7");
     expect(requestNoun("gitlab", true)).toBe("Merge requests");
     expect(requestNoun(null)).toBe("Pull request");
+  });
+});
+
+describe("compactCount", () => {
+  it("keeps small counts whole and shortens thousands", () => {
+    expect(compactCount(0)).toBe("0");
+    expect(compactCount(199)).toBe("199");
+    expect(compactCount(1000)).toBe("1k");
+    expect(compactCount(7213)).toBe("7.2k");
+    expect(compactCount(12400)).toBe("12k");
   });
 });

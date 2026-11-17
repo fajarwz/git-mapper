@@ -478,34 +478,65 @@ test("merge verbs pass through op names and the snake_case payload folds", async
   });
 });
 
-test("loadPullRequests shapes gh's list when ok, and carries a non-ok status with nothing", async () => {
-  const raw = JSON.stringify([
-    {
-      number: 3,
-      title: "t",
-      state: "OPEN",
-      isDraft: false,
-      author: { login: "a" },
-      headRefName: "feat/x",
-      baseRefName: "main",
-      isCrossRepository: false,
-      url: "u",
-      updatedAt: "2026-01-01T00:00:00Z",
-      reviewDecision: "APPROVED",
-      statusCheckRollup: [],
+const ghPage = JSON.stringify({
+  data: {
+    repository: {
+      pullRequests: {
+        totalCount: 199,
+        pageInfo: { hasNextPage: true, endCursor: "c1" },
+        nodes: [
+          {
+            number: 3,
+            title: "t",
+            state: "OPEN",
+            isDraft: false,
+            headRefName: "feat/x",
+            baseRefName: "main",
+            isCrossRepository: false,
+            url: "u",
+            updatedAt: "2026-01-01T00:00:00Z",
+            reviewDecision: "APPROVED",
+            author: { login: "a" },
+            commits: { nodes: [{ commit: { statusCheckRollup: { state: "SUCCESS" } } }] },
+          },
+        ],
+      },
     },
-  ]);
-  vi.mocked(invoke).mockResolvedValueOnce({ status: "ok", provider: "github", raw });
-  const ok = await loadPullRequests("/r");
+  },
+});
+
+test("loadPullRequests returns a shaped page, and a non-ok status with nothing", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce({ status: "ok", provider: "github", raw: ghPage });
+  const ok = await loadPullRequests("/r", "open");
   assert.equal(ok.status, "ok");
+  assert.equal(ok.nextCursor, "c1");
+  assert.equal(ok.total, 199);
   assert.deepEqual(
-    ok.pullRequests.map((pull) => [pull.number, pull.state, pull.review]),
-    [[3, "open", "approved"]],
+    ok.pullRequests.map((pull) => [pull.number, pull.state, pull.review, pull.checks]),
+    [[3, "open", "approved", "passing"]],
   );
-  assert.equal(vi.mocked(invoke).mock.calls.at(-1)?.[0], "read_pull_requests");
+  assert.deepEqual(vi.mocked(invoke).mock.calls.at(-1), [
+    "read_pull_requests",
+    { dir: "/r", scope: "open", cursor: null, provider: null },
+  ]);
 
   vi.mocked(invoke).mockResolvedValueOnce({ status: "cli-missing", provider: "gitlab", raw: "" });
-  assert.deepEqual(await loadPullRequests("/r"), { status: "cli-missing", provider: "gitlab", pullRequests: [] });
+  assert.deepEqual(await loadPullRequests("/r", "open"), {
+    status: "cli-missing",
+    provider: "gitlab",
+    pullRequests: [],
+    nextCursor: null,
+    total: null,
+  });
+});
+
+test("loadPullRequests asks the next page of the provider that answered the first", async () => {
+  vi.mocked(invoke).mockResolvedValueOnce({ status: "ok", provider: "github", raw: ghPage });
+  await loadPullRequests("/r", "all", "c1", "github");
+  assert.deepEqual(vi.mocked(invoke).mock.calls.at(-1), [
+    "read_pull_requests",
+    { dir: "/r", scope: "all", cursor: "c1", provider: "github" },
+  ]);
 });
 
 test("loadPullRequests parses GitLab's list, and an unknown provider yields no requests", async () => {
@@ -521,13 +552,14 @@ test("loadPullRequests parses GitLab's list, and an unknown provider yields no r
     },
   ]);
   vi.mocked(invoke).mockResolvedValueOnce({ status: "ok", provider: "gitlab", raw });
-  const gitlab = await loadPullRequests("/r");
+  const gitlab = await loadPullRequests("/r", "open");
   assert.equal(gitlab.provider, "gitlab");
+  assert.equal(gitlab.nextCursor, null, "a short page is the last one");
   assert.deepEqual(
     gitlab.pullRequests.map((pull) => [pull.provider, pull.number, pull.state]),
     [["gitlab", 4, "open"]],
   );
 
   vi.mocked(invoke).mockResolvedValueOnce({ status: "cli-missing", provider: "", raw: "" });
-  assert.deepEqual(await loadPullRequests("/r"), { status: "cli-missing", provider: null, pullRequests: [] });
+  assert.equal((await loadPullRequests("/r", "open")).provider, null);
 });

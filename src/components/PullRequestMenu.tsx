@@ -1,15 +1,17 @@
-import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import type { PullRequest } from "../types";
 import type { PullRequestsView } from "../hooks/usePullRequests";
 import { openExternal } from "../lib/external";
 import { formatAbsoluteDate } from "../lib/format";
 import { GLASS_CONTROL, PANEL } from "../lib/ui";
+import { PR_PAGE_SIZE } from "../lib/pullRequests";
 import {
   CHECK_TONE,
   PR_STATE,
   PROVIDER_NAME,
   REVIEW_TONE,
+  compactCount,
   pullRequestLabel,
   requestNoun,
 } from "../lib/pullRequestTone";
@@ -17,8 +19,6 @@ import { AlertIcon, CheckIcon, CloseIcon, ExternalIcon, PullRequestIcon, Refresh
 import { PullRequestStateIcon } from "./PullRequestStateIcon";
 
 type Filter = "open" | "all";
-
-const LIVE = new Set(["open", "draft"]);
 
 /** The CLI each provider's list comes from, with where to get it and how to sign in. */
 const CLI = {
@@ -98,11 +98,11 @@ function Row({ pull }: { pull: PullRequest }) {
   );
 }
 
-function SkeletonRows() {
+function SkeletonRows({ count = 3 }: { count?: number }) {
   return (
     <div role="status" aria-live="polite">
       <span className="sr-only">Loading…</span>
-      {[0, 1, 2].map((index) => (
+      {Array.from({ length: count }, (_, index) => index).map((index) => (
         <div key={index} aria-hidden="true" className="flex gap-2.5 motion-safe:animate-pulse p-2.5">
           <span className="mt-0.5 size-6 shrink-0 rounded-lg bg-ink/10" />
           <span className="flex flex-1 flex-col gap-2 pt-1">
@@ -176,15 +176,46 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
     };
   }, [open]);
 
-  const live = useMemo(() => pulls.pulls.filter((pull) => LIVE.has(pull.state)), [pulls.pulls]);
-  const shown = filter === "open" ? live : pulls.pulls;
+  const { loadMore, showAll } = pulls;
+  const feed = filter === "open" ? pulls.open : pulls.all;
+  const shown = feed.pulls;
+  const canObserve = typeof IntersectionObserver !== "undefined";
+  const listRef = useRef<HTMLDivElement>(null);
+  const sentinel = useRef<HTMLDivElement>(null);
+  // The sentinel exists only while a page is waiting and nothing is in flight, so each landed
+  // page re-arms the observer: it keeps loading until the list overflows the panel, then waits.
+  const waiting = feed.cursor !== null && !feed.loadingMore && feed.moreError === null;
+
+  useEffect(() => {
+    const target = sentinel.current;
+    if (!open || !waiting || !target || !canObserve) return;
+    const observer = new IntersectionObserver(
+      (hits) => {
+        if (hits.some((hit) => hit.isIntersecting)) loadMore(filter);
+      },
+      { root: listRef.current, rootMargin: "240px" },
+    );
+    observer.observe(target);
+    return () => observer.disconnect();
+    // `position` is in the list because the panel (and so the sentinel) mounts a render after `open`.
+  }, [open, position, waiting, filter, loadMore, canObserve, shown.length]);
 
   if (pulls.status === "unsupported-remote") return null;
 
   const nouns = requestNoun(pulls.provider, true);
   const lower = nouns.toLowerCase();
   const cli = pulls.provider === null ? null : CLI[pulls.provider];
-  const firstLoad = pulls.status === null && pulls.error === null;
+  // GitHub says how many there are; GitLab only whether another page may exist.
+  const openCount = pulls.open.total ?? pulls.open.pulls.length;
+  const openMore = pulls.open.total === null && pulls.open.cursor !== null;
+  const openLabel = `${compactCount(openCount)}${openMore ? "+" : ""}`;
+  const allLabel = pulls.all.loaded
+    ? `${compactCount(pulls.all.total ?? pulls.all.pulls.length)}${pulls.all.total === null && pulls.all.cursor !== null ? "+" : ""}`
+    : null;
+  const firstLoad =
+    filter === "open"
+      ? pulls.status === null && pulls.error === null
+      : pulls.status === "ok" && !pulls.all.loaded && pulls.all.moreError === null;
 
   return (
     <>
@@ -196,8 +227,8 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
         aria-expanded={open}
         aria-label={nouns}
         title={
-          live.length > 0
-            ? `${live.length} open ${requestNoun(pulls.provider, live.length !== 1).toLowerCase()}`
+          openCount > 0
+            ? `${openLabel} open ${requestNoun(pulls.provider, openCount !== 1).toLowerCase()}`
             : nouns
         }
         className={`${GLASS_CONTROL} relative grid place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-7 ${
@@ -205,12 +236,12 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
         }`}
       >
         <PullRequestIcon size={13} className={pulls.loading ? "animate-pulse" : undefined} />
-        {live.length > 0 && (
+        {openCount > 0 && (
           <span
             aria-hidden="true"
-            className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full bg-success font-mono text-[9px] font-bold leading-none text-white soft-shadow"
+            className="absolute -right-1 -top-1 grid h-4 min-w-4 place-items-center rounded-full bg-success px-1 font-mono text-[9px] font-bold leading-none text-white soft-shadow"
           >
-            {live.length > 9 ? "9+" : live.length}
+            {openCount > 9 ? "9+" : openCount}
           </span>
         )}
       </button>
@@ -241,15 +272,20 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
                       key={value}
                       type="button"
                       aria-pressed={filter === value}
-                      onClick={() => setFilter(value)}
+                      onClick={() => {
+                        setFilter(value);
+                        if (value === "all") showAll();
+                      }}
                       className={`${SEGMENT} ${
                         filter === value ? "bg-primary text-white" : "text-ink-dim hover:bg-hover-glass hover:text-ink"
                       }`}
                     >
-                      {value === "open" ? "Open" : "All"}{" "}
-                      <span className="font-mono font-medium opacity-80">
-                        {value === "open" ? live.length : pulls.pulls.length}
-                      </span>
+                      {value === "open" ? "Open" : "All"}
+                      {(value === "open" ? openLabel : allLabel) !== null && (
+                        <span className="ml-1 font-mono font-medium opacity-80">
+                          {value === "open" ? openLabel : allLabel}
+                        </span>
+                      )}
                     </button>
                   ))}
                 </div>
@@ -266,7 +302,10 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
               </div>
             </div>
 
-            <div className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto border-t border-rule p-1.5">
+            <div
+              ref={listRef}
+              className="flex min-h-0 flex-1 flex-col gap-0.5 overflow-y-auto border-t border-rule p-1.5"
+            >
               {pulls.status === "cli-missing" && (
                 <Notice>
                   {cli ? (
@@ -295,17 +334,49 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
                 </Notice>
               )}
               {firstLoad && <SkeletonRows />}
-              {pulls.status === "ok" && shown.length === 0 && (
+              {pulls.status === "ok" && feed.loaded && shown.length === 0 && (
                 <Empty
                   title={filter === "open" ? `No open ${lower}` : `No ${lower} yet`}
                   hint={
-                    filter === "open" && pulls.pulls.length > 0
-                      ? "Merged and closed ones are under All."
+                    filter === "open"
+                      ? "Merged and closed ones, if any, are under All."
                       : "Nothing has been opened for this repository."
                   }
                 />
               )}
               {pulls.status === "ok" && shown.map((pull) => <Row key={pull.number} pull={pull} />)}
+              {feed.loadingMore && <SkeletonRows count={1} />}
+              {feed.moreError !== null && (
+                <Notice warn>
+                  Could not load {feed.loaded ? "more " : ""}
+                  {lower}: {feed.moreError}{" "}
+                  <button
+                    type="button"
+                    onClick={() => loadMore(filter)}
+                    className="font-semibold text-primary-ink underline underline-offset-2 hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60"
+                  >
+                    Retry
+                  </button>
+                </Notice>
+              )}
+              {waiting && (
+                // The marker the observer watches; without an observer (old webview, jsdom) the
+                // same page is one click away.
+                <div ref={sentinel} className="flex justify-center py-1.5">
+                  {!canObserve && (
+                    <button
+                      type="button"
+                      onClick={() => loadMore(filter)}
+                      className="rounded-full px-3 py-1 text-[11.5px] font-semibold text-ink-dim hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60"
+                    >
+                      Load more
+                    </button>
+                  )}
+                </div>
+              )}
+              {feed.loaded && feed.cursor === null && shown.length > PR_PAGE_SIZE && (
+                <p className="m-0 py-2 text-center text-[11px] text-ink-dim">That&apos;s all of them.</p>
+              )}
             </div>
           </div>,
           document.body,
