@@ -1,6 +1,6 @@
 name: CI
 
-# The gate AGENTS.md describes, on every push and pull request: Tailwind class
+# The gate docs/commands-and-tests.md describes, on every push and pull request: Tailwind class
 # lint, `tsc && vite build`, the vitest suite, then `cargo test` against real
 # throwaway repos (git.rs builds them in the OS temp dir, so the runner's git
 # CLI is the only dependency). The README's Tests badge points at this workflow.

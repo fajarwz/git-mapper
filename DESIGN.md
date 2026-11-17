@@ -236,7 +236,7 @@ Soft glassware: large-radius containers, mostly-full small controls. Panels are 
 ## Do's and Don'ts
 
 ### Do:
-- **Do** reference `--color-*` tokens from components only, and re-point them under `.dark` — reintroduce zero hex in TSX (AGENTS.md rule 1).
+- **Do** reference `--color-*` tokens from components only, and re-point them under `.dark` — reintroduce zero hex in TSX (docs/design-system.md rule 1).
 - **Do** ship shadows exclusively through the `panel-shadow` / `soft-shadow` custom utilities.
 - **Do** tint any interactive element floating on the aurora with `bg-glass-soft` + `backdrop-blur-md` (TitleBar chrome rule).
 - **Do** pair a loud colour with its `*-ink` variant for small text; never raw `text-warning` on glass.
