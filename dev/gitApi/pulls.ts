@@ -13,22 +13,25 @@ type Attempt =
 const PAGE_SIZE = 30;
 const GITHUB_QUERY = `query($owner: String!, $name: String!, $states: [PullRequestState!], $after: String) { repository(owner: $owner, name: $name) { pullRequests(first: ${PAGE_SIZE}, states: $states, after: $after, orderBy: {field: CREATED_AT, direction: DESC}) { totalCount pageInfo { hasNextPage endCursor } nodes { number title state isDraft headRefName baseRefName isCrossRepository url updatedAt reviewDecision author { login } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }`;
 
+const GITHUB_SEARCH = `query($q: String!, $after: String) { search(query: $q, type: ISSUE, first: ${PAGE_SIZE}, after: $after) { issueCount pageInfo { hasNextPage endCursor } nodes { ... on PullRequest { number title state isDraft headRefName baseRefName isCrossRepository url updatedAt reviewDecision author { login } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }`;
+
 const PROGRAM: Record<Provider, string> = { github: "gh", gitlab: "glab" };
 
-function cliArgs(provider: Provider, scope: string, cursor: string | null): string[] {
-  const openOnly = scope === "open";
+function cliArgs(provider: Provider, scope: string, cursor: string | null, query: string): string[] {
   if (provider === "github") {
-    return [
-      "api", "graphql", "-F", "owner={owner}", "-F", "name={repo}",
-      ...(openOnly ? ["-F", "states[]=OPEN"] : []),
-      ...(cursor ? ["-f", `after=${cursor}`] : []),
-      "-f", `query=${GITHUB_QUERY}`,
-    ];
+    const after = cursor ? ["-f", `after=${cursor}`] : [];
+    if (query) {
+      const state = scope === "open" ? " is:open" : scope === "merged" ? " is:merged" : "";
+      return ["api", "graphql", "-F", `q=repo:{owner}/{repo} is:pr${state} sort:created-desc ${query}`, ...after, "-f", `query=${GITHUB_SEARCH}`];
+    }
+    const states = scope === "open" ? ["-F", "states[]=OPEN"] : scope === "merged" ? ["-F", "states[]=MERGED"] : [];
+    return ["api", "graphql", "-F", "owner={owner}", "-F", "name={repo}", ...states, ...after, "-f", `query=${GITHUB_QUERY}`];
   }
   const page = Number.parseInt(cursor ?? "", 10);
   return [
     "mr", "list", "--per-page", String(PAGE_SIZE), "--page", String(Number.isFinite(page) && page > 0 ? page : 1),
-    ...(openOnly ? [] : ["--all"]),
+    ...(scope === "merged" ? ["--merged"] : scope === "open" ? [] : ["--all"]),
+    ...(query ? ["--search", query] : []),
     "--output", "json",
   ];
 }
@@ -70,9 +73,9 @@ function remoteHost(dir: string): string | null {
   }
 }
 
-function attempt(dir: string, provider: Provider, scope: string, cursor: string | null): Attempt {
+function attempt(dir: string, provider: Provider, scope: string, cursor: string | null, query: string): Attempt {
   const program = PROGRAM[provider];
-  const result = spawnSync(program, cliArgs(provider, scope, cursor), {
+  const result = spawnSync(program, cliArgs(provider, scope, cursor, query), {
     cwd: dir,
     encoding: "utf8",
     env: { ...process.env, GH_PROMPT_DISABLED: "1", GH_NO_UPDATE_NOTIFIER: "1", NO_PROMPT: "1", GLAB_CHECK_UPDATE: "false", NO_COLOR: "1" },
@@ -86,7 +89,7 @@ function attempt(dir: string, provider: Provider, scope: string, cursor: string 
 const answer = (status: string, provider: Provider | "", raw = "") => ({ status, provider, raw });
 
 export const pullsHandlers: Handlers = {
-  read_pull_requests: ({ dir, scope, cursor, provider: asked }) => {
+  read_pull_requests: ({ dir, scope, cursor, provider: asked, query }) => {
     const host = remoteHost(String(dir));
     const named = asked === "github" || asked === "gitlab" ? (asked as Provider) : null;
     const matched = named !== null || (host !== null && (host.includes("gitlab") || host.includes("github")));
@@ -100,7 +103,13 @@ export const pullsHandlers: Handlers = {
 
     const attempts: Array<[Provider, Attempt]> = [];
     for (const provider of providers) {
-      const result = attempt(String(dir), provider, scope === "all" ? "all" : "open", typeof cursor === "string" ? cursor : null);
+      const result = attempt(
+        String(dir),
+        provider,
+        scope === "all" || scope === "merged" ? String(scope) : "open",
+        typeof cursor === "string" ? cursor : null,
+        typeof query === "string" ? query.trim() : "",
+      );
       attempts.push([provider, result]);
       if (result.kind === "ok") return answer("ok", provider, result.raw);
     }

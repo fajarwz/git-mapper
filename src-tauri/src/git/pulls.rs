@@ -16,6 +16,14 @@ orderBy: {field: CREATED_AT, direction: DESC}) { totalCount pageInfo { hasNextPa
 number title state isDraft headRefName baseRefName isCrossRepository url updatedAt reviewDecision \
 author { login } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }";
 
+/// The text-search twin of the query above: GitHub's search returns issues and PRs alike, so the
+/// `is:pr` qualifier in `q` narrows it and the fragment keeps only PR fields. Its count is
+/// `issueCount`, not `totalCount`.
+const GITHUB_SEARCH: &str = "query($q: String!, $after: String) { search(query: $q, type: ISSUE, first: __PAGE__, \
+after: $after) { issueCount pageInfo { hasNextPage endCursor } nodes { ... on PullRequest { \
+number title state isDraft headRefName baseRefName isCrossRepository url updatedAt reviewDecision \
+author { login } commits(last: 1) { nodes { commit { statusCheckRollup { state } } } } } } } }";
+
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum Provider {
     GitHub,
@@ -45,32 +53,57 @@ impl Provider {
         }
     }
 
-    /// CLI arguments for one page. `scope` is "open" (open and draft only) or "all"; `cursor` is
-    /// GitHub's `endCursor` or GitLab's page number, and `None` asks for the first page.
-    pub fn args(self, scope: &str, cursor: Option<&str>) -> Vec<String> {
-        let open_only = scope == "open";
+    /// CLI arguments for one page. `scope` is "open" (open and draft), "merged" or "all"; `cursor`
+    /// is GitHub's `endCursor` or GitLab's page number, `None` asking for the first page; `query`
+    /// is free text matched server-side across the WHOLE repository, so a search is not limited to
+    /// the pages already loaded.
+    pub fn args(self, scope: &str, cursor: Option<&str>, query: Option<&str>) -> Vec<String> {
+        let query = query.map(str::trim).filter(|text| !text.is_empty());
         match self {
             Provider::GitHub => {
-                let mut args: Vec<String> = ["api", "graphql", "-F", "owner={owner}", "-F", "name={repo}"]
-                    .map(String::from)
-                    .to_vec();
-                if open_only {
-                    args.extend(["-F".to_string(), "states[]=OPEN".to_string()]);
-                }
+                let mut args: Vec<String> = Vec::new();
+                let graphql = match query {
+                    Some(text) => {
+                        let state = match scope {
+                            "open" => " is:open",
+                            "merged" => " is:merged",
+                            _ => "",
+                        };
+                        // -F fills {owner}/{repo} from the working directory's remote; the value
+                        // starts with "repo:" so -F cannot coerce it into a number or boolean.
+                        args.extend(["api", "graphql", "-F"].map(String::from));
+                        args.push(format!("q=repo:{{owner}}/{{repo}} is:pr{state} sort:created-desc {text}"));
+                        GITHUB_SEARCH
+                    }
+                    None => {
+                        args.extend(["api", "graphql", "-F", "owner={owner}", "-F", "name={repo}"].map(String::from));
+                        match scope {
+                            "open" => args.extend(["-F".to_string(), "states[]=OPEN".to_string()]),
+                            "merged" => args.extend(["-F".to_string(), "states[]=MERGED".to_string()]),
+                            _ => {}
+                        }
+                        GITHUB_QUERY
+                    }
+                };
                 if let Some(cursor) = cursor {
                     // -f, not -F: -F would coerce a cursor that happens to look like a number.
                     args.extend(["-f".to_string(), format!("after={cursor}")]);
                 }
-                let query = GITHUB_QUERY.replace("__PAGE__", &PAGE_SIZE.to_string());
-                args.extend(["-f".to_string(), format!("query={query}")]);
+                let graphql = graphql.replace("__PAGE__", &PAGE_SIZE.to_string());
+                args.extend(["-f".to_string(), format!("query={graphql}")]);
                 args
             }
             Provider::GitLab => {
                 let page = cursor.and_then(|c| c.parse::<u32>().ok()).unwrap_or(1);
                 let mut args: Vec<String> = ["mr", "list", "--per-page"].map(String::from).to_vec();
                 args.extend([PAGE_SIZE.to_string(), "--page".to_string(), page.to_string()]);
-                if !open_only {
-                    args.push("--all".to_string());
+                match scope {
+                    "merged" => args.push("--merged".to_string()),
+                    "open" => {}
+                    _ => args.push("--all".to_string()),
+                }
+                if let Some(text) = query {
+                    args.extend(["--search".to_string(), text.to_string()]);
                 }
                 args.extend(["--output".to_string(), "json".to_string()]);
                 args
@@ -197,8 +230,8 @@ fn remote_host(dir: &str) -> Option<String> {
     url.ok().and_then(|url| host_of(&url))
 }
 
-fn attempt(dir: &str, provider: Provider, scope: &str, cursor: Option<&str>) -> Attempt {
-    let out = match cli_command(provider.program(), dir).args(provider.args(scope, cursor)).output() {
+fn attempt(dir: &str, provider: Provider, scope: &str, cursor: Option<&str>, query: Option<&str>) -> Attempt {
+    let out = match cli_command(provider.program(), dir).args(provider.args(scope, cursor, query)).output() {
         Ok(out) => out,
         Err(error) if error.kind() == std::io::ErrorKind::NotFound => return Attempt::Missing,
         Err(error) => return Attempt::Failed(format!("failed to run {}: {error}", provider.program())),
@@ -219,6 +252,7 @@ pub fn read_pull_requests_in(
     scope: &str,
     cursor: Option<&str>,
     provider: Option<&str>,
+    query: Option<&str>,
 ) -> Result<PullRequestsPayload, String> {
     let host = remote_host(dir);
     let (providers, matched) = match provider.and_then(Provider::from_name) {
@@ -227,7 +261,7 @@ pub fn read_pull_requests_in(
     };
     let mut attempts = Vec::new();
     for provider in providers {
-        let result = attempt(dir, provider, scope, cursor);
+        let result = attempt(dir, provider, scope, cursor, query);
         let done = matches!(result, Attempt::Ok(_));
         attempts.push((provider, result));
         if done {
