@@ -200,6 +200,12 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
     // `position` is in the list because the panel (and so the sentinel) mounts a render after `open`.
   }, [open, position, waiting, filter, loadMore, canObserve, shown.length]);
 
+  // The tab outlives a repo switch: on a repo whose All list was never read, waiting for the
+  // All button's click would leave the skeleton up forever, so a selected All reads itself.
+  useEffect(() => {
+    if (open && filter === "all" && pulls.status === "ok") showAll();
+  }, [open, filter, pulls.status, showAll]);
+
   if (pulls.status === "unsupported-remote") return null;
 
   const nouns = requestNoun(pulls.provider, true);
@@ -272,10 +278,7 @@ export function PullRequestMenu({ pulls }: { pulls: PullRequestsView }) {
                       key={value}
                       type="button"
                       aria-pressed={filter === value}
-                      onClick={() => {
-                        setFilter(value);
-                        if (value === "all") showAll();
-                      }}
+                      onClick={() => setFilter(value)}
                       className={`${SEGMENT} ${
                         filter === value ? "bg-primary text-white" : "text-ink-dim hover:bg-hover-glass hover:text-ink"
                       }`}

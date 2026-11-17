@@ -275,3 +275,24 @@ test("the end of a multi-page list says so; a one-page list stays quiet", () => 
   rerender(<PullRequestMenu pulls={view({ open: feed(many(5)) })} />);
   assert.equal(screen.queryByText("That's all of them."), null);
 });
+
+test("an All tab left selected reads itself on a repo whose All list was never loaded", () => {
+  const firstRepoShowAll = vi.fn();
+  const { container, rerender } = render(<PullRequestMenu pulls={view({ showAll: firstRepoShowAll })} />);
+  openMenu(container);
+  fireEvent.click(within(screen.getByRole("group", { name: /^Filter/ })).getByRole("button", { name: /^All/ }));
+  assert.equal(firstRepoShowAll.mock.calls.length, 1);
+
+  // Another repo: a new showAll, an All feed nobody has asked for, and the tab still on All.
+  const secondRepoShowAll = vi.fn();
+  rerender(<PullRequestMenu pulls={view({ showAll: secondRepoShowAll })} />);
+  assert.equal(secondRepoShowAll.mock.calls.length, 1, "no click needed: the selected tab asks for its list");
+  assert.ok(screen.getByRole("status"), "and shows the skeleton only while that read is out");
+});
+
+test("a selected All does not ask for a list while the CLI cannot answer", () => {
+  const showAll = vi.fn();
+  const { container } = render(<PullRequestMenu pulls={view({ status: "cli-missing", showAll })} />);
+  openMenu(container);
+  assert.equal(showAll.mock.calls.length, 0);
+});
