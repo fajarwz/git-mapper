@@ -170,7 +170,10 @@ and the README's Tests badge points at it.
   "Pull" vs "Merge request", "Open on GitHub|GitLab"). It is NOT part of load/refresh — it is a
   network call — so `hooks/usePullRequests.ts` owns it per repo path: re-read on a refs change and on
   focus (60s throttle), and automatic retries stop once the CLI is known missing/signed out (only the
-  menu's Refresh retries). Branch pills get a chip by name (`pullRequestForRef`; a local branch by
+  menu's Refresh retries). State is a drawn glyph (open / draft / merged / closed, `PullRequestStateIcon`)
+  plus a tone from `pullRequestTone.ts`, never colour alone; only open speaks in colour, finished
+  states stay neutral or violet so a long All list is not a rainbow. The pill chip is a
+  surface-coloured capsule so it reads on any lane hue, filled pill included. Branch pills get a chip by name (`pullRequestForRef`; a local branch by
   name, a remote past `<remote>/`; fork PRs never match), and `PullRequestMenu` in the title bar
   lists them, read-only — a row opens the request in the browser. The popover is portaled to
   `<body>` because the title bar's backdrop blur would become the containing block of a fixed panel.

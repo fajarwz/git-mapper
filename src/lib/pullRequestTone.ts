@@ -1,12 +1,29 @@
 import type { PullRequest, PullRequestProvider, PullRequestState } from "../types";
 
-/** Token colour and wording per PR state, shared by the pill badge and the list rows. */
-export const PR_STATE: Record<PullRequestState, { label: string; color: string }> = {
-  open: { label: "Open", color: "var(--color-success)" },
-  draft: { label: "Draft", color: "var(--color-ink-dim)" },
-  merged: { label: "Merged", color: "var(--color-primary)" },
-  closed: { label: "Closed", color: "var(--color-danger)" },
+/**
+ * Wording and tone per PR state, shared by the pill chip and the list rows. Only live work
+ * (open) speaks in colour; finished states stay quiet, so a long All list is not a rainbow and
+ * draft vs closed is told apart by glyph, not hue.
+ */
+export const PR_STATE: Record<PullRequestState, { label: string; text: string; tile: string }> = {
+  open: { label: "Open", text: "text-success-ink", tile: "bg-success/15" },
+  draft: { label: "Draft", text: "text-ink-dim", tile: "bg-ink/10" },
+  merged: { label: "Merged", text: "text-primary-ink", tile: "bg-primary/15" },
+  closed: { label: "Closed", text: "text-ink-dim", tile: "bg-ink/10" },
 };
+
+/** The two status chips under a row's title: the tint pair is `bg-X/15` + `text-X-ink`. */
+export const CHECK_TONE = {
+  passing: { label: "Checks passing", chip: "bg-success/15 text-success-ink" },
+  failing: { label: "Checks failing", chip: "bg-danger/15 text-danger-ink" },
+  pending: { label: "Checks running", chip: "bg-warning/15 text-warning-ink" },
+} as const;
+
+export const REVIEW_TONE = {
+  approved: { label: "Approved", chip: "bg-success/15 text-success-ink" },
+  changes: { label: "Changes requested", chip: "bg-warning/15 text-warning-ink" },
+  required: { label: "Review required", chip: "bg-ink/10 text-ink-soft" },
+} as const;
 
 export const PROVIDER_NAME: Record<PullRequestProvider, string> = { github: "GitHub", gitlab: "GitLab" };
 
