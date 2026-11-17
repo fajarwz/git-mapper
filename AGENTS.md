@@ -155,6 +155,18 @@ and the README's Tests badge points at it.
   network, not the last fetch — opening a repo (browse-in or saved-tab wake) fetches too. The
   fetch is silent on failure: offline is not an error worth a toast. Other tabs are not
   refreshed — they are off screen and each refresh costs git reads.
+- **Pull requests are the one provider-specific read, and they go through the `gh` CLI.**
+  `read_pull_requests` (`git/github.rs`, mirrored in `dev/gitApi/github.ts`) runs `gh pr list --json`
+  and returns `{status, raw}`; `gh-missing` / `gh-unauthenticated` / `not-github` are answers, not
+  errors, so the menu explains them in place. `lib/pullRequests.ts` shapes the JSON into the
+  provider-neutral `PullRequest` (a GitLab adapter would fill the same type, nothing in the UI knows
+  GitHub except the "Open on GitHub" wording). It is NOT part of load/refresh — it is a network
+  call — so `hooks/usePullRequests.ts` owns it per repo path: re-read on a refs change and on focus
+  (60s throttle), and automatic retries stop once gh is known missing/signed out (only the menu's
+  Refresh retries). Branch pills get a `#number` chip by name (`pullRequestForRef`; a local branch
+  by name, a remote past `<remote>/`; fork PRs never match), and `PullRequestMenu` in the title bar
+  lists them, read-only — a row opens the PR in the browser. The popover is portaled to `<body>`
+  because the title bar's backdrop blur would become the containing block of a fixed panel.
 - `src/lib/graphGeometry.ts` — `ROW_HEIGHT` is shared between `CommitRow` and the SVG graph. Change both together or dots misalign with rows.
 - `src/lib/commitFilter.ts` — `filterCommits(commits, query)`: space-separated tokens AND together, case-insensitive substring over hash, subject, body, author, email and ref-pill names (literal text — no fuzzy `_`/`-` folding). An empty query returns the input array itself so rows keep object identity. Search covers ONLY the loaded window; paging is suspended while a query is active, and deep search over unpaginated history is a planned separate slice.
 - `src/lib/highlight.ts` — lazy highlight.js: the core is a dynamic import, and each grammar too (one small chunk per language, loaded the first time a diff of that type opens). `languageForPath` maps extension/basename → grammar, `loadHighlighter` + `highlightSync` produce ESCAPED token HTML (highlight.js escapes before wrapping — safe for dangerouslySetInnerHTML). The schemes are NOT highlight.js themes: index.css scopes palettes under `data-syntax` on the diff panel — `app` (design tokens, follows the theme), `github` and `neon` (literals with light/dark variants). The picker lives in settings, persisted as `git-mapper:syntax-scheme`, default `app` — there is no colour-off option.
@@ -349,5 +361,5 @@ root sets `base = "website"`. Gate: `npm run build` + `npm run check` inside
 
 ## Roadmap (not built yet)
 
-Deep search over unpaginated history (loaded-window filtering is built: the title-bar search box); PR review via a `gh` CLI passthrough is the discussed next slice. (Staging, committing and merge resolution are built.)
+Deep search over unpaginated history (loaded-window filtering is built: the title-bar search box); PR badges and the read-only list are built; next is the PR diff (fetch `refs/pull/N/head`, then reuse `DiffViewer`) and create/close verbs. (Staging, committing and merge resolution are built.)
 History pages at 500 commits per read; `loadMoreCommits` appends the next page on scroll.
