@@ -1,0 +1,156 @@
+/**
+ * Icon index. The markup for every glyph lives in ../assets/*.svg; this module is a
+ * thin `size`-prop wrapper over the svgr `?react` components so call sites keep their
+ * API, and `currentColor` (declared inside each SVG file) keeps following the tone of
+ * the parent button or label.
+ */
+import type { ComponentType } from "react";
+import RawBranchIcon from "../../assets/branch.svg?react";
+import RawArrowDownIcon from "../../assets/arrow-down.svg?react";
+import RawArrowUpIcon from "../../assets/arrow-up.svg?react";
+import RawTagIcon from "../../assets/tag.svg?react";
+import RawRemoteIcon from "../../assets/remote.svg?react";
+import RawStashIcon from "../../assets/stash.svg?react";
+import RawRepoIcon from "../../assets/repo.svg?react";
+import RawPlusIcon from "../../assets/plus.svg?react";
+import RawChevronDownIcon from "../../assets/chevron-down.svg?react";
+import RawCloseIcon from "../../assets/close.svg?react";
+import RawSettingsIcon from "../../assets/settings.svg?react";
+import RawCheckIcon from "../../assets/check.svg?react";
+import RawSearchIcon from "../../assets/search.svg?react";
+import RawChangesIcon from "../../assets/changes.svg?react";
+import RawMinusIcon from "../../assets/minus.svg?react";
+import RawUndoIcon from "../../assets/undo.svg?react";
+import RawHeartIcon from "../../assets/heart.svg?react";
+import RawStarIcon from "../../assets/star.svg?react";
+import RawAlertIcon from "../../assets/alert.svg?react";
+import RawSubmoduleIcon from "../../assets/submodule.svg?react";
+import RawPullRequestIcon from "../../assets/pull-request.svg?react";
+import RawPullRequestDraftIcon from "../../assets/pull-request-draft.svg?react";
+import RawPullRequestMergedIcon from "../../assets/pull-request-merged.svg?react";
+import RawPullRequestClosedIcon from "../../assets/pull-request-closed.svg?react";
+import RawExternalIcon from "../../assets/external.svg?react";
+interface IconProps {
+  size?: number;
+}
+
+interface GlyphProps {
+  size?: number;
+  className?: string;
+}
+
+type SvgGlyph = ComponentType<{ width?: number; height?: number; className?: string }>;
+
+function SizedIcon({ glyph, size, className }: { glyph: SvgGlyph; size: number; className?: string }) {
+  const Glyph = glyph;
+  return <Glyph width={size} height={size} className={className} />;
+}
+
+export function BranchIcon({ size = 12 }: IconProps) {
+  return <SizedIcon glyph={RawBranchIcon} size={size} />;
+}
+
+export function ArrowDownIcon({ size = 12 }: IconProps) {
+  return <SizedIcon glyph={RawArrowDownIcon} size={size} />;
+}
+
+export function ArrowUpIcon({ size = 12 }: IconProps) {
+  return <SizedIcon glyph={RawArrowUpIcon} size={size} />;
+}
+
+export function TagIcon({ size = 12 }: IconProps) {
+  return <SizedIcon glyph={RawTagIcon} size={size} />;
+}
+
+export function RemoteIcon({ size = 12, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawRemoteIcon} size={size} className={className} />;
+}
+
+export function StashIcon({ size = 12 }: IconProps) {
+  return <SizedIcon glyph={RawStashIcon} size={size} />;
+}
+
+export function RepoIcon({ size = 14 }: IconProps) {
+  return <SizedIcon glyph={RawRepoIcon} size={size} />;
+}
+
+export function SubmoduleIcon({ size = 12, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawSubmoduleIcon} size={size} className={className} />;
+}
+
+export function PullRequestIcon({ size = 12, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawPullRequestIcon} size={size} className={className} />;
+}
+
+export function PlusIcon({ size = 12 }: IconProps) {
+  return <SizedIcon glyph={RawPlusIcon} size={size} />;
+}
+
+export function ChevronDownIcon({ size = 12, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawChevronDownIcon} size={size} className={className} />;
+}
+
+export function AlertIcon({ size = 14, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawAlertIcon} size={size} className={className} />;
+}
+
+export function CloseIcon({ size = 12, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawCloseIcon} size={size} className={className} />;
+}
+
+export function SettingsIcon({ size = 14, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawSettingsIcon} size={size} className={className} />;
+}
+
+export function CheckIcon({ size = 12, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawCheckIcon} size={size} className={className} />;
+}
+
+export function SearchIcon({ size = 13, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawSearchIcon} size={size} className={className} />;
+}
+
+export function ChangesIcon({ size = 13 }: IconProps) {
+  return <SizedIcon glyph={RawChangesIcon} size={size} />;
+}
+
+export function MinusIcon({ size = 12 }: IconProps) {
+  return <SizedIcon glyph={RawMinusIcon} size={size} />;
+}
+
+export function TrashIcon({ size = 12 }: IconProps) {
+  return <SizedIcon glyph={RawUndoIcon} size={size} />;
+}
+
+export function HeartIcon({ size = 11, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawHeartIcon} size={size} className={className} />;
+}
+
+export function StarIcon({ size = 12, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawStarIcon} size={size} className={className} />;
+}
+
+/* Fixed-size glyphs re-exported as-is; their dimensions live in the SVG files. */
+export { default as BrandGlyph } from "../../assets/brand.svg?react";
+export { default as RefreshIcon } from "../../assets/refresh.svg?react";
+export { default as TextWrapIcon } from "../../assets/text-wrap.svg?react";
+export { default as WindowMinimizeIcon } from "../../assets/window-minimize.svg?react";
+export { default as WindowMaximizeIcon } from "../../assets/window-maximize.svg?react";
+export { default as WindowRestoreIcon } from "../../assets/window-restore.svg?react";
+export { default as WindowCloseIcon } from "../../assets/window-close.svg?react";
+
+export function PullRequestDraftIcon({ size = 12, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawPullRequestDraftIcon} size={size} className={className} />;
+}
+
+export function PullRequestMergedIcon({ size = 12, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawPullRequestMergedIcon} size={size} className={className} />;
+}
+
+export function PullRequestClosedIcon({ size = 12, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawPullRequestClosedIcon} size={size} className={className} />;
+}
+
+export function ExternalIcon({ size = 12, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawExternalIcon} size={size} className={className} />;
+}

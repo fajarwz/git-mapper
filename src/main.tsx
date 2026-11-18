@@ -2,8 +2,8 @@ import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
 import "./index.css";
-import { installWebviewGuards } from "./lib/webview";
-import { installZoom } from "./lib/zoom";
+import { installWebviewGuards } from "./shared/lib/webview";
+import { installZoom } from "./features/shell/zoom";
 
 installWebviewGuards();
 installZoom();

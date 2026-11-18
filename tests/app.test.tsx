@@ -9,8 +9,8 @@ vi.mock("@tauri-apps/api/core", () => ({ invoke: vi.fn() }));
 
 import App from "../src/App";
 import { SLEEP_AFTER_MS, SLEEP_TICK_MS } from "../src/data/gitLoader";
-import { STORAGE_KEYS } from "../src/lib/persisted";
-import { ROW_HEIGHT } from "../src/lib/graphGeometry";
+import { STORAGE_KEYS } from "../src/shared/lib/persisted";
+import { ROW_HEIGHT } from "../src/features/history/lib/graphGeometry";
 import type { Repository } from "../src/types";
 
 const NUL = String.fromCharCode(0);

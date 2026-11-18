@@ -10,15 +10,15 @@ import type {
   Submodule,
 } from "../types";
 import { PullRequestProvider, PullRequestsStatus } from "../types";
-import { parsePullRequestPage, type PullRequestPage } from "../lib/pullRequests";
-import { sameSubmodules, shapeSubmodules, type RawSubmodule } from "../lib/submodule";
-import { STORAGE_KEYS } from "../lib/persisted";
-import { orderRefs } from "../lib/refOrder";
-import { layoutGraph } from "../lib/graphLanes";
-import { parseCommitFiles, parseDiffSections } from "../lib/gitDiffParser";
-import { parseLog, parseStashes } from "../lib/gitLogParser";
-import type { LogStash } from "../lib/gitLogParser";
-import { shapeWorktreeFiles, type WorktreeFile } from "../lib/staging";
+import { parsePullRequestPage, type PullRequestPage } from "../features/pull-requests/lib/pullRequests";
+import { sameSubmodules, shapeSubmodules, type RawSubmodule } from "../features/submodules/submodule";
+import { STORAGE_KEYS } from "../shared/lib/persisted";
+import { orderRefs } from "../features/history/lib/refOrder";
+import { layoutGraph } from "../features/history/lib/graphLanes";
+import { parseCommitFiles, parseDiffSections } from "../features/diff/lib/gitDiffParser";
+import { parseLog, parseStashes } from "../features/history/lib/gitLogParser";
+import type { LogStash } from "../features/history/lib/gitLogParser";
+import { shapeWorktreeFiles, type WorktreeFile } from "../features/staging/staging";
 
 const LOG_LIMIT = 500;
 
