@@ -13,7 +13,7 @@
   from inside WSL (`git` in the distro on ext4) is the real speedup if status stays painful.
 - **Never reload the webview.** WebView2's context-menu Reload (and F5 / Ctrl+R) reloads the
   custom-protocol origin and lands on Edge's "can't reach this page" instead of the app.
-  `src/lib/webview.ts` blocks both paths at startup; dev keeps the context menu for Inspect,
+  `src/shared/lib/webview.ts` blocks both paths at startup; dev keeps the context menu for Inspect,
   Ctrl+Shift+I still opens devtools. Refresh data by focusing the window (see App.tsx) or by
   reopening the tab, not by reloading the page.
 - **The app icon regenerates from `src-tauri/icons/app-icon.svg`** (brand glyph on the violet
