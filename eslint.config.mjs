@@ -25,4 +25,32 @@ export default [
       "tailwindcss/enforces-negative-arbitrary-values": "warn",
     },
   },
+  {
+    // shared/ is the bottom layer: it never reaches up into a feature.
+    files: ["src/shared/**/*.{ts,tsx}"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        { patterns: [{ group: ["**/features/**"], message: "shared/ must not import from features/." }] },
+      ],
+    },
+  },
+  {
+    // Pure feature logic: no React, no Tauri, no components — keeps it testable with node alone.
+    files: ["src/features/*/lib/**/*.ts"],
+    ignores: ["**/*.test.ts"],
+    rules: {
+      "no-restricted-imports": [
+        "error",
+        {
+          patterns: [
+            {
+              group: ["react", "react-dom", "react/*", "@tauri-apps/*", "**/*.tsx"],
+              message: "features/*/lib holds pure logic: no React, Tauri or components.",
+            },
+          ],
+        },
+      ],
+    },
+  },
 ];
