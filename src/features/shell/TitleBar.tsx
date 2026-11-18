@@ -21,6 +21,8 @@ import { GLASS_CONTROL } from "../../shared/lib/ui";
 import {
   BranchIcon,
   ArrowDownIcon,
+  ArrowLeftIcon,
+  ArrowRightIcon,
   ArrowUpIcon,
   BrandGlyph,
   CloseIcon,
@@ -121,6 +123,11 @@ interface TitleBarProps {
   onToggleStage: () => void;
   /** The active repo's pull requests (gh CLI); drives the button and its popover. */
   pulls: PullRequestsView;
+  /** Back/forward through the places visited, across tabs (Alt+Left / Alt+Right). */
+  canGoBack: boolean;
+  canGoForward: boolean;
+  onBack: () => void;
+  onForward: () => void;
 }
 
 interface SortableTabProps {
@@ -222,6 +229,10 @@ export function TitleBar({
   stageOpen,
   onToggleStage,
   pulls,
+  canGoBack,
+  canGoForward,
+  onBack,
+  onForward,
 }: TitleBarProps) {
   const [maximized, setMaximized] = useState(false);
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -316,6 +327,29 @@ export function TitleBar({
         <span data-tauri-drag-region className="text-[12.5px] font-bold tracking-tight text-ink">
           Git Mapper
         </span>
+      </div>
+
+      <div className="flex shrink-0 items-center gap-1">
+        <button
+          type="button"
+          onClick={onBack}
+          disabled={!canGoBack}
+          aria-label="Go back"
+          title="Go back (Alt+Left)"
+          className={`${GLASS_CONTROL} grid place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 disabled:opacity-40 size-7`}
+        >
+          <ArrowLeftIcon size={12} />
+        </button>
+        <button
+          type="button"
+          onClick={onForward}
+          disabled={!canGoForward}
+          aria-label="Go forward"
+          title="Go forward (Alt+Right)"
+          className={`${GLASS_CONTROL} grid place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 disabled:opacity-40 size-7`}
+        >
+          <ArrowRightIcon size={12} />
+        </button>
       </div>
 
       <DndContext

@@ -8,6 +8,8 @@ import type { ComponentType } from "react";
 import RawBranchIcon from "../../assets/branch.svg?react";
 import RawArrowDownIcon from "../../assets/arrow-down.svg?react";
 import RawArrowUpIcon from "../../assets/arrow-up.svg?react";
+import RawArrowLeftIcon from "../../assets/arrow-left.svg?react";
+import RawArrowRightIcon from "../../assets/arrow-right.svg?react";
 import RawTagIcon from "../../assets/tag.svg?react";
 import RawRemoteIcon from "../../assets/remote.svg?react";
 import RawStashIcon from "../../assets/stash.svg?react";
@@ -56,6 +58,14 @@ export function ArrowDownIcon({ size = 12 }: IconProps) {
 
 export function ArrowUpIcon({ size = 12 }: IconProps) {
   return <SizedIcon glyph={RawArrowUpIcon} size={size} />;
+}
+
+export function ArrowLeftIcon({ size = 12 }: IconProps) {
+  return <SizedIcon glyph={RawArrowLeftIcon} size={size} />;
+}
+
+export function ArrowRightIcon({ size = 12 }: IconProps) {
+  return <SizedIcon glyph={RawArrowRightIcon} size={size} />;
 }
 
 export function TagIcon({ size = 12 }: IconProps) {
