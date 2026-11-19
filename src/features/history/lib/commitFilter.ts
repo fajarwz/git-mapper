@@ -1,6 +1,5 @@
 import type { Commit } from "../../../types";
 
-/** Everything a search token is matched against, joined and lowercased once per row. */
 function haystack(commit: Commit): string {
   return [
     commit.hash,
@@ -14,7 +13,6 @@ function haystack(commit: Commit): string {
     .toLowerCase();
 }
 
-/** The query's tokens: lowercased, split on whitespace. Empty means "nothing is searched". */
 export function queryTokens(query: string): string[] {
   return query.toLowerCase().split(/\s+/).filter((token) => token !== "");
 }
@@ -40,11 +38,9 @@ export function findMatches(commits: Commit[], query: string): string[] {
 
 export interface TextPart {
   text: string;
-  /** True for the stretch a search token matched: the row paints it as a highlight. */
   hit: boolean;
 }
 
-/** Cut `text` into plain and matched stretches for the given tokens (case-insensitive). */
 export function splitByTokens(text: string, tokens: string[]): TextPart[] {
   if (tokens.length === 0 || text === "") return [{ text, hit: false }];
   const pattern = new RegExp(

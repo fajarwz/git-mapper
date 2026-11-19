@@ -102,7 +102,6 @@ test("a deleted side falls back to a whole-file choice that says who deleted it"
 test("every code row carries its line number from the file on disk, markers counted", () => {
   const { container } = renderView();
   const numbers = [...container.querySelectorAll("[data-line-number]")].map((n) => n.textContent);
-  // 2 and 4 and 6 are the marker lines; the bands stand in for them.
   assert.deepEqual(numbers, ["1", "3", "5", "7", "8"]);
 });
 

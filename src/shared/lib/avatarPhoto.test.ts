@@ -8,7 +8,7 @@ const SHA256_ABC = "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f200
 const SHA256_ABC_ABC = "bbb59da3af939f7af5f360f2ceb80a496e3bae1cd87dde426db0ae40677e1c2c";
 
 test("the email hash is sha256 over the spec-normalised address", async () => {
-  if (globalThis.crypto?.subtle === undefined) return; // The photo path needs WebCrypto.
+  if (globalThis.crypto?.subtle === undefined) return;
   assert.equal(await emailSha256Hex("abc"), SHA256_ABC);
   assert.equal(await emailSha256Hex("  abc  "), SHA256_ABC, "trimmed");
   assert.equal(await emailSha256Hex("ABC"), SHA256_ABC, "lowercased");

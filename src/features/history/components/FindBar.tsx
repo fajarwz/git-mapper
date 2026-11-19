@@ -2,22 +2,16 @@ import { useEffect, useRef } from "react";
 import { useExit } from "../../../shared/lib/useExit";
 import { ArrowDownIcon, ArrowUpIcon, CloseIcon, SearchIcon } from "../../../shared/components/icons";
 
-/** What the commit list needs to draw and drive the find bar. The App owns the state. */
 export interface FindState {
   query: string;
   onQueryChange: (query: string) => void;
-  /** Hashes of the matching commits in list order; empty while the query is blank. */
   matches: string[];
-  /** Which match is current (index into `matches`). */
   activeIndex: number;
-  /** Move the current match by this many places, wrapping at either end. */
   onStep: (delta: number) => void;
   onClose: () => void;
-  /** How many commits the search has seen so far. */
   loadedCount: number;
   /** False while older history is still unread: a miss only speaks for the loaded rows. */
   allLoaded: boolean;
-  /** Changes each time Ctrl+F is hit, so an open bar refocuses and selects its text. */
   focusToken: number;
 }
 

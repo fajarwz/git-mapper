@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-// Context menu behaviour: which entries show, what copy writes, how it closes.
 import assert from "node:assert/strict";
 import { cleanup, fireEvent, render, within } from "@testing-library/react";
 import { afterEach, test, vi } from "vitest";

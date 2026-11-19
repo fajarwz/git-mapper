@@ -1,9 +1,3 @@
-/**
- * Icon index. The markup for every glyph lives in ../assets/*.svg; this module is a
- * thin `size`-prop wrapper over the svgr `?react` components so call sites keep their
- * API, and `currentColor` (declared inside each SVG file) keeps following the tone of
- * the parent button or label.
- */
 import type { ComponentType } from "react";
 import RawBranchIcon from "../../assets/branch.svg?react";
 import RawArrowDownIcon from "../../assets/arrow-down.svg?react";
@@ -140,7 +134,6 @@ export function StarIcon({ size = 12, className = "" }: GlyphProps) {
   return <SizedIcon glyph={RawStarIcon} size={size} className={className} />;
 }
 
-/* Fixed-size glyphs re-exported as-is; their dimensions live in the SVG files. */
 export { default as BrandGlyph } from "../../assets/brand.svg?react";
 export { default as RefreshIcon } from "../../assets/refresh.svg?react";
 export { default as TextWrapIcon } from "../../assets/text-wrap.svg?react";

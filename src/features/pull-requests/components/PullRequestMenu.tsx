@@ -26,7 +26,6 @@ const TABS: Array<{ value: Filter; label: string }> = [
   { value: PullScope.All, label: "All" },
 ];
 
-/** The CLI each provider's list comes from, with where to get it and how to sign in. */
 const CLI = {
   [PullRequestProvider.GitHub]: { name: "GitHub CLI", program: "gh", site: "cli.github.com" },
   [PullRequestProvider.GitLab]: { name: "GitLab CLI", program: "glab", site: "gitlab.com/gitlab-org/cli" },

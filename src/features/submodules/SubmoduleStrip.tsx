@@ -24,7 +24,6 @@ export function SubmoduleStrip({
   onSelect,
 }: {
   root: Repository;
-  /** Every open repo, to read the state of submodules that are already loaded. */
   repos: Repository[];
   activeId: string | null;
   /** The submodule being read right now; its pill waits instead of racing a second click. */

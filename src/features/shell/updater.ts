@@ -21,12 +21,9 @@ export type UpdatePhase =
 
 export interface UpdateStatus {
   phase: UpdatePhase;
-  /** The version that is available or downloaded. */
   version?: string;
-  /** Download progress in bytes. */
   received?: number;
   total?: number | null;
-  /** The error text, when the check or the download failed. */
   message?: string;
 }
 
@@ -60,7 +57,6 @@ export function onUpdateStatus(listener: (status: UpdateStatus) => void): () => 
   return () => listeners.delete(listener);
 }
 
-/** Checks the feed. `auto` also downloads in the background; `manual` stops at "available". Neither installs. */
 export async function checkForUpdates(mode: UpdateMode): Promise<void> {
   if (!updaterSupported()) return;
   set({ phase: "checking" });
@@ -80,7 +76,6 @@ export async function checkForUpdates(mode: UpdateMode): Promise<void> {
   }
 }
 
-/** Downloads the update the check found and stops there: installing waits for `restartToUpdate`. */
 export async function downloadUpdate(): Promise<void> {
   if (!current) return;
   const version = current.version;
@@ -94,7 +89,6 @@ export async function downloadUpdate(): Promise<void> {
         total = event.data.contentLength ?? null;
       } else if (event.event === "Progress") {
         received += event.data.chunkLength;
-        // Chunk events can be frequent; refresh the UI at most twice a second.
         const now = Date.now();
         if (now - lastTick > 500) {
           lastTick = now;

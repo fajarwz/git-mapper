@@ -27,7 +27,6 @@ function isTauri(): boolean {
   return typeof window !== "undefined" && "__TAURI_INTERNALS__" in window;
 }
 
-/** Same command names the Rust module exposes; POST /api/git serves browser tabs. */
 function devApi(op: string, args: Record<string, unknown>): Promise<unknown> {
   return fetch("/api/git", {
     method: "POST",
@@ -47,13 +46,11 @@ async function call<T>(op: string, args: Record<string, unknown>, unwrap: (raw: 
   return unwrap(raw);
 }
 
-/** Pseudo-commit hash for the "Uncommitted changes" row (Rust + middleware treat it the same). */
 export const UNCOMMITTED_HASH = "wip";
 
 /** How long an inactive tab keeps its history before it is dropped, and how often that is checked. */
 export const SLEEP_AFTER_MS = 5 * 60_000;
 export const SLEEP_TICK_MS = 30_000;
-/** Changed-file payloads (full patch text) kept across all repos; the least recent used is dropped. */
 export const FILES_CACHE_CAP = 32;
 
 export const OPEN_REPOS_KEY = STORAGE_KEYS.repos;
@@ -68,13 +65,9 @@ interface StatusInfo {
   ahead: number;
   behind: number;
   dirty: boolean;
-  /** Changed paths in the working tree, untracked files counted individually. */
   changed: number;
-  /** HEAD commit sha; empty on an unborn branch. */
   head: string;
-  /** Digest of the working tree: catches an edit inside a file the count already included. */
   worktree: string;
-  /** The merge resolver's state: MERGE_HEAD present, and its unmerged paths. */
   merging?: boolean;
   conflicts?: string[];
 }
@@ -112,7 +105,6 @@ function toCommits(parsed: ReturnType<typeof parseLog>): Commit[] {
   }));
 }
 
-/** True for the rows the app builds itself: the uncommitted row and one per stash entry. */
 export function isStashRow(commit: Commit): boolean {
   return commit.stashIndex !== undefined;
 }
@@ -165,7 +157,6 @@ function mergeStashes(history: Commit[], stashes: Commit[]): Commit[] {
   return rows;
 }
 
-/** `hash\tfullref` lines → refs grouped by hash, typed by the ref namespace. */
 export function parseForEachRef(
   raw: string,
   currentBranch: string,
@@ -190,7 +181,6 @@ export function parseForEachRef(
     }
     if (!ref) continue;
     const list = byHash.get(hash) ?? [];
-    // Skip duplicates against decorations from the log (same type+name).
     if (!list.some((existing) => existing.type === ref?.type && existing.name === ref?.name)) {
       list.push(ref);
       byHash.set(hash, list);
@@ -273,7 +263,6 @@ function uncommittedCommit(commits: Commit[], changed: number, head: string): Co
   };
 }
 
-/** Places lanes over the real commits plus, when present, the uncommitted row on top. */
 function withLanes(commits: Commit[]): Commit[] {
   const layout = layoutGraph(
     commits.map((c) => ({
@@ -434,11 +423,8 @@ export async function refreshRepository(
         const previous = previousByHash.get(commit.hash);
         return previous && sameRefs(previous.refs, refs) ? previous : { ...commit, refs };
       });
-      // A page cap means the window shifted, and an empty delta with a moved HEAD means history
-      // was rewritten or rewound (reset, rebase); both need the full log again.
       if (fresh.length >= LOG_LIMIT || (headMoved && fresh.length === 0)) return fullReload(repo);
     } catch (deltaError) {
-      // A rebase or force-push can orphan the old HEAD; the range is meaningless then.
       console.error("Could not read the new commits, reloading the repository", deltaError);
       return fullReload(repo);
     }
@@ -529,7 +515,6 @@ export async function refreshRepository(
   };
 }
 
-/** Rewritten history or a shifted window: read everything again, and flash what is new. */
 async function fullReload(repo: Repository): Promise<RefreshedRepository> {
   const reloaded = await loadRepository(repo.path);
   const known = new Set(repo.commits.map((commit) => commit.hash));
@@ -541,7 +526,6 @@ async function fullReload(repo: Repository): Promise<RefreshedRepository> {
   };
 }
 
-/** Appends the next page of history to a loaded repository, lanes re-computed over the whole list. */
 export async function loadMoreCommits(
   repo: Repository,
 ): Promise<{ repo: Repository; done: boolean } | null> {
@@ -588,7 +572,6 @@ export async function checkoutBranch(dir: string, branch: string): Promise<void>
   await call("checkout_branch", { dir, branch }, (raw) => raw as void);
 }
 
-/** Detaches HEAD onto a commit. The confirm dialog in the app owns the warning; this just does it. */
 export async function checkoutCommit(dir: string, hash: string): Promise<void> {
   await call("checkout_commit", { dir, hash }, (raw) => raw as void);
 }
@@ -598,12 +581,10 @@ export async function pullBranch(dir: string): Promise<string> {
   return call("pull_branch", { dir }, (raw) => raw as string);
 }
 
-/** Applies, pops or drops the stash entry at `index` (0 = newest); pop/drop are confirmed first. */
 export async function stashAction(dir: string, index: number, action: "apply" | "pop" | "drop"): Promise<void> {
   await call("stash_action", { dir, index, action }, (raw) => raw as void);
 }
 
-/** Reads every remote into the tracking refs, so ahead/behind state includes remote commits. */
 export async function fetchRemote(dir: string): Promise<void> {
   await call("fetch_remote", { dir }, (raw) => raw as void);
 }
@@ -665,11 +646,6 @@ interface WorktreeEntryRaw {
   deletions: number;
 }
 
-/**
- * The staging rail's reads: one command returns every staged/unstaged row (including a file
- * staged then edited again, which lists twice — index copy and worktree remainder, distinct
- * keys) with per-copy line counts, shaped for the panel.
- */
 export async function loadWorktree(dir: string): Promise<WorktreeFile[]> {
   const snapshot = await call(
     "read_worktree_files",
@@ -679,22 +655,18 @@ export async function loadWorktree(dir: string): Promise<WorktreeFile[]> {
   return shapeWorktreeFiles(snapshot.entries ?? []);
 }
 
-/** `git add --` the given paths (untracked files included). */
 export async function stagePaths(dir: string, paths: string[]): Promise<void> {
   await call("stage_files", { dir, paths }, (raw) => raw as void);
 }
 
-/** `git restore --staged --`; a staged rename walks its file back to the source name. */
 export async function unstagePaths(dir: string, paths: string[]): Promise<void> {
   await call("unstage_files", { dir, paths }, (raw) => raw as void);
 }
 
-/** Per-path discard; the backend classifies from a fresh status (untracked, staged, tracked). */
 export async function discardPaths(dir: string, paths: string[]): Promise<void> {
   await call("discard_files", { dir, paths }, (raw) => raw as void);
 }
 
-/** Panel-wide discard: tracked changes reset, untracked files (and dirs) are removed. */
 export async function discardEverything(dir: string): Promise<void> {
   await call("discard_all", { dir }, (raw) => raw as void);
 }
@@ -702,13 +674,11 @@ export async function discardEverything(dir: string): Promise<void> {
 export type WipSide = "staged" | "unstaged";
 export type HunkAction = "stage" | "unstage" | "discard";
 
-/** One side of the uncommitted changes with patches: HEAD→index, or index→disk plus untracked. */
 export async function loadWipSide(dir: string, side: WipSide): Promise<ChangedFile[]> {
   const payload = await call("read_wip_side", { dir, side }, (raw) => raw as RawFilePayload);
   return parseCommitFiles(payload, true);
 }
 
-/** Stages, unstages or discards one hunk; `hunkHeader` lets the backend refuse a moved hunk. */
 export async function applyHunk(
   dir: string,
   path: string,
@@ -724,7 +694,6 @@ export async function applyHunk(
   );
 }
 
-/** `applyHunk` narrowed to chosen lines: `lines` counts the hunk's +/- lines from 0. */
 export async function applyHunkLines(
   dir: string,
   path: string,
@@ -741,12 +710,10 @@ export async function applyHunkLines(
   );
 }
 
-/** Commits the current index with `-m`; a message is required and pre-trimmed. */
 export async function commitStaged(dir: string, message: string): Promise<void> {
   await call("commit_staged", { dir, message }, (raw) => raw as void);
 }
 
-/** Takes the tip commit back one step (`reset --soft`): its tree returns staged, nothing lost. */
 export async function undoCommit(dir: string): Promise<void> {
   await call("undo_commit", { dir }, (raw) => raw as void);
 }
@@ -761,7 +728,6 @@ export async function mergeBranch(dir: string, target: string): Promise<MergeOut
   return call("merge_branch", { dir, target }, (raw) => raw as MergeOutcome);
 }
 
-/** Takes one side of each unmerged path from the index stages and stages it. */
 export async function resolveConflictSides(
   dir: string,
   paths: string[],
@@ -770,12 +736,10 @@ export async function resolveConflictSides(
   await call("resolve_conflicts", { dir, paths, side }, (raw) => raw as void);
 }
 
-/** Rolls the merge back to the pre-merge tip; the app asks first via the danger dialog. */
 export async function abortMerge(dir: string): Promise<void> {
   await call("abort_merge", { dir }, (raw) => raw as void);
 }
 
-/** Commits the fully resolved merge with git's own prepared message (`--no-edit`). */
 export async function completeMerge(dir: string): Promise<void> {
   await call("complete_merge", { dir }, (raw) => raw as void);
 }
@@ -784,13 +748,11 @@ export interface ConflictSnapshot {
   /** Ours patched against the shared base; empty when our side had no stage (deleted). */
   oursPatch: string;
   theirsPatch: string;
-  /** The file on disk with git's conflict markers; empty when binary or unreadable. */
   worktreeText: string;
   /** The branch that was merged in (or a short hash); empty when git left no merge message. */
   incoming: string;
 }
 
-/** One unmerged path: the file with its markers, and which sides still have a stage. */
 export async function loadConflictFiles(dir: string, path: string): Promise<ConflictSnapshot> {
   return call("read_conflict_files", { dir, path }, (raw) => {
     const snake = raw as {
@@ -818,10 +780,6 @@ export async function writeConflictResolution(
 }
 
 
-/**
- * The changed files of one commit ("wip" = the working tree). withPatch=false skips the
- * patch body; each file's diff arrives lazily through loadFilePatch.
- */
 export async function loadCommitFiles(
   repoPath: string,
   hash: string,
@@ -835,7 +793,6 @@ export async function loadCommitFiles(
   return parseCommitFiles(payload, withPatch);
 }
 
-/** One file's unified diff lines, parsed from its own patch (`read_file_patch`). */
 export async function loadFilePatch(
   repoPath: string,
   hash: string,
@@ -860,7 +817,6 @@ interface RawImageVersions {
   new: RawImageVersion | null;
 }
 
-/** One side of an image diff: the blob as a data URL, ready for an <img> src. */
 export interface ImageVersion {
   url: string;
   bytes: number;
@@ -868,13 +824,10 @@ export interface ImageVersion {
 }
 
 export interface ImageVersions {
-  /** The parent's copy; null when the file was added (or the commit is a root). */
   previous: ImageVersion | null;
-  /** The commit's copy; null when the file was deleted (the working file for "wip"). */
   current: ImageVersion | null;
 }
 
-/** Both copies of an image file change, served as data URLs by the Rust command. */
 export async function loadImageVersions(
   repoPath: string,
   hash: string,

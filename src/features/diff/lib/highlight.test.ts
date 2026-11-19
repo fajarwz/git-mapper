@@ -1,4 +1,3 @@
-// Syntax highlighting: path→grammar mapping, lazy loading, escaped token HTML.
 import assert from "node:assert/strict";
 import { test } from "vitest";
 

@@ -1,4 +1,3 @@
-// The sub-tab strip: the repo first, then its submodules; markers, and what each click reports.
 // @vitest-environment jsdom
 import assert from "node:assert/strict";
 import { cleanup, fireEvent, render } from "@testing-library/react";

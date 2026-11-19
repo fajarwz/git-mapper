@@ -1,4 +1,3 @@
-// The star card: its three actions and Esc (which counts as "later").
 // @vitest-environment jsdom
 import assert from "node:assert/strict";
 import { cleanup, fireEvent, render, screen } from "@testing-library/react";

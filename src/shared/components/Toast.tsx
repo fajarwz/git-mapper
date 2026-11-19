@@ -18,9 +18,7 @@ export function Toast({
 }: {
   title: string;
   detail?: string;
-  /** Fires once the exit animation has played. */
   onClose: () => void;
-  /** Replaces the alert glyph and turns the toast into a persistent, non-error notice. */
   icon?: ReactNode;
   closeOnEscape?: boolean;
   /** A function gets `close`, which plays the exit before `onClose` fires. */

@@ -4,7 +4,6 @@ import { buildFileTree, type FileTreeNode } from "../lib/fileTree";
 import { STATUS_TONES, fileDirTone, fileNameTone, fileTitle, statusLetter } from "../../../shared/lib/format";
 import { ChevronDownIcon, SubmoduleIcon } from "../../../shared/components/icons";
 
-/** How the changed-file list is shaped: a flat path list, or GitHub's folder tree. */
 export type FileView = "list" | "tree";
 
 interface FileListProps {
@@ -19,7 +18,6 @@ interface FileListProps {
   /** Flat paths or the folder tree; defaults to the flat list when the owner does not care. */
   view?: FileView;
   onViewChange?: (view: FileView) => void;
-  /** Paths that are submodules of this repo: their rows wear the submodule glyph. */
   submodulePaths?: ReadonlySet<string>;
 }
 
@@ -100,10 +98,6 @@ function FileRow({
   );
 }
 
-/**
- * The tree depth-first: a folder row first, then (while expanded) its children indented one
- * step. Root-level files sit beside the top folder rows, exactly like GitHub's file tree.
- */
 function TreeBranch({
   node,
   depth,
@@ -175,7 +169,6 @@ const VIEW_SEGMENTS: { value: FileView; label: string; title: string }[] = [
   { value: "tree", label: "Tree", title: "Group the changed files by folder, GitHub-style" },
 ];
 
-/** List/tree switch — the same segmented pattern as the diff-scope toggle. */
 function ViewToggle({
   view,
   onViewChange,

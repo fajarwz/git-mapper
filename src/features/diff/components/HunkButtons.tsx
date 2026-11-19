@@ -7,7 +7,6 @@ export interface HunkActions {
   side: WipSide;
   busy?: boolean;
   onAction: (path: string, hunkIndex: number, hunkHeader: string, action: HunkAction) => void;
-  /** Same verbs on ticked lines of one hunk; absent = line picking is off. */
   onLines?: (
     path: string,
     hunkIndex: number,
@@ -17,7 +16,6 @@ export interface HunkActions {
   ) => void;
 }
 
-/** "+2 −1": what a line pick will move, in the diff's own add/remove colours. */
 function Tally({ add, remove }: { add: number; remove: number }) {
   return (
     <>
@@ -49,9 +47,7 @@ export function HunkButtons({
   index: number;
   header: string;
   actions: HunkActions;
-  /** Ticked changed lines of this hunk (ordinals among its +/- lines). */
   picked?: number[];
-  /** The picked lines by kind: the label says "+1 −1", the same tally as the file header. */
   counts?: { add: number; remove: number };
   onClear?: () => void;
 }) {

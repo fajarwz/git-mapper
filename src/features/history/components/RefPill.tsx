@@ -6,13 +6,11 @@ import { PullRequestChip } from "../../pull-requests/components/PullRequestChip"
 
 interface RefPillProps {
   ref: CommitRef;
-  /** The branch's pull/merge request, when it has one: a chip that opens it in the browser. */
   pullRequest?: PullRequest;
   /** The commit's branch colour index, so the pill matches its node. */
   color: number;
   /** Only local branches are checkout-able; double-clicking the pill switches to it. */
   onCheckout?: (branch: string) => void;
-  /** Right-clicking the pill opens the context menu for this exact ref. */
   onContextMenu?: (ref: CommitRef, x: number, y: number) => void;
 }
 
@@ -53,7 +51,6 @@ export function RefPill({ ref, pullRequest, color, onCheckout, onContextMenu }: 
           ? { backgroundColor: colorValue }
           : {
               borderColor: colorValue,
-              // Text slightly darker than the bordering dot colour for small-text contrast.
               color: `color-mix(in oklab, ${colorValue}, var(--color-ink) 55%)`,
             }
       }
@@ -73,8 +70,6 @@ export function RefPill({ ref, pullRequest, color, onCheckout, onContextMenu }: 
         <span
           className="ml-0.5 pl-1 font-medium opacity-90"
           style={{
-            // On the filled (checked-out) pill the divider takes the text colour;
-            // on outline pills it takes the branch colour.
             borderLeft: `1px solid ${ref.isCurrent ? "var(--color-surface)" : colorValue}`,
           }}
         >

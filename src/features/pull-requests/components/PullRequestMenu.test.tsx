@@ -1,4 +1,3 @@
-// The title-bar PR door: counts on the button, the popover list, paging and the CLI states.
 // @vitest-environment jsdom
 import assert from "node:assert/strict";
 import { act, cleanup, fireEvent, render, screen, within } from "@testing-library/react";
@@ -53,7 +52,6 @@ const feeds = (over: Partial<Feeds> = {}): Feeds => ({
   ...over,
 });
 
-/** A view over plain lists; `open`/`merged`/`all` fill those lists, and `found` + `query` make it a search. */
 const view = (
   over: Partial<PullRequestsView> & { open?: Feed; merged?: Feed; all?: Feed; found?: Partial<Feeds> } = {},
 ): PullRequestsView => {
@@ -328,7 +326,6 @@ test("a selected tab reads itself on a repo whose list was never loaded", () => 
   fireEvent.click(tab(/^All/));
   assert.ok(first.mock.calls.some((call) => call[0] === PullScope.All));
 
-  // Another repo: a new `show`, lists nobody has asked for, and the tab still on All.
   const second = vi.fn();
   rerender(<PullRequestMenu pulls={view({ show: second })} />);
   assert.ok(second.mock.calls.some((call) => call[0] === PullScope.All), "no click needed: the selected tab asks for its list");

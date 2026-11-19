@@ -12,7 +12,6 @@ function normalizedEmail(email: string): string {
   return email.trim().toLowerCase();
 }
 
-/** The lowercase hex SHA-256 gravatar keys its lookup on, like `sha256("abc")` = `ba78…5ad`. */
 export async function emailSha256Hex(email: string): Promise<string | undefined> {
   try {
     const data = new TextEncoder().encode(normalizedEmail(email));
@@ -34,13 +33,11 @@ export function notePhotoMissing(email: string): void {
   photoMissing.add(email.trim().toLowerCase());
 }
 
-/** Clear both caches — the tests reset state between runs. */
 export function resetPhotoCache(): void {
   photoUrlCache.clear();
   photoMissing.clear();
 }
 
-/** URL to a 64px gravatar photo, or null when the author has none (d=404 makes that an error). */
 export function gravatarPhotoUrl(email: string): Promise<string | null> {
   const normalized = email.trim().toLowerCase();
   if (photoMissing.has(normalized)) return Promise.resolve(null);
@@ -51,7 +48,6 @@ export function gravatarPhotoUrl(email: string): Promise<string | null> {
   const pending = emailSha256Hex(normalized).then((hex) =>
     hex ? `https://www.gravatar.com/avatar/${hex}?s=64&d=404` : null,
   );
-  // The entry stays whatever the image probe turns out to be; failures resolve to null below.
   photoUrlCache.set(normalized, pending);
   return pending;
 }

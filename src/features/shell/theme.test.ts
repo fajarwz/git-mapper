@@ -1,5 +1,4 @@
 // @vitest-environment jsdom
-// Theme: storage key agreed with the head script in index.html, store/apply round-trip.
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { test } from "vitest";

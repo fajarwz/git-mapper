@@ -1,4 +1,3 @@
-// Per-hunk buttons on the uncommitted diff: which verbs each side offers, and the discard confirm.
 // @vitest-environment jsdom
 import assert from "node:assert/strict";
 import { cleanup, fireEvent, render } from "@testing-library/react";
@@ -167,7 +166,6 @@ test("picked lines can be cleared, discarded after a confirm, and unstaged on th
 
 test("split layout picks lines on both panes, and new or removed files offer no tick boxes", () => {
   const split = showLines(mixed, "unstaged", "split");
-  // "old" (left) and "new" (right) of the first row are one change: either side ticks both.
   fireEvent.mouseDown(split.container.querySelectorAll('[data-diff-num="new"][data-line-pick]')[0]);
   assert.equal(split.container.querySelector('[data-hunk-action="stage"]')?.textContent, "Stage +1 −1");
   assert.equal(split.container.querySelectorAll("[data-line-picked]").length, 2);

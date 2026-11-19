@@ -1,4 +1,3 @@
-/** A changed stretch of a line, as UTF-16 offsets into its text (end exclusive). */
 export type Range = [number, number];
 
 interface Token {
@@ -6,7 +5,6 @@ interface Token {
   start: number;
 }
 
-/** Words, whitespace runs and single punctuation marks: the unit the diff compares. */
 function tokenize(text: string): Token[] {
   const tokens: Token[] = [];
   for (const match of text.matchAll(/\s+|\w+|[^\w\s]/g)) {
@@ -15,10 +13,8 @@ function tokenize(text: string): Token[] {
   return tokens;
 }
 
-/** Past this many token pairs the exact LCS is skipped and the whole middle is marked. */
 const LCS_BUDGET = 40_000;
 
-/** Above this share of changed characters a line pair is a rewrite: the row tint says it all. */
 const REWRITE_SHARE = 0.8;
 
 /** Merges touching ranges and ranges separated only by whitespace in `text`. */
@@ -32,11 +28,6 @@ function mergeRanges(ranges: Range[], text: string): Range[] {
   return merged;
 }
 
-/**
- * Which parts of two paired lines changed, GitHub-style. Common head and tail tokens are
- * trimmed, the middle is matched by longest common subsequence. Returns null when nothing
- * differs or when the lines are mostly rewritten (marking nearly everything is noise).
- */
 export function changedRanges(
   oldText: string,
   newText: string,
@@ -149,7 +140,6 @@ export function escapeHtml(text: string): string {
     .replace(/'/g, "&#x27;");
 }
 
-/** Stronger tint over the changed words; the row's own wash sits underneath. */
 export const MARK_CLASS = {
   add: "bg-success/40 text-inherit rounded-[2px]",
   remove: "bg-danger/40 text-inherit rounded-[2px]",

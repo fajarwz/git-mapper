@@ -5,7 +5,6 @@ type Orientation = "vertical" | "horizontal";
 
 interface ResizeHandleProps {
   label: string;
-  /** Current size in px, for assistive tech. Omit when the column is still flexible. */
   value?: number;
   min: number;
   max: number;
@@ -14,7 +13,6 @@ interface ResizeHandleProps {
   onResize: (size: number) => void;
   onReset?: () => void;
   orientation?: Orientation;
-  /** "splitter" spans a panel edge, "column" sits in a table header cell. */
   variant?: "splitter" | "column";
   /**
    * Vertical splitters that ride a rounded panel's own edge set this: the visible rule stops
@@ -53,7 +51,6 @@ const COLUMN_VISUALS = [
   "hover:after:bg-primary focus-visible:after:bg-primary data-[dragging=true]:after:bg-primary",
 ].join(" ");
 
-/** Draggable divider for the graph gutter, table columns, panel splits and the details height. */
 export function ResizeHandle({
   label,
   value,

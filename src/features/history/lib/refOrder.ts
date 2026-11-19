@@ -2,16 +2,10 @@ import type { CommitRef, RefType } from "../../../types";
 
 const PRIORITY: RefType[] = ["head", "stash", "branch", "tag", "remote"];
 
-/**
- * Clean ref lists for the pills: `origin/HEAD` is noise; a local branch paired
- * with its `origin/…` twin merges into one pill rendered as "name | origin";
- * branches sort first, then tags, then other remotes.
- */
 export function orderRefs(refs: CommitRef[]): CommitRef[] {
   const key = (ref: CommitRef) => `${ref.type}:${ref.name}`;
   const byKey = new Map<string, CommitRef>();
 
-  // Locals and tags first, so remote pairing finds its branch either way.
   for (const ref of refs.filter((item) => item.type !== "remote")) {
     const existing = byKey.get(key(ref));
     if (!existing) {
@@ -30,7 +24,6 @@ export function orderRefs(refs: CommitRef[]): CommitRef[] {
   }
   for (const remote of refs.filter((item) => item.type === "remote")) {
     if (remote.name === "origin/HEAD") continue;
-    // Any remote (origin, gitlab, upstream, ...) whose tip shadows a local branch pairs with it.
     const match = [...byKey.values()].find(
       (sibling) =>
         sibling.type === "branch" && remote.name.endsWith(`/${sibling.name}`),

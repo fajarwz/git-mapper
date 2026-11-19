@@ -5,10 +5,8 @@ import { PANEL } from "../lib/ui";
 
 interface ConfirmDialogProps {
   title: string;
-  /** The story under the title: what happens, and the way back when there is one. */
   body: ReactNode;
   confirmLabel: string;
-  /** Destructive confirmations (drop a stash) confirm in red; plain ones stay violet. */
   danger?: boolean;
   onConfirm: () => void;
   onClose: () => void;
@@ -28,7 +26,6 @@ export function ConfirmDialog({ title, body, confirmLabel, danger = false, onCon
   // Only dismissing fades out; confirming closes at once because the action runs right away.
   const { leaving, close } = useExit(onClose);
 
-  // Focus moves to Cancel (the safe answer) and hands back to the trigger on close.
   useEffect(() => {
     returnFocusRef.current = document.activeElement as HTMLElement | null;
     closeRef.current?.focus();
@@ -82,9 +79,7 @@ export function ConfirmDialog({ title, body, confirmLabel, danger = false, onCon
             onClick={onConfirm}
             className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold soft-shadow transition-colors hover:brightness-110 ${
               danger
-                ? // A filled #d5535e fails white-on-red AA (4.02:1); the app's danger pairing
-                  // is the tinted fill with danger-ink text, which holds 4.5:1 in both themes.
-                  "border border-danger/30 bg-danger/15 text-danger-ink hover:bg-danger/25"
+                ? "border border-danger/30 bg-danger/15 text-danger-ink hover:bg-danger/25"
                 : "bg-primary text-white"
             }`}
           >

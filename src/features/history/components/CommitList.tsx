@@ -51,21 +51,16 @@ interface CommitListProps {
   /** The find bar's state; absent or closed means no bar and no dimming. */
   find?: FindState | null;
   selectedHash: string;
-  /** Commits a refresh just added or re-pilled; they flash once. */
   flashHashes: Set<string>;
   onSelect: (hash: string) => void;
   loadingMore: boolean;
   /** True while a slept tab reloads after being clicked: history is on its way back. */
   waking?: boolean;
-  /** The initials avatar left of the username; a settings toggle owns this. */
   showAvatars: boolean;
   onNearBottom: () => void;
-  /** Branch name → pull request, for the #number chip on branch pills. */
   pullsByBranch?: Map<string, PullRequest>;
-  /** The request a commit came from, for the chip on its row. */
   commitChip?: (commit: Commit) => PullChipData | null;
   onCheckoutBranch: (branch: string) => void;
-  /** Right-click on a row (or one of its pills): opens the commit context menu. */
   onContextMenu?: (commit: Commit, ref: CommitRef | undefined, x: number, y: number) => void;
 }
 
@@ -123,10 +118,6 @@ function HeaderCell({
 }
 
 export function CommitList({ repo, commits, find = null, selectedHash, flashHashes, onSelect, loadingMore, waking = false, showAvatars, onNearBottom, pullsByBranch, commitChip, onCheckoutBranch, onContextMenu }: CommitListProps) {
-  // One layout for the graph column and the SVG. Sizing the column from the dot lanes alone used to
-  // clip the graph whenever a line ran right of every dot.
-  // Same inputs as gitLoader.withLanes (stash rows float, the uncommitted row is flagged) —
-  // a different shape here desyncs the SVG from the rows' lanes and colours.
   const layout = useMemo(
     () =>
       layoutGraph(
@@ -172,7 +163,6 @@ export function CommitList({ repo, commits, find = null, selectedHash, flashHash
     setStoredOrder([...moved, ...hidden]);
   }
 
-  // Rows outside the find's matches recede; with a blank query nothing dims.
   const matchSet = useMemo(() => new Set(find?.matches ?? []), [find?.matches]);
   const dimming = find !== null && find.query.trim() !== "";
   const terms = useMemo(() => (dimming ? queryTokens(find.query) : undefined), [dimming, find?.query]);
@@ -198,8 +188,6 @@ export function CommitList({ repo, commits, find = null, selectedHash, flashHash
   const scrollRef = useRef<HTMLDivElement>(null);
   const lastScrollTop = useRef(0);
 
-  // Keep the viewport anchored across data reloads (branch switch, page append):
-  // re-apply the last scroll offset whenever the commit list is replaced.
   useEffect(() => {
     const el = scrollRef.current;
     if (el && lastScrollTop.current > 0) el.scrollTop = lastScrollTop.current;
@@ -222,7 +210,6 @@ export function CommitList({ repo, commits, find = null, selectedHash, flashHash
     "--col-author": `${authorWidth}px`,
     "--col-date": `${dateWidth}px`,
     "--col-hash": `${HASH_WIDTH}px`,
-    // A pinned message column leaves the leftover space to a spacer; unpinned, the message fills it.
     "--col-spacer": messageWidth === null ? "0px" : "1fr",
     "--header-grid": grids.header,
     "--row-grid": grids.row,
@@ -230,18 +217,12 @@ export function CommitList({ repo, commits, find = null, selectedHash, flashHash
 
   const measureMessage = () => widthOf(messageCellRef.current, 300);
 
-  // While the message column is flexible (1fr, the first-load state) it absorbs every track
-  // change on its right — an author/date drag then looked inverted: the dragged edge stayed
-  // pinned against the hash column while the column grew from its far side. Pinning the
-  // message to its live width hands the leftover to the spacer, and the dragged edge follows
-  // the pointer like any desktop table.
   function pinMessageWidth(): number {
     const measured = measureMessage();
     setMessageWidth(clampMessageWidth(measured, graphColumnWidth, authorWidth, dateWidth));
     return measured;
   }
 
-  // Keep the pinned message column inside the window: the header and rows use the same 52px of gaps/padding.
   function clampMessageWidth(width: number, graph: number, author: number, date: number): number {
     const sectionWidth = sectionRef.current?.getBoundingClientRect().width ?? 0;
     const shown = (visible.author ? author : 0) + (visible.date ? date : 0) + (visible.hash ? HASH_WIDTH : 0);
@@ -376,7 +357,6 @@ export function CommitList({ repo, commits, find = null, selectedHash, flashHash
               onSelect={onSelect}
               onCheckoutBranch={onCheckoutBranch}
               onContextMenu={onContextMenu ? (row, x, y) => {
-                // The row's most relevant ref: its branch, falling back to the first pill.
                 const ref = row.refs.find((item) => item.type === "branch") ?? row.refs[0];
                 onContextMenu(row, ref, x, y);
               } : undefined}

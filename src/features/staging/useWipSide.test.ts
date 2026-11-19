@@ -1,4 +1,3 @@
-// Side choice for the uncommitted diff: the clicked side wins, an emptied side falls back.
 // @vitest-environment jsdom
 import assert from "node:assert/strict";
 import { act, renderHook, waitFor } from "@testing-library/react";

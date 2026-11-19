@@ -1,10 +1,8 @@
 import type { DiffLine, Repository, Submodule, SubmoduleState } from "../../types";
 
-/** What a changed gitlink says: the commit it pointed at, and the one it points at now. */
 export interface SubmodulePointer {
   from: string | null;
   to: string | null;
-  /** The working tree of the submodule has changes of its own (git prints `-dirty`). */
   dirty: boolean;
 }
 
@@ -19,7 +17,6 @@ export function submodulePointer(lines: DiffLine[] | null): SubmodulePointer | n
   const pointer: SubmodulePointer = { from: null, to: null, dirty: false };
   let seen = 0;
   for (const line of lines) {
-    // The parser turns the patch's trailing newline into an empty context line.
     if (line.type === "hunk" || (line.type === "context" && line.text === "")) continue;
     const match = POINTER_LINE.exec(line.text);
     if (!match || line.type === "context") return null;
@@ -55,7 +52,6 @@ export function shapeSubmodules(root: string, raw: RawSubmodule[]): Submodule[] 
   }));
 }
 
-/** Child repo id → parent repo id, for every open repo that is a submodule of another open one. */
 export function submoduleParents(repos: Repository[]): Map<string, string> {
   const parents = new Map<string, string>();
   for (const repo of repos) {

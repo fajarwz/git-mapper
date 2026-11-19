@@ -26,7 +26,6 @@ interface ImageDiffProps {
   commitHash?: string;
 }
 
-/** One rendered copy: image on a checkerboard, captioned with dimensions and size. */
 function ImageSide({
   side,
   version,

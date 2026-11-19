@@ -1,4 +1,3 @@
-// The updater store, with the Tauri plugins mocked: check → download → ready → install + relaunch.
 // @vitest-environment jsdom
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test, vi } from "vitest";

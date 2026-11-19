@@ -29,7 +29,6 @@ export type { HunkActions } from "./HunkButtons";
  */
 export type DiffScope = "file" | "all";
 
-/** How the lines lay out: one stacked column, or old/new side by side (GitHub's split view). */
 export type DiffLayout = "unified" | "split";
 
 interface DiffViewerProps {
@@ -40,12 +39,9 @@ interface DiffViewerProps {
   onScopeChange: (scope: DiffScope) => void;
   layout: DiffLayout;
   onLayoutChange: (layout: DiffLayout) => void;
-  /** Soft-wrap long lines (the default; the pane is narrow). Off = GitHub-style horizontal scroll. */
   wrap?: boolean;
   onWrapChange?: (wrap: boolean) => void;
-  /** Which syntax palette the tokens use (see index.css `data-syntax` blocks). Default: app. */
   scheme?: SyntaxScheme;
-  /** Where the image diff fetches its blobs: the repo path and the selected commit's hash. */
   repoPath?: string;
   commitHash?: string;
   /**
@@ -55,7 +51,6 @@ interface DiffViewerProps {
   onPatchNeeded?: (path: string) => void;
   /** Uncommitted diff only: per-hunk stage / unstage / discard buttons, and which side this is. */
   hunkActions?: HunkActions;
-  /** The repo's submodules: a changed gitlink renders as a pointer bump, with an Open button. */
   submodules?: Submodule[];
   onOpenSubmodule?: (fullPath: string) => void;
 }
@@ -126,13 +121,10 @@ function groupByHunk(
   ));
 }
 
-/** A ticked changed line: a solid primary wash replaces its add/remove tint. */
 const PICKED_ROW = "bg-primary/20";
 
-/** Keyboard focus on a tick box: a ring inside the cell (the pick cells are tab-reachable). */
 const PICK_FOCUS = "outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/70";
 
-/** The tick box itself: shown on row hover, filled with a check once picked. */
 function PickBox({ picked, hoverGroup }: { picked: boolean; hoverGroup: string }) {
   return (
     <span
@@ -174,12 +166,9 @@ function HunkHint({ text }: { text?: string }) {
   );
 }
 
-/** Line picking needs a file that exists on both sides, and a caller that can act on lines. */
 const canPickLines = (file: ChangedFile, hunkActions?: HunkActions) =>
   Boolean(hunkActions?.onLines) && file.status === "modified";
 
-/** Diff gutters: ink at low alpha, GitHub's muted gray — clearly fainter than the code next to
- * it, and .dark re-points it with the theme. */
 const GUTTER_TONE = "text-ink/45";
 
 /** The props that make a gutter cell a tick box; undefined when the line cannot be picked. */
@@ -231,11 +220,9 @@ function pickProps(
   };
 }
 
-/** Screen-reader name of a changed line: kind and number. */
 const pickLabel = (line: NumberedDiffLine) =>
   `${line.type === "add" ? "added" : "removed"} line ${line.newNumber ?? line.oldNumber ?? ""}`.trim();
 
-/** The changed lines of one split row: its remove and add are picked as a pair. */
 function changeGroup(selection: LineSelection | null, row: DiffSplitRow): number[] {
   return [row.oldIndex, row.newIndex].filter((index) => index >= 0 && selection?.slots[index]);
 }
@@ -367,7 +354,6 @@ function DiffBody({
   );
 }
 
-/** Off-screen stacked files skip layout and paint; `auto` remembers each section's real height. */
 const SECTION_CULLING = "[content-visibility:auto] [contain-intrinsic-size:auto_480px]";
 
 const SKELETON_WIDTHS = ["w-2/5", "w-3/4", "w-1/2", "w-5/6", "w-2/3", "w-1/3", "w-3/5", "w-4/5"];
@@ -454,10 +440,8 @@ function SplitCells({
   line: NumberedDiffLine | null;
   side: "old" | "new";
   html?: string;
-  /** Changed words of this line against its paired line on the other side. */
   ranges?: Range[];
   wrap: boolean;
-  /** Present when this line can be ticked for a line-level stage/unstage/discard. */
   pick?: PickProps;
   picked?: boolean;
 }) {
@@ -491,7 +475,6 @@ function SplitCells({
         className={`group/cell select-none border-r border-rule text-right ${pick ? "" : "pr-2"} ${line.type === "add" || line.type === "remove" ? tone.lineNumberBox : GUTTER_TONE}${pick ? ` cursor-pointer ${PICK_FOCUS}` : ""}`}
       >
         {pick ? (
-          // Box and number share one line box, so they centre on the same line however tall the row.
           <span className="flex items-center gap-x-1 pl-1 pr-2">
             <PickBox picked={picked} hoverGroup="group-hover/cell:inline-flex" />
             <span className="ml-auto">{number ?? ""}</span>
@@ -544,7 +527,6 @@ function SplitDiffBody({
   const highlighted = useHighlightedLines(file.path, texts);
   const changes = useMemo(() => intralineRanges(lines), [lines]);
   const selection = useLineSelection(file.diff, canPickLines(file, hunkActions));
-  // With tick boxes the number gutters grow just enough for the widest number plus the box.
   const digits = Math.max(2, ...lines.map((line) => String(Math.max(line.oldNumber ?? 0, line.newNumber ?? 0)).length));
   const numberTracks: React.CSSProperties | undefined = selection
     ? {
@@ -554,8 +536,6 @@ function SplitDiffBody({
       }
     : undefined;
 
-  // Wrap mode swaps the max-content auto tracks for fr tracks: both panes take half the pane
-  // each and long lines soft-wrap inside. The one shared grid still keeps panes aligned.
   return (
     <div
       style={numberTracks}
@@ -675,7 +655,6 @@ function FileHeader({ file }: { file: ChangedFile }) {
   );
 }
 
-/** The scope switch. Two segments rather than a checkbox: both states are named on screen. */
 function ScopeToggle({
   scope,
   onScopeChange,
@@ -715,7 +694,6 @@ function ScopeToggle({
   );
 }
 
-/** The layout switch: unified stacks old and new in one column, split puts them side by side. */
 function LayoutToggle({
   layout,
   onLayoutChange,
@@ -928,7 +906,6 @@ export function DiffViewer({
                 }}
               >
                 <FileHeader file={item} />
-                {/* Unwrapped, each file scrolls sideways on its own; the header stays outside. */}
                 <div className={wrap ? "pt-1" : "overflow-x-auto pt-1"}>
                   <DiffSection
                     file={item}
@@ -946,7 +923,6 @@ export function DiffViewer({
           </div>
         )
       ) : (
-        // One file at a time: the panel header above IS this file's header.
         <div className="min-h-0 flex-1 overflow-auto bg-sheet pb-3 pt-1 font-mono text-[12px] leading-[1.6]">
           {file ? (
             <DiffSection

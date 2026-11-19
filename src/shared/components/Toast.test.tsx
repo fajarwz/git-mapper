@@ -1,4 +1,3 @@
-// The failure toast: title/detail render, the close button, and the self-dismiss timer.
 // @vitest-environment jsdom
 import assert from "node:assert/strict";
 import { cleanup, render, fireEvent } from "@testing-library/react";

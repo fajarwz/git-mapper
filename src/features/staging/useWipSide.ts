@@ -17,13 +17,10 @@ export function useWipSide({
   selectedFilePath,
 }: {
   repoPath: string | null;
-  /** True while the uncommitted row is the selected commit. */
   active: boolean;
-  /** The rail's rows: they say which sides have anything to show. */
   rows: WorktreeFile[];
   /** Paths the rail lists elsewhere (merge conflicts): this diff never stacks them. */
   hiddenPaths?: string[];
-  /** The worktree digest; a move reloads the side. */
   digest: string | undefined;
   selectedFilePath: string | null;
 }) {

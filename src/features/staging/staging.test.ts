@@ -1,5 +1,3 @@
-// shapeWorktreeFiles: raw reader entries become the panel's rows — index rows first,
-// alphabetical inside a section, snake_case old paths folded into the UI shape.
 import assert from "node:assert/strict";
 import { test } from "vitest";
 

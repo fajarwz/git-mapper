@@ -1,6 +1,5 @@
 import type { ChangedFile, DiffLine, FileStatus } from "../../../types";
 
-/** The raw `read_commit_files` payload (snake_case, straight off git). */
 export interface RawCommitFiles {
   numstat: string;
   name_status: string;
@@ -16,7 +15,6 @@ const STATUS_TYPES: Record<string, FileStatus> = {
   R: "renamed",
 };
 
-/** numstat prints renames as "dir/{old => new}"; the file's live path uses the new side. */
 function newNumstatPath(rawPath: string): string {
   const renamed = /^([^{}]*)\{([^}]*)\s+=>\s+([^}]*)\}([^{}]*)$/.exec(rawPath);
   if (!renamed) return rawPath;
@@ -27,7 +25,6 @@ interface NameStatusEntry {
   status: FileStatus;
   path: string;
   oldPath?: string;
-  /** Similarity percent parsed from the R/C code (R100 → 100). */
   score?: number;
 }
 
@@ -101,7 +98,6 @@ export function parseDiffSections(raw: string): Map<string, DiffLine[]> {
         currentPath = line.startsWith("+++ b/") ? line.slice(6) : null;
         inHeader = false;
       } else if (line.startsWith("@@")) {
-        // Merge-commit patches: the parents header precedes; treat patch body as ready.
         inHeader = false;
       }
       continue;
@@ -125,20 +121,13 @@ export function parseDiffSections(raw: string): Map<string, DiffLine[]> {
 }
 
 export interface DiffSplitRow {
-  /** Hunk header row: spans both panes, old/new are empty. */
   hunk: DiffLine | null;
-  /** Left pane (a remove or context) and right pane (an add or context) of one visual row. */
   old: DiffLine | null;
   new: DiffLine | null;
-  /** Where each side's line sits in the source list (-1 when absent), for highlight lookups. */
   oldIndex: number;
   newIndex: number;
 }
 
-/**
- * Pairs a unified line list into side-by-side rows (GitHub's split view): context shows on both
- * sides, a block of removes and adds zips into rows, and whichever side runs out stays empty.
- */
 export function splitDiffRows(lines: DiffLine[]): DiffSplitRow[] {
   const rows: DiffSplitRow[] = [];
   let index = 0;
@@ -179,7 +168,6 @@ export function splitDiffRows(lines: DiffLine[]): DiffSplitRow[] {
   return rows;
 }
 
-/** `withPatch` false leaves every diff null — the list read; patches fill in per file. */
 export function parseCommitFiles(payload: RawCommitFiles, withPatch = true): ChangedFile[] {
   const sections = parseDiffSections(payload.diff);
   const counts = parseNumstat(payload.numstat);

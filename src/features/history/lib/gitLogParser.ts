@@ -66,19 +66,15 @@ export function parseLog(raw: string): LogCommit[] {
 }
 
 export interface LogStash {
-  /** `stash@{0}` — the reflog selector, which is also the pill's name. */
   selector: string;
   hash: string;
-  /** The stash commit's parents: the base it was taken on, then git's index snapshot. */
   parents: string[];
   author: string;
   authorEmail: string;
   date: string;
-  /** `WIP on main: 1234abc <subject it was taken on>` — git's own wording. */
   message: string;
 }
 
-/** `read_stashes` payload → one entry per stash, newest first (stash@{0} leads). */
 export function parseStashes(raw: string): LogStash[] {
   const out: LogStash[] = [];
   for (const record of raw.split(RECORD)) {

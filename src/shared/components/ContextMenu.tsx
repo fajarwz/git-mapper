@@ -3,15 +3,12 @@ import type { Commit, CommitRef } from "../../types";
 import { UNCOMMITTED_HASH } from "../../data/gitLoader";
 import { copyText } from "../lib/clipboard";
 
-/** What a stash row offers: the safe apply, or the two that need a confirm first. */
 export type StashAction = "apply" | "pop" | "drop";
 
-/** What the menu was opened on: a position, the row's commit, and the ref it targets. */
 export interface ContextMenuTarget {
   x: number;
   y: number;
   commit: Commit;
-  /** The pill that was right-clicked, or the row's most relevant ref. */
   ref?: CommitRef;
 }
 
@@ -26,9 +23,7 @@ interface ContextMenuProps {
   onUndoCommit?: () => void;
   /** Full sha of HEAD at the last read: the row that is HEAD gets no checkout entry. */
   head: string;
-  /** The checked-out branch's name; a non-current local branch may be merged into it. */
   currentBranch?: string;
-  /** Merges a local, non-current branch into the checked-out one; App confirms first. */
   onMerge?: (branch: string) => void;
   /** Opens the provider's new pull request page for a branch (a remote ref passes its bare
    * name). Offered for any branch or remote pill; the branch must already be pushed. */
@@ -65,7 +60,6 @@ export function ContextMenu({
   onCreatePullRequest,
   onClose,
 }: ContextMenuProps) {
-  // The entry that just copied shows "Copied!" for a beat; the others keep their labels.
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -98,10 +92,7 @@ export function ContextMenu({
 
   const branch = target.ref?.type === "branch" ? target.ref : null;
   const checkoutable = branch !== null && !branch.isCurrent;
-  // The merge target is exactly the checkoutable case (a local, non-current branch), so
-  // the entry rides the same mount condition — App passes the handler when one is valid.
   const mergeable = checkoutable && branch !== null && Boolean(onMerge) && Boolean(currentBranch);
-  // A pull request is opened for a branch name; a remote pill ("origin/feat") means "feat".
   const pullBranch =
     target.ref?.type === "branch"
       ? target.ref.name
@@ -119,7 +110,6 @@ export function ContextMenu({
   // A local copy the callbacks can close over (TS will not narrow the prop inside them).
   const activeRef = target.ref;
 
-  // Keep the menu on screen when opened near the right or bottom edge.
   const left = Math.max(4, Math.min(target.x, window.innerWidth - 240));
   const stashIndex = target.commit.stashIndex;
   // The menu is ~32px an entry; the estimate grows with it so it never opens off-screen.
@@ -130,7 +120,7 @@ export function ContextMenu({
     (commitCheckoutable ? 1 : 0) +
     (undoable ? 1 : 0) +
     (stashIndex !== undefined ? 3 : 0) +
-    1 + 1 + (activeRef ? 1 : 0); // two copy entries always: hash + (ref or none)
+    1 + 1 + (activeRef ? 1 : 0);
   const top = Math.max(4, Math.min(target.y, window.innerHeight - entries * 32 - 20));
 
   function copy(key: string, text: string) {
@@ -188,7 +178,6 @@ export function ContextMenu({
             onCheckoutCommit(target.commit.hash);
           }}
         >
-          {/* The menu is a fixed 240px: the label reads the short hash, like the list. */}
           Check out commit {target.commit.hash.slice(0, 8)}
         </button>
       )}

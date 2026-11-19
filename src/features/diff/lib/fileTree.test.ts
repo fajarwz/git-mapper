@@ -1,4 +1,3 @@
-// The pure tree behind the file list's tree view: nesting, merging, ordering.
 import assert from "node:assert/strict";
 import { test } from "vitest";
 

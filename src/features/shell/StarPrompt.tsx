@@ -1,7 +1,6 @@
 import { StarIcon } from "../../shared/components/icons";
 import { Toast } from "../../shared/components/Toast";
 
-/** A one-time, non-blocking ask to star the repo. Closing it (button or Esc) counts as "later". */
 export function StarPrompt({
   onStar,
   onLater,
@@ -9,7 +8,6 @@ export function StarPrompt({
 }: {
   onStar: () => void;
   onLater: () => void;
-  /** The second and final ask says so. */
   last: boolean;
 }) {
   return (

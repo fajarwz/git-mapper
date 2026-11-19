@@ -1,11 +1,8 @@
 import type { ChangedFile, FileStatus } from "../../types";
 
-/** One raw `1 <XY> … <path>`-shaped entry that the status reader returned. */
 export interface WorktreeEntryRaw {
-  /** `index:<path>` or `worktree:<path>` — one path can legitimately carry both copies. */
   key: string;
   path: string;
-  /** Rename/copy source (`git mv` / detected rename) in the same state. */
   old_path?: string | null;
   status: string;
   staged: boolean;

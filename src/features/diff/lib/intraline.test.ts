@@ -45,13 +45,11 @@ test("only equal-sized remove/add blocks are paired", () => {
 
 test("marks go inside syntax token spans and keep the HTML well formed", () => {
   const html = '<span class="hljs-string">&quot;#22a88d&quot;</span>,';
-  // The text is "#22a88d" in quotes, then a comma: offsets 2..8 are 22a88d.
   const out = markHtml(html, [[2, 8]], "m");
   assert.equal(
     out,
     '<span class="hljs-string">&quot;#<mark class="m">22a88d</mark>&quot;</span>,',
   );
-  // A range spanning a tag boundary closes and reopens around it.
   const spanning = markHtml("<b>ab</b>cd", [[1, 3]], "m");
   assert.equal(spanning, '<b>a<mark class="m">b</mark></b><mark class="m">c</mark>d');
 });

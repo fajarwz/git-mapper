@@ -37,17 +37,12 @@ export interface BranchPath {
 }
 
 export interface GraphLayout {
-  /** Horizontal lane index of each commit's dot. */
   lanes: number[];
-  /** Branch-colour index of each commit's dot. */
   branchColors: number[];
-  /** One path per branch, already in draw order. */
   branches: BranchPath[];
-  /** Lanes needed at the widest row, for the SVG width. */
   laneCount: number;
   /** False when a parent appeared above its child (input was not newest-first topological). */
   ordered: boolean;
-  /** Parents that sit outside the loaded window or above their child. */
   gaps: LaneGap[];
 }
 
@@ -194,13 +189,10 @@ export function layoutGraph(
       vertex.branch !== null &&
       parentVertex.branch !== null
     ) {
-      // The merge's second parent is already on another branch: trace a connecting path
-      // from this vertex down to that parent, reusing the parent's branch colour.
       const parentBranch = parentVertex.branch;
       let foundPointToParent = false;
       for (i = startAt + 1; i < n; i++) {
         const curVertex = vertices[i];
-        // If the current vertex is the target parent, land on its existing point.
         const curPoint = curVertex === parentVertex ? parentVertex.point() : curVertex.nextPoint();
         if (curVertex === parentVertex) foundPointToParent = true;
 
@@ -250,7 +242,6 @@ export function layoutGraph(
       }
 
       if (i === n && parentVertex !== null && parentVertex.id === -1) {
-        // Parent is outside the loaded window; mark the edge as handled.
         vertex.registerParentProcessed();
       }
 

@@ -1,4 +1,3 @@
-// Ref pill shaping: namespace priority, remote pairing, noise dropping.
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
@@ -18,7 +17,6 @@ test("merging two copies of one ref keeps the remote pairing", () => {
     { type: "branch", name: "main", isCurrent: true, withRemote: "origin" },
   ]);
 
-  // Same input from either side has to agree, or a refresh re-pills and flashes the row.
   assert.deepEqual(orderRefs(tips), merged);
 });
 

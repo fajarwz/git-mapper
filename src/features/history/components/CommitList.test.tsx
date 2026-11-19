@@ -1,4 +1,3 @@
-// The commit table: optional columns switch from the header's right-click menu and persist.
 // @vitest-environment jsdom
 import assert from "node:assert/strict";
 import { cleanup, fireEvent, render, within } from "@testing-library/react";

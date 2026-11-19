@@ -1,4 +1,3 @@
-// Back/forward history: push, truncate, dedupe, cap, and stepping past dead entries.
 import assert from "node:assert/strict";
 import { test } from "vitest";
 

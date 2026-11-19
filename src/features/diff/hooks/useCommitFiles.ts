@@ -37,7 +37,6 @@ export function useCommitFiles({
       ? filesKey(repo.path, selectedCommit.hash, repo.worktree)
       : null;
   const files = selectedFilesKey ? (filesByCommitHash[selectedFilesKey] ?? []) : [];
-  // null means "fall back to the first changed file", which a fresh commit selection wants.
   const selectedFile = useMemo(
     () => files.find((file) => file.path === selectedFilePath) ?? files[0] ?? null,
     [files, selectedFilePath],
@@ -56,7 +55,6 @@ export function useCommitFiles({
     });
   }, []);
 
-  // Drops every cached payload of one repository: when its tab closes, and when the tab sleeps.
   const evictRepoFiles = useCallback((repoPath: string) => {
     const prefix = `${repoPath}::`;
     const kept = filesCacheOrder.current.filter((key) => !key.startsWith(prefix));

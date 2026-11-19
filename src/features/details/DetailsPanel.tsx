@@ -28,51 +28,34 @@ import { ChevronDownIcon, CloseIcon } from "../../shared/components/icons";
 
 interface DetailsPanelProps {
   commit: Commit;
-  /** Repo root; passed down so image files can fetch their blob versions. */
   repoPath: string;
   files: ChangedFile[];
   filesLoading: boolean;
   selectedFile: ChangedFile | null;
   onSelectFile: (path: string) => void;
-  /** One file at a time, or every file in a single scroll (the diff pane's toggle). */
   diffScope: DiffScope;
   onDiffScopeChange: (scope: DiffScope) => void;
-  /** Diff line layout: one unified column, or old/new side by side (the diff pane's toggle). */
   diffLayout: DiffLayout;
   onDiffLayoutChange: (layout: DiffLayout) => void;
-  /** Soft-wrap long lines (default on); the diff pane's wrap toggle flips it. */
   diffWrap: boolean;
   onDiffWrapChange: (wrap: boolean) => void;
-  /** Diff token palette, chosen in settings and passed straight to the DiffViewer. */
   syntaxScheme: SyntaxScheme;
-  /** The avatar toggle in settings: initials + gravatar photo beside the author here too. */
   showAvatars: boolean;
-  /** Branch name → pull request, for the #number chip on this commit's branch pills. */
   pullsByBranch?: Map<string, PullRequest>;
-  /** The request this commit came from, next to its hash. */
   commitChip?: (commit: Commit) => PullChipData | null;
-  /** The find bar's tokens when this commit is one of its matches: the text they hit is painted. */
   terms?: string[];
-  /** Double-clicking a branch pill here checks the branch out, same as in the commit list. */
   onCheckoutBranch?: (branch: string) => void;
-  /** Right-clicking a pill opens the same ref menu as the commit list's pills. */
   onRefContextMenu?: (ref: CommitRef, x: number, y: number) => void;
-  /** True when the commit is the uncommitted row: the rail owns the file list, so this panel
-   * drops its sidebar and the diff takes the pane — the rail click's full view. */
   isWorktree?: boolean;
   /** Asks App for one file's patch (patches are lazy; the file list arrives without them). */
   onPatchNeeded?: (path: string) => void;
   /** Uncommitted diff only: the per-hunk buttons and the side (staged / working tree) on show. */
   hunkActions?: HunkActions;
-  /** Set while a merge conflict row was summoned from the rail: both sides replace the diff. */
   conflict?: ConflictFile | null;
-  /** Resolves the conflict's path from within the conflict view (same wire as the rail). */
   onResolveConflict?: (paths: string[], side: "ours" | "theirs") => void;
   /** Saves the conflicted file after a block choice; resolves once the rewrite landed. */
   onWriteConflictText?: (path: string, text: string) => Promise<void>;
-  /** The checked-out branch, named on the "current" side of each conflict. */
   currentBranch?: string;
-  /** The repo's submodules: gitlink rows get a glyph and their diff a pointer card. */
   submodules?: Submodule[];
   onOpenSubmodule?: (fullPath: string) => void;
   onClose: () => void;
@@ -125,7 +108,6 @@ export function DetailsPanel({
   // Flat path list or the folder tree for the changed files. The panel owns it (not App) so the
   // whole file-list domain lives here; the choice is persisted like the rest of the panel state.
   const [fileView, setFileView] = usePersistedState<FileView>(STORAGE_KEYS.fileView, "list");
-  // Click-to-copy on the hash line: the marker resets itself, and a switch of commits clears it.
   const [hashCopied, setHashCopied] = useState(false);
   const hashTimer = useRef(0);
 
@@ -308,7 +290,6 @@ export function DetailsPanel({
               )}
             </div>
 
-            {/* Zero-height anchor on the summary/files boundary; the splitter straddles it. */}
             {!summaryCollapsed && !filesCollapsed && (
               <div className="relative h-0 shrink-0">
                 <ResizeHandle

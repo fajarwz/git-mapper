@@ -103,7 +103,6 @@ export function CommitGraph({ commits, layout, selectedHash }: CommitGraphProps)
               />
             )}
             {checkedOut ? (
-              // HEAD sits here: hollow ring, same branch colour as its line.
               <circle
                 cx={x}
                 cy={y}

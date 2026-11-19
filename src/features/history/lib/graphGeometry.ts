@@ -1,13 +1,11 @@
 import { LINE_COLOR_COUNT } from "./graphLanes";
 import type { GraphLayout, BranchPath, BranchLine } from "./graphLanes";
 
-/** Fixed row height in px. The commit rows and the SVG graph both use it so they stay aligned. */
 export const ROW_HEIGHT = 32;
 export const LANE_WIDTH = 16;
 export const GRAPH_PADDING_X = 14;
 export const DOT_RADIUS = 3.5;
 
-/** One hue per branch. Tokens, so themes carry over. */
 export const LINE_COLORS = [
   "var(--color-lane-1)",
   "var(--color-lane-2)",
@@ -19,18 +17,12 @@ export const LINE_COLORS = [
   "var(--color-lane-8)",
 ];
 
-/** The uncommitted row's dot and connector: one fixed gray, both themes. */
 export const UNCOMMITTED_COLOR = "var(--color-graph-system)";
 
-/**
- * Colour of a branch. Lines and dots belonging to the same branch share this colour even when the
- * branch changes horizontal lane, which is the look of vscode-git-graph.
- */
 export function branchColor(branchColorIndex: number): string {
   return LINE_COLORS[branchColorIndex % LINE_COLOR_COUNT];
 }
 
-/** Kept for callers that still think in lanes; the colour is now branch-based. */
 export function laneColor(lane: number): string {
   return branchColor(lane);
 }
@@ -47,7 +39,6 @@ export function rowY(index: number): number {
   return index * ROW_HEIGHT + ROW_HEIGHT / 2;
 }
 
-/** Width that fits every lane the layout uses. */
 export function graphWidth(laneCount: number): number {
   const lanes = Math.max(laneCount, 1);
   return GRAPH_PADDING_X * 2 + (lanes - 1) * LANE_WIDTH;
@@ -57,19 +48,13 @@ export interface GraphEdge {
   key: string;
   path: string;
   color: string;
-  /** System rows (uncommitted changes) draw dashed, like vscode-git-graph. */
   uncommitted?: boolean;
 }
 
-/**
- * Turns branch paths into SVG paths. Consecutive vertical segments in the same branch are merged
- * so long runs draw as one path element.
- */
 export function buildEdges(layout: GraphLayout): GraphEdge[] {
   const edges: GraphEdge[] = [];
 
   layout.branches.forEach((branch: BranchPath, branchIndex: number) => {
-    // Simplify consecutive straight vertical lines, preserving the committed/uncommitted split.
     const lines: BranchLine[] = [];
     for (const line of branch.lines) {
       const last = lines[lines.length - 1];
@@ -123,8 +108,6 @@ export function buildEdges(layout: GraphLayout): GraphEdge[] {
       if (Math.abs(x1 - x2) < 0.01) {
         path += ` L ${x2} ${y2}`;
       } else {
-        // vscode-git-graph rounded style: keep the line vertical for most of the row, then bend
-        // near each end. d = 0.8 of the vertical distance produces the smooth S-curve.
         const d = Math.abs(y2 - y1) * 0.8;
         path += ` C ${x1} ${y1 + d}, ${x2} ${y2 - d}, ${x2} ${y2}`;
       }

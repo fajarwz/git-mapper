@@ -15,7 +15,6 @@ export function nextZoom(current: number, action: "in" | "out" | "reset"): numbe
   return Math.min(ZOOM_MAX, Math.max(ZOOM_MIN, next));
 }
 
-/** The shortcut a keydown stands for (Ctrl/Cmd + = + - 0), or null. */
 export function zoomAction(event: Pick<KeyboardEvent, "key" | "ctrlKey" | "metaKey" | "altKey">) {
   if (!(event.ctrlKey || event.metaKey) || event.altKey) return null;
   if (event.key === "=" || event.key === "+") return "in";
@@ -36,14 +35,13 @@ function readZoom(): number {
 /** Whole-window zoom like VS Code: Ctrl/Cmd +, -, 0 and Ctrl + wheel, remembered across launches.
  * The native webview zoom is used (not CSS zoom), so layout, the title bar and px maths agree. */
 export function installZoom(): void {
-  if (!("__TAURI_INTERNALS__" in window)) return; // the browser tab has its own zoom
+  if (!("__TAURI_INTERNALS__" in window)) return;
   let zoom = readZoom();
   const apply = (next: number) => {
     zoom = next;
     try {
       localStorage.setItem(STORAGE_KEYS.zoom, JSON.stringify(zoom));
     } catch {
-      /* zoom still applies for this session */
     }
     void getCurrentWebview().setZoom(zoom);
   };

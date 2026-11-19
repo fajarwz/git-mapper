@@ -8,9 +8,7 @@ import { useEffect, useRef, useState } from "react";
 import { LINE_COLOR_COUNT } from "../lib/graphLanes";
 import { gravatarPhotoUrl, notePhotoMissing } from "../../../shared/lib/avatarPhoto";
 
-/** Colour slot for an author: a stable hash of the email, spread over the lane palette. */
 export function avatarColorIndex(email: string): number {
-  // djb2 — small, stable across sessions, and even one different character reshuffles the tint.
   let hash = 5381;
   for (let i = 0; i < email.length; i++) {
     hash = ((hash << 5) + hash + email.charCodeAt(i)) | 0;
@@ -18,7 +16,6 @@ export function avatarColorIndex(email: string): number {
   return (hash >>> 0) % LINE_COLOR_COUNT;
 }
 
-/** The initial the avatar shows: the first letter of the name, or a dot when the name is bare. */
 export function avatarInitial(name: string): string {
   const first = name.trim().charAt(0);
   return first ? first.toUpperCase() : "·";
@@ -27,7 +24,6 @@ export function avatarInitial(name: string): string {
 interface AvatarProps {
   name: string;
   email: string;
-  /** Photos load from gravatar.com; off means the initials chip alone. The setting owns this. */
   photos?: boolean;
 }
 
@@ -36,7 +32,6 @@ export function Avatar({ name, email, photos = false }: AvatarProps) {
   // name and email, and an empty tinted circle there read as a broken image. Hooks below still
   // run unconditionally, so switching the selected commit never changes hook order.
   const anonymous = name.trim() === "" && email.trim() === "";
-  // Mixed into the lane colour so both themes carry it and neighbouring authors mostly differ.
   const tone = `var(--color-lane-${avatarColorIndex(email) + 1})`;
   const tint = { backgroundColor: `color-mix(in oklab, ${tone} 22%, transparent)`, color: tone };
   // The resolved photo is stapled to the email it belongs to: switching commits (a new email

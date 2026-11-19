@@ -7,43 +7,28 @@ import { PANEL } from "../../shared/lib/ui";
 
 interface StagePanelProps {
   branch: string;
-  /** The worktree rows, owned by and reloaded from App (the badge counts them). */
   files: WorktreeFile[];
-  /** True while a git write is in flight: every row action and the commit button wait. */
   busy?: boolean;
-  /** The merge resolution slice's state: MERGE_HEAD present, its unmerged paths. */
   merging?: boolean;
   conflicts?: string[];
-  /** Takes one side of every given unmerged path from the index stages and stages it. */
   onResolve: (paths: string[], side: "ours" | "theirs") => void;
-  /** Abandons the whole merge; the panel asks first through its danger confirm. */
   onAbortMerge: () => void;
-  /** Commits the fully resolved merge with git's own prepared message. */
   onCompleteMerge: () => void;
-  /** A conflict row click: App reads both sides into the details panel. */
   onSelectConflict?: (path: string) => void;
-  /** `git add --` these paths (a worktree row's stage, or the Stage-all sweep). */
   onStage: (paths: string[]) => void;
-  /** `git restore --staged --` these paths (a staged row's unstage, or the Unstage-all sweep). */
   onUnstage: (paths: string[]) => void;
-  /** Per-path discard; the wire classifies from a fresh status (untracked, staged, tracked). */
   onDiscard: (paths: string[]) => void;
-  /** Discard every row: tracked changes reset, untracked files are deleted from disk. */
   onDiscardAll: () => void;
-  /** Commits the index; success docks the drawer from App's side. */
   onCommit: (message: string) => void;
-  /** A row click is a request to read that file: App selects it in the details diff. */
   onSelectRow?: (file: WorktreeFile) => void;
   /**
    * The row the diff pane is showing (path + side). App owns it, so the highlight follows the
    * pane — including its fallback to the other side. Unset: the panel tracks its own clicks.
    */
   selection?: { path: string; staged: boolean } | null;
-  /** Docks the drawer: the × in the header, Esc while the panel holds focus, the badge state. */
   onClose: () => void;
 }
 
-/** Rail width knobs: a pin outlives layout changes, null = the tuned default. */
 export const DEFAULT_STAGE_WIDTH = 280;
 export const MIN_STAGE_WIDTH = 220;
 export const MAX_STAGE_WIDTH = 480;
@@ -60,7 +45,6 @@ const SECTION_HEADER_CLASS =
 const SECTION_ACTION_CLASS =
   "ml-auto shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold text-ink-dim transition-colors hover:bg-hover-glass hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/60 disabled:invisible";
 
-/** One changed file: status cube, path, counts, and the row's stage/unstage/discard actions. */
 function ItemRow({
   file,
   selected,
@@ -74,7 +58,6 @@ function ItemRow({
   selected: boolean;
   /** Gets the row's key, not its path: a half-staged file is two rows and only one is selected. */
   onSelect: (key: string) => void;
-  /** Row click handler from App: selects the file for the details-diff pane. */
   onSelectRow?: (file: WorktreeFile) => void;
   /** Worktree rows only: stamps the file into the index. */
   onStage?: () => void;
@@ -194,7 +177,6 @@ interface SectionProps {
   children: ReactNode;
 }
 
-/** Stacked subsection of the panel: sticky header with its count chip and bulk action. */
 function Section({ title, count, empty, action, disabled, children }: SectionProps) {
   return (
     <section aria-label={`${title} files`}>
@@ -382,7 +364,6 @@ export function StagePanel({
                       >
                         incoming
                       </button>
-                      {/* Manual edit: the user resolved it in their editor — git add marks it. */}
                       <button
                         type="button"
                         aria-label={`Mark ${base} resolved`}

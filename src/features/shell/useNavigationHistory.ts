@@ -18,7 +18,6 @@ const REPLAY_GRACE_MS = 600;
 interface Options {
   /** Where the reader is now; null while nothing is selected (no repo, still loading). */
   current: NavLocation | null;
-  /** Applies a location: switch tab (waking it), select the commit and the file. */
   navigate: (location: NavLocation) => void;
   /** False for a location that no longer exists; back/forward skip it. */
   isValid: (location: NavLocation) => boolean;

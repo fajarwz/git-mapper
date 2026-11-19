@@ -12,7 +12,6 @@ import type { LanguageFn } from "highlight.js";
 
 export type SyntaxScheme = "app" | "github" | "neon";
 
-/** hljs core, loaded once on the first highlighted diff. */
 type Core = {
   registerLanguage: (name: string, grammar: LanguageFn) => void;
   highlight: (code: string, options: { language: string; ignoreIllegals?: boolean }) => { value: string };
@@ -20,7 +19,6 @@ type Core = {
 let core: Core | null = null;
 const loaded = new Set<string>();
 
-/** File extension → grammar name.highlight.js; basename fallbacks for extension-less files. */
 const EXTENSIONS: Record<string, string> = {
   ts: "typescript", tsx: "typescript", mts: "typescript", cts: "typescript",
   js: "javascript", jsx: "javascript", mjs: "javascript", cjs: "javascript",
@@ -37,13 +35,11 @@ const EXTENSIONS: Record<string, string> = {
   sql: "sql", lua: "lua", dart: "dart",
 };
 
-/** Extension-less names that still map ("Dockerfile", "Makefile", ".env"). */
 const BASENAMES: Record<string, string> = {
   dockerfile: "dockerfile", makefile: "makefile", cmakelists: "cmake",
   ".env": "ini", ".env.local": "ini", ".env.example": "ini",
 };
 
-/** Grammar for a repo path, or null when the diff should stay plain. */
 export function languageForPath(path: string): string | null {
   const base = path.split(/[\\/]/).pop() ?? path;
   if (BASENAMES[base.toLowerCase()] !== undefined) return BASENAMES[base.toLowerCase()];

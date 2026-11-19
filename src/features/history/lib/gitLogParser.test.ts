@@ -1,4 +1,3 @@
-// Log/stash record parsing: one entry per git record, newest first, plumbing skipped.
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
@@ -7,7 +6,6 @@ import { parseStashes } from "./gitLogParser";
 const NUL = String.fromCharCode(0);
 const RS = String.fromCharCode(30);
 
-/** One `read_stashes` record, shaped the way git prints it (record + newline). */
 const stashRecord = (selector, hash, parents, date, message) =>
   [selector, hash, parents, "fajarwz", "fajar@example.com", date, message].join(NUL) + RS + "\n";
 

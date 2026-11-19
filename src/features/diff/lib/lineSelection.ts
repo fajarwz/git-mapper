@@ -7,7 +7,6 @@ export interface ChangeSlot {
   ordinal: number;
 }
 
-/** One entry per diff line: its slot when it is an add/remove, null for context and headers. */
 export function changeSlots(lines: DiffLine[]): Array<ChangeSlot | null> {
   let hunk = -1;
   let ordinal = 0;

@@ -64,7 +64,6 @@ function BrandMark() {
   );
 }
 
-/** Tab label that fades its right edge once it stops fitting, like a Chrome tab. */
 function TabLabel({ text }: { text: string }) {
   const ref = useRef<HTMLSpanElement>(null);
   const [clipped, setClipped] = useState(false);
@@ -91,9 +90,7 @@ interface TitleBarProps {
   activeId: string | null;
   repo: Repository | null;
   adding: boolean;
-  /** True while a manual reload is in flight; the refresh button spins with it. */
   refreshing: boolean;
-  /** Whether the floating find bar is open; the search button carries a pressed state. */
   findOpen: boolean;
   onToggleFind: () => void;
   onSelect: (id: string) => void;
@@ -102,28 +99,20 @@ interface TitleBarProps {
   /** Move the tab at `from` into position `to`, after a drop. */
   onReorder: (from: number, to: number) => void;
   onRefresh: () => void;
-  /** Pull every remote into the tracking refs; `fetching` while the request is out. */
   onFetch: () => void;
   fetching: boolean;
   onOpenSettings: () => void;
-  /** True when an update is downloaded and waiting: the settings gear shows a dot. */
   updateReady?: boolean;
-  /** Installs the downloaded update and restarts; the pill beside the gear calls it. */
   onRestartToUpdate?: () => void;
-  /** Pull/push the checked-out branch; `syncing` while either is in flight. */
   onPull: () => void;
   onPush: () => void;
   syncing: boolean;
   /** The failed op and git's message, shown on the button that failed until the timeout. */
   syncError: { op: "pull" | "push"; message: string } | null;
-  /** Uncommitted-change count in the drawer (sample data for now); 0 = nothing to show. */
   stageCount: number;
-  /** Whether the staging rail is open; the toggle carries a pressed state. */
   stageOpen: boolean;
   onToggleStage: () => void;
-  /** The active repo's pull requests (gh CLI); drives the button and its popover. */
   pulls: PullRequestsView;
-  /** Back/forward through the places visited, across tabs (Alt+Left / Alt+Right). */
   canGoBack: boolean;
   canGoForward: boolean;
   onBack: () => void;
@@ -147,7 +136,6 @@ function SortableTab({ item, active, suppressed, onSelect, onClose }: SortableTa
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: item.id,
   });
-  // @dnd-kit labels the handle with role="button"; this one is a tab, so keep ours.
   const { role: _handleRole, ...handleAria } = attributes;
 
   return (
@@ -270,7 +258,6 @@ export function TitleBar({
 
   const dragged = repos.find((item) => item.id === draggedId) ?? null;
 
-  // The caption button swaps to a restore glyph while the window is maximized.
   useEffect(() => {
     if (!IN_TAURI) return;
     let stop: (() => void) | undefined;
@@ -294,7 +281,6 @@ export function TitleBar({
   }, []);
 
   function handleDoubleClick(event: React.MouseEvent<HTMLDivElement>) {
-    // Double-clicking the empty bar maximizes, the way a native title bar does.
     if ((event.target as HTMLElement).closest("button")) return;
     void windowAction("toggleMaximize");
   }
@@ -419,8 +405,6 @@ export function TitleBar({
           </span>
         )}
         {repo && (
-          // The staging rail's summon: a badge-toggle, visible at rest whenever the repo has
-          // uncommitted changes. When the rail is open it carries a pressed (filled) state.
           <button
             type="button"
             onClick={onToggleStage}
@@ -442,7 +426,6 @@ export function TitleBar({
             {stageCount > 0 && (
               <span
                 aria-hidden="true"
-                // Amber like the uncommitted row's file pill beside it: the same count, the same colour.
                 className="absolute -right-1 -top-1 grid size-4 place-items-center rounded-full border-[1.5px] border-warning bg-surface font-mono text-[9px] font-bold leading-none text-warning-ink soft-shadow"
               >
                 {stageCount > 9 ? "9+" : stageCount}
@@ -533,7 +516,6 @@ export function TitleBar({
         </button>
       </div>
 
-      {/* Caption buttons, flush with the window edge. */}
       <div className="ml-1 flex h-10 shrink-0 items-stretch self-stretch">
         <button
           type="button"

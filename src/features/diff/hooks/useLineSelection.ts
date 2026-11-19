@@ -5,16 +5,11 @@ import type { DiffLine } from "../../../types";
 export interface LineSelection {
   slots: Array<ChangeSlot | null>;
   isPicked: (lineIndex: number) => boolean;
-  /** Mouse down on a gutter: flips the group (a split row's remove + add) and starts a drag;
-   * with `extend`, picks everything from the last anchor to here. */
   begin: (group: number[], extend: boolean) => void;
-  /** Pointer entering another row mid-drag: that row takes the drag's state. */
   enter: (group: number[]) => void;
   /** Keyboard flip, no drag. */
   toggleGroup: (group: number[]) => void;
-  /** The picked ordinals of one hunk, ascending. */
   pickedIn: (hunk: number) => number[];
-  /** Picked lines of one hunk by kind, for labels like "+2 −1". */
   countsIn: (hunk: number) => { add: number; remove: number };
   clear: (hunk: number) => void;
 }
@@ -22,10 +17,6 @@ export interface LineSelection {
 type Picks = ReadonlyMap<number, { sig: string; ords: ReadonlySet<number> }>;
 const EMPTY: Picks = new Map();
 
-/**
- * Which changed lines of one file's diff are ticked. Picks are kept per hunk with that hunk's
- * fingerprint: a reload that leaves the hunk untouched keeps them, one that changes it drops them.
- */
 export function useLineSelection(diff: DiffLine[] | null, enabled: boolean): LineSelection | null {
   const lines = useMemo(() => diff ?? [], [diff]);
   const slots = useMemo(() => changeSlots(lines), [lines]);

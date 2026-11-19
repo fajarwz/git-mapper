@@ -1,4 +1,3 @@
-// findMatches behaviour: tokens, case folding, field coverage, nothing for a blank query.
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
@@ -52,7 +51,6 @@ test("several matches come back in list order", () => {
 
 test("space-separated tokens AND together across fields", () => {
   assert.deepEqual(findMatches(rows, "fix flash"), ["bbbb2222"]);
-  // Both tokens on one field is fine as well.
   assert.deepEqual(findMatches(rows, "lane cap"), ["aaaa1111"]);
   assert.deepEqual(findMatches(rows, "fix v2.0.1"), [], "no row carries both");
 });

@@ -20,14 +20,12 @@ export function usePersistedState<T>(key: string, fallback: T) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
     } catch {
-      // Storage can be unavailable (private mode); the in-memory value still applies.
     }
   }, [key, value]);
 
   return [value, setValue] as const;
 }
 
-/** Keys the app restores on launch, in one place so they can be cleared together. */
 export const STORAGE_KEYS = {
   theme: "git-mapper:theme",
   repos: "git-mapper:open-repos",

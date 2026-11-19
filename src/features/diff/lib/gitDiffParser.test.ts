@@ -1,6 +1,3 @@
-// Parser coverage: numstat / name-status / patch in, ChangedFile list out.
-// The raw payloads mirror what src-tauri/src/git.rs read_commit_files returns
-// (+ its untracked_entry appendons for the wip pseudo-commit).
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
@@ -127,7 +124,6 @@ test("patch sections group per file, keyed by the b-side (or a-side for deletion
 });
 
 test("the fake binary hunk for untracked files still renders something", () => {
-  // src-tauri/src/git.rs untracked_entry prints this when a new file is unreadable/binary.
   const diff = "diff --git a/logo.png b/logo.png\nnew file mode 100644\n--- /dev/null\n+++ b/logo.png\n@@ Binary file, not shown @@\n";
   const sections = parseDiffSections(diff);
   assert.deepEqual(sections.get("logo.png"), [
@@ -209,7 +205,6 @@ test("a detached HEAD decorates as a bare HEAD marker, not a branch", () => {
     "the detached commit keeps its bold row and graph marker",
   );
 
-  // Detached at a commit that is also a branch tip or tag: the pills coexist.
   const mixed = parseRefs("(HEAD, tag: v2)");
   assert.deepEqual(
     mixed.map((r) => `${r.type}:${r.name}`),

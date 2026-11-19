@@ -2,11 +2,9 @@ export type ConflictChoice = "ours" | "theirs" | "both";
 
 export interface ConflictBlock {
   kind: "conflict";
-  /** Position among the file's blocks; `applyChoice` addresses a block by it. */
   index: number;
   ours: string[];
   theirs: string[];
-  /** File line numbers (1-based, markers counted) of the first current / incoming line. */
   oursStart: number;
   theirsStart: number;
   /** The text after `<<<<<<<` — `HEAD` for the checked-out side. */
@@ -18,7 +16,6 @@ export interface ConflictBlock {
 export interface TextSegment {
   kind: "text";
   lines: string[];
-  /** File line number (1-based) of the first line. */
   start: number;
 }
 
@@ -45,7 +42,6 @@ function split(text: string): { lines: string[]; trailing: boolean } {
   return { lines, trailing };
 }
 
-/** Complete `<<<<<<<` … `=======` … `>>>>>>>` runs; an unterminated marker stays plain text. */
 function findSpans(lines: string[]): Span[] {
   const spans: Span[] = [];
   let i = 0;
@@ -73,7 +69,6 @@ function findSpans(lines: string[]): Span[] {
   return spans;
 }
 
-/** The file as alternating plain stretches and conflict blocks, in file order. */
 export function parseConflictText(text: string): ConflictSegment[] {
   const { lines } = split(text);
   const segments: ConflictSegment[] = [];
@@ -96,7 +91,6 @@ export function parseConflictText(text: string): ConflictSegment[] {
   return segments;
 }
 
-/** The file with block `index` replaced by the chosen side(s); every other block is untouched. */
 export function applyChoice(text: string, index: number, choice: ConflictChoice): string {
   const { lines, trailing } = split(text);
   const span = findSpans(lines)[index];

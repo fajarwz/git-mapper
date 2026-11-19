@@ -12,7 +12,6 @@ export const COLUMN_LABELS: Record<ColumnKey, string> = { author: "Author", date
 export type ColumnId = "message" | ColumnKey;
 export const DEFAULT_ORDER: ColumnId[] = ["message", "author", "date", "hash"];
 
-/** A stored order made safe: unknown ids and repeats dropped, anything missing appended. */
 export function normalizeOrder(stored: unknown): ColumnId[] {
   const known = new Set<string>(DEFAULT_ORDER);
   const seen = new Set<string>();
@@ -31,12 +30,10 @@ const TRACKS: Record<ColumnId, string> = {
   hash: "var(--col-hash)",
 };
 
-/** The columns on screen, in order: the commit column is always there. */
 export function shownColumns(visible: ColumnVisibility, order: ColumnId[]): ColumnId[] {
   return order.filter((id) => id === "message" || visible[id]);
 }
 
-/** Track lists for the header (graph first) and the rows, for the columns currently shown. */
 export function commitGrids(
   visible: ColumnVisibility,
   order: ColumnId[] = DEFAULT_ORDER,

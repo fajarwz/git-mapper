@@ -1,5 +1,3 @@
-// gitLoader behaviour against a mocked invoke(): the load/refresh/paging logic
-// the UI trusts, with the Rust backend replaced by recorded git-shaped output.
 import assert from "node:assert/strict";
 import { afterEach, beforeEach, test, vi } from "vitest";
 import { invoke } from "@tauri-apps/api/core";
@@ -31,7 +29,6 @@ globalThis.window = { __TAURI_INTERNALS__: true };
 const NUL = String.fromCharCode(0);
 const RS = String.fromCharCode(30);
 
-/** One `read_log` record, shaped the way git prints it (tformat, \x00 fields, \x1e record). */
 function logRecord(
   deco: string,
   hash: string,
@@ -54,7 +51,6 @@ interface FakeCommit {
   date?: string;
 }
 
-/** A tiny fake backend: git commands answered from in-memory state, calls recorded. */
 class FakeGit {
   calls: string[] = [];
   /** Every read_log --skip, in call order: the paging window must never drift. */
@@ -131,7 +127,6 @@ class FakeGit {
   }
 }
 
-/** Every load/refresh test starts from the same fake repository state. */
 async function bootstrap(fake: FakeGit): Promise<Repository> {
   vi.mocked(invoke).mockImplementation(
     (op: string, args: Record<string, unknown>) => fake.respond(op, args),
@@ -329,7 +324,7 @@ test("a pushed branch under existing commits re-pills without reloading the log 
   const rowH2 = repo.commits.find((c) => c.hash === "H2");
 
   fake.refs = "H1\trefs/heads/main\nH1\trefs/remotes/origin/main\nH2\trefs/remotes/upstream/feature\n";
-  fake.deltaCommits = []; // the branch tip is H2, already on screen
+  fake.deltaCommits = [];
 
   const result = await refreshRepository(repo);
   assert.ok(result !== null, "a new ref counts as movement");
@@ -351,7 +346,6 @@ test("rewritten history (moved head over an empty delta) falls back to a full re
   const fake = new FakeGit();
   const repo = await bootstrap(fake);
 
-  // History was rebased away: HEAD points at a commit that shares nothing with the old window.
   fake.head = "NX1";
   fake.commits = [
     { deco: "(HEAD -> main)", hash: "NX1", parents: "NX2", subject: "rebased: one" },

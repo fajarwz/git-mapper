@@ -38,7 +38,6 @@ const SIDE = {
   },
 } as const;
 
-// The same gutter as the diff pane: a muted number column ruled off from the code.
 const GUTTER = "select-none border-r border-rule pr-2 text-right text-ink/45";
 const ROW = "grid grid-cols-[44px_minmax(0,1fr)] font-mono text-[11.5px] leading-tracked";
 const NAV_BUTTON =
@@ -56,7 +55,6 @@ function Chip({ side, children }: { side: "ours" | "theirs"; children: string })
   );
 }
 
-/** Numbered code rows; `html` carries the highlighted tokens once the grammar has loaded. */
 function Lines({
   lines,
   start,
@@ -103,10 +101,8 @@ function Block({
   onChoose,
 }: {
   block: ConflictBlock;
-  /** Highlighted rows for `[...ours, ...theirs]`, when ready. */
   html: string[] | null;
   current: string;
-  /** The merged branch from the snapshot, for a `>>>>>>>` line git left unlabeled. */
   snapshotIncoming: string;
   disabled: boolean;
   onChoose: (choice: ConflictChoice) => void;
@@ -176,7 +172,6 @@ const PATCH_TONES = {
   hunk: { row: "", gutter: "", mark: "" },
 } as const;
 
-/** One side's patch against the shared base — what that side did to the file. */
 function PatchRows({ patch, path }: { patch: string; path: string }) {
   const lines = useMemo(
     () => numberDiffLines(parseDiffSections(patch).get(path) ?? []),
@@ -249,7 +244,6 @@ function WholeFile({
     : theirsGone
       ? `The incoming branch (${incoming}) deleted this file, while the current branch (${current}) changed it.`
       : "Git could not merge this file line by line, so it can only be taken whole.";
-  // The side that kept the file is the one with a change to show: what it did to the file.
   const kept = oursGone ? "theirs" : theirsGone ? "ours" : null;
   const keptPatch = kept === "ours" ? oursPatch : kept === "theirs" ? theirsPatch : "";
   const keptName = kept === "ours" ? current : incoming;
@@ -294,11 +288,6 @@ function WholeFile({
   );
 }
 
-/**
- * The conflicted file as git left it, one view: plain lines around each conflict block, and
- * the choice sits on the block itself. A click rewrites that block in the file; once the last
- * one is gone the file is staged and leaves the Conflicts list.
- */
 export function ConflictViewer({
   conflict,
   currentBranch,
@@ -308,7 +297,6 @@ export function ConflictViewer({
 }: {
   conflict: ConflictFile;
   currentBranch: string;
-  /** Syntax palette, as in the diff pane (see index.css `data-syntax`). */
   scheme?: SyntaxScheme;
   onResolve: (side: "ours" | "theirs") => void;
   onWriteText: (text: string) => Promise<void>;
@@ -317,7 +305,6 @@ export function ConflictViewer({
   const text = conflict.snapshot.worktreeText;
   const segments = useMemo(() => parseConflictText(text), [text]);
   const blocks = segments.filter((segment) => segment.kind === "conflict").length;
-  // Every shown line in file order, so one grammar pass highlights the lot.
   const texts = useMemo(
     () => segments.flatMap((s) => (s.kind === "text" ? s.lines : [...s.ours, ...s.theirs])),
     [segments],

@@ -1,4 +1,3 @@
-// The changed-file sidebar: path splitting, selection, totals, collapse.
 // @vitest-environment jsdom
 import assert from "node:assert/strict";
 import { cleanup, render, fireEvent, within } from "@testing-library/react";
@@ -165,7 +164,6 @@ test("a deleted file's whole path is struck through, directory and name alike", 
   const struck = (text: string) => within(container).getByText(text).className.includes("line-through");
   assert.ok(struck("docs/") && struck("old-name.md"), "the deleted path is struck, folder included");
   assert.ok(!struck("src/") && !struck("keep.ts"), "other files are untouched");
-  // Hover leads with the status, for every kind of file.
   const titled = [...container.querySelectorAll("[title]")].map((el) => el.getAttribute("title"));
   assert.ok(titled.includes("Deleted · docs/old-name.md"));
   assert.ok(titled.includes("Modified · src/keep.ts"));

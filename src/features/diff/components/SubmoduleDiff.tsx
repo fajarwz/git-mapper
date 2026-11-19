@@ -12,10 +12,6 @@ function Commit({ hash }: { hash: string }) {
   );
 }
 
-/**
- * A changed gitlink: git's patch is two `Subproject commit` lines, which read as noise. This
- * says what happened to the submodule and, when it is cloned here, offers to open it.
- */
 export function SubmoduleDiff({
   file,
   pointer,

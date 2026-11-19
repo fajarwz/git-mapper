@@ -31,6 +31,5 @@ export function storeTheme(theme: Theme): void {
   try {
     localStorage.setItem(STORAGE_KEY, theme);
   } catch {
-    // Storage can be unavailable (private mode); the in-memory choice still applies.
   }
 }

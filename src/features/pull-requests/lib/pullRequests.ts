@@ -14,7 +14,6 @@ export const PR_PAGE_SIZE = 30;
 
 export interface PullRequestPage {
   pullRequests: PullRequest[];
-  /** Opaque, provider-specific: pass it back to read the next page; null when this was the last. */
   nextCursor: string | null;
   /** Every request in the scope, not just this page; null when the provider does not say. */
   total: number | null;
@@ -38,7 +37,6 @@ interface RawNode {
 
 interface RawConnection {
   totalCount?: number;
-  /** A search reports its count as issueCount, and its nodes may be empty objects for non-PRs. */
   issueCount?: number;
   pageInfo?: { hasNextPage?: boolean; endCursor?: string | null };
   nodes?: RawNode[];
@@ -51,7 +49,6 @@ interface RawGitHubPage {
   } | null;
 }
 
-/** What GitHub's GraphQL spells for the head commit's check rollup. */
 export enum GitHubRollup {
   Success = "SUCCESS",
   Failure = "FAILURE",
@@ -164,7 +161,6 @@ interface RawMergeRequest {
   squash_commit_sha?: string | null;
 }
 
-/** What GitLab spells for a pipeline's status. */
 export enum GitLabPipeline {
   Created = "created",
   WaitingForResource = "waiting_for_resource",
@@ -296,7 +292,6 @@ export function pullRequestsByBranch(pulls: PullRequest[]): Map<string, PullRequ
   return byBranch;
 }
 
-/** The PR for a pill: a local branch by its name, a remote-tracking one by its name past `<remote>/`. */
 export function pullRequestForRef(ref: CommitRef, byBranch: Map<string, PullRequest>): PullRequest | undefined {
   if (ref.type === "branch") return byBranch.get(ref.name);
   if (ref.type === "remote") return byBranch.get(ref.name.slice(ref.name.indexOf("/") + 1));
@@ -344,7 +339,6 @@ export function requestNamedInCommit(subject: string, body = ""): { provider: Pu
   return gitlab ? { provider: PullRequestProvider.GitLab, number: Number(gitlab[1]) } : null;
 }
 
-/** What a chip shows: a loaded request in full, or just the number a commit's text names. */
 export interface PullChipData {
   provider: PullRequestProvider;
   number: number;

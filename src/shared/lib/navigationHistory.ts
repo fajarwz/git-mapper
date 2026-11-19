@@ -1,7 +1,6 @@
 // Back/forward history across every open repository, VS Code style: one global list of
 // places the reader has been. Pure state transitions only; the hook owns timing and wiring.
 
-/** One place in the app: a repository, the commit selected in it, and the file open there. */
 export interface NavLocation {
   repoId: string;
   commitHash: string;
@@ -10,7 +9,6 @@ export interface NavLocation {
 
 export interface NavHistory {
   entries: NavLocation[];
-  /** Index of the entry the reader is on; -1 while the list is empty. */
   index: number;
 }
 

@@ -21,7 +21,6 @@ export function isImageFile(path: string): boolean {
   return IMAGE_EXTENSIONS.has(path.slice(dot + 1).toLowerCase());
 }
 
-/** GitHub-style size captions: "12 B", "45.3 KB", "2.4 MB". */
 export function formatBytes(bytes: number): string {
   if (bytes < 1024) return `${bytes} B`;
   const units = ["KB", "MB", "GB"];

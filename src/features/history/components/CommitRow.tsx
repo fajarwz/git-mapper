@@ -20,29 +20,22 @@ import { Marked } from "./Marked";
 interface CommitRowProps {
   commit: Commit;
   selected: boolean;
-  /** Just arrived (or its refs changed) in the last refresh: flash the row once. */
   fresh?: boolean;
   /** A find is running and this row is not a match: it recedes, the graph beside it stays intact. */
   dim?: boolean;
-  /** The match the find bar is on right now. */
   current?: boolean;
   /** The find's tokens, on a matching row only: the text they hit is painted. Keep it stable for the memo. */
   terms?: string[];
-  /** The initials avatar sits left of the username; the settings toggle owns its visibility. */
   showAvatar?: boolean;
   /** Which optional columns are shown; keep the object stable so the memo holds. */
   columns?: ColumnVisibility;
-  /** Column order, shared with the header; stable identity like `columns`. */
   order?: ColumnId[];
   /** Branch name → PR; keep the map stable (the hook memoizes it) so the memo holds. */
   pullsByBranch?: Map<string, PullRequest>;
-  /** The request a commit came from (a squash merge's own commit, or the one its message names). */
   commitChip?: (commit: Commit) => PullChipData | null;
   onSelect: (hash: string) => void;
   onCheckoutBranch?: (branch: string) => void;
-  /** Right-click on the row body: the menu targets the commit and its most relevant ref. */
   onContextMenu?: (commit: Commit, x: number, y: number) => void;
-  /** Right-click on a pill: the menu targets that exact ref. */
   onRefContextMenu?: (commit: Commit, ref: CommitRef, x: number, y: number) => void;
 }
 

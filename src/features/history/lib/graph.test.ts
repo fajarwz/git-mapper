@@ -1,4 +1,3 @@
-// Regression checks for the commit graph: branch colours, lane geometry, smooth curves.
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
@@ -44,7 +43,6 @@ function checkInvariants(rows, label = "") {
     assert.ok(lane >= 0 && lane < layout.laneCount, `${prefix}row ${index}: dot outside the lanes`);
   });
 
-  // Unloaded parents are recorded as gaps.
   for (let index = 0; index < list.length; index++) {
     const commit = list[index];
     const unloaded = commit.parents.filter((parent) => !byHash.has(parent));
@@ -68,7 +66,6 @@ function checkInvariants(rows, label = "") {
     `${prefix}width clips the last lane`,
   );
 
-  // Edge colours are real palette colours and end on a lane.
   const edges = buildEdges(layout);
   for (const edge of edges) {
     assert.ok(
@@ -139,7 +136,6 @@ test("branch colour stays stable when a lane shifts", () => {
     "at least one surviving line shifted left",
   );
 
-  // The colour of the branch is unchanged wherever it appears.
   assert.equal(layout.branchColors[4], middleColor, "middle branch kept its colour");
   assert.equal(layout.branchColors[5], rightColor, "right branch kept its colour");
 });
@@ -152,7 +148,6 @@ test("two children sharing a parent keep one line", () => {
     ["base"],
   ];
   const layout = checkInvariants(rows, "shared parent");
-  // The first child owns the parent line; later children connect to it.
   assert.equal(layout.branchColors[0], layout.branchColors[3], "parent line inherits first child's colour");
 });
 

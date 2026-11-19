@@ -1,4 +1,3 @@
-// The diff panel: bare tokens, signs in their own cell, status labels.
 // @vitest-environment jsdom
 import assert from "node:assert/strict";
 import { cleanup, render, within, waitFor, fireEvent } from "@testing-library/react";
@@ -8,7 +7,6 @@ import { DiffViewer } from "./DiffViewer";
 import { loadImageVersions } from "../../../data/gitLoader";
 import type { ChangedFile } from "../../../types";
 
-// The picture diff talks to the backend through gitLoader; give it canned blobs per test.
 vi.mock("../../../data/gitLoader", () => ({ loadImageVersions: vi.fn() }));
 
 // Grammar loading is real, except the css grammar can be held open by a test that needs the
@@ -626,7 +624,6 @@ test("a renamed file reads from what to what, with its similarity", () => {
   assert.ok(within(container).getByText("92%"), "a partial rename carries its similarity");
   assert.ok(within(container).getByText("Renamed"));
 
-  // The all-files scope's sticky header carries the same story.
   const all = render(
     <DiffViewer files={[renamedFile]} file={renamedFile} scope="all" onScopeChange={() => {}} scheme="app" />,
   );
@@ -768,7 +765,6 @@ for (const layout of ["unified", "split"] as const) {
     );
     const marks = [...container.querySelectorAll("mark")].map((mark) => mark.textContent);
     assert.deepEqual(marks, ["22a88d", "e2557a"], "one mark per side, on the colour value only");
-    // The line text itself is untouched by the marking.
     assert.ok(container.textContent?.includes('primary: "#22a88d", ink: 1'));
   });
 }

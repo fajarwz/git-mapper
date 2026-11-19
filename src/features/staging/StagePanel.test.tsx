@@ -1,5 +1,3 @@
-// The staging panel over real-shaped rows: which payload each row action emits (stage/unstage/
-// discard/commit), the commit guards, and the dock affordances (× button, Esc with focus).
 // @vitest-environment jsdom
 import assert from "node:assert/strict";
 import { cleanup, fireEvent, render, within } from "@testing-library/react";
@@ -85,7 +83,6 @@ test("index and worktree sections render with their rows and the branch line", (
   const wrap = renderPanel();
   assert.ok(within(wrap.container).getByText("Uncommitted changes"));
   assert.ok(within(wrap.container).getByText("Staged"));
-  // "2" also matches the numstat `3/1` rows' text; scope the count chip to the index section.
   const sections = within(wrap.container).getAllByText(/^(Staged|Changes)$/);
   assert.ok(sections.length === 2);
   const stagedChip = sections
@@ -96,7 +93,6 @@ test("index and worktree sections render with their rows and the branch line", (
   assert.ok(within(wrap.container).getByText("main"));
   assert.ok(within(wrap.container).getByLabelText("Stage App.tsx"));
   assert.ok(within(wrap.container).getByLabelText("Unstage staging.ts"));
-  // Untracked rows speak delete: their discard action says so.
   assert.ok(within(wrap.container).getByLabelText("Delete untracked fresh.txt"));
 });
 
@@ -180,19 +176,16 @@ test("a merge in progress renders the Conflicts section with its actions", () =>
   const complete = within(wrap.container).getByText("Complete merge") as HTMLButtonElement;
   assert.equal(complete.disabled, true, "completing waits for every conflict to be resolved");
 
-  // Sides resolve one-by-one; the row click summons the conflict view.
   fireEvent.click(within(wrap.container).getByLabelText("Keep incoming version of app.ts"));
   assert.deepEqual(wrap.resolved(), { paths: ["app.ts"], side: "theirs" });
   fireEvent.click(within(wrap.container).getByText("app.ts"));
   assert.equal(wrap.conflictSelected(), "app.ts");
 
-  // Abort asks first — the dialog's own button carries the payload.
   fireEvent.click(within(wrap.container).getByText("Abort merge…"));
   assert.equal(wrap.aborted(), false, "nothing fired before the confirm");
   fireEvent.click(within(document.body).getByRole("button", { name: "Abort merge" }));
   assert.equal(wrap.aborted(), true);
 
-  // A merge with everything staged reads resolved and the merge completes from the footer.
   const stagedFile = row({ key: "index:app.ts", path: "app.ts", staged: true });
   const settled = renderPanel([stagedFile], false, { merging: true, conflicts: ["app.ts"] });
   assert.ok(within(settled.container).getByText("resolved"));

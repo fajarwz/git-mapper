@@ -6,9 +6,7 @@ import type { ChangedFile } from "../../../types";
  * middle of a path simply does not exist here.
  */
 export interface FileTreeNode {
-  /** Folder segment, e.g. "components". The root is "". */
   name: string;
-  /** Full prefix ending in "/", e.g. "src/components/". The root is "". */
   path: string;
   dirs: FileTreeNode[];
   files: ChangedFile[];
@@ -23,7 +21,6 @@ export function buildFileTree(files: ChangedFile[]): FileTreeNode {
   for (const file of files) {
     const segments = file.path.split("/").filter((segment) => segment !== "");
     let node = root;
-    // Every segment but the last is a folder; the last is the file itself.
     for (let depth = 0; depth < segments.length - 1; depth += 1) {
       const name = segments[depth];
       let next = node.dirs.find((dir) => dir.name === name);

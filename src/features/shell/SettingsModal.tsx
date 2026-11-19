@@ -10,12 +10,10 @@ import { CheckIcon, CloseIcon, HeartIcon } from "../../shared/components/icons";
 interface SettingsModalProps {
   theme: Theme;
   onThemeChange: (theme: Theme) => void;
-  /** The initials avatar beside the username in the commit list. */
   showAvatars: boolean;
   onShowAvatarsChange: (show: boolean) => void;
   syntaxScheme: SyntaxScheme;
   onSyntaxSchemeChange: (scheme: SyntaxScheme) => void;
-  /** The running release version, from the Tauri runtime ("dev" in a plain browser). */
   appVersion: string;
   updateMode: UpdateMode;
   onUpdateModeChange: (mode: UpdateMode) => void;
@@ -125,7 +123,6 @@ export function SettingsModal({
   const returnFocusRef = useRef<HTMLElement | null>(null);
   const { leaving, close } = useExit(onClose);
 
-  // Move focus into the dialog, and hand it back to the trigger when the dialog closes.
   useEffect(() => {
     returnFocusRef.current = document.activeElement as HTMLElement | null;
     closeRef.current?.focus();

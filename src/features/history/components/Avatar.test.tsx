@@ -23,8 +23,6 @@ test("the colour slot is a stable function of the email", () => {
 });
 
 test("an avatar with no author renders nothing", () => {
-  // The uncommitted-changes row carries an empty name and email: an empty tinted circle there
-  // read as a broken picture beside a blank author.
   const { container } = render(<Avatar name="" email="" photos />);
   assert.equal(container.firstElementChild, null, "nobody to picture, nothing rendered");
 });
@@ -37,13 +35,13 @@ test("the avatar renders the initial and its email tint", () => {
 });
 
 test("switching the email swaps the photo instead of keeping the old one", async () => {
-  if (globalThis.crypto?.subtle === undefined) return; // The photo path needs WebCrypto.
+  if (globalThis.crypto?.subtle === undefined) return;
   resetPhotoCache();
   const { container, rerender } = render(
     <Avatar name="A" email="first@example.com" photos />,
   );
   rerender(<Avatar name="B" email="second@example.com" photos />);
-  await act(async () => {}); // Let both photo look-ups settle.
+  await act(async () => {});
 
   const img = container.querySelector("img");
   if (!img) return; // No WebCrypto here either; nothing to assert.

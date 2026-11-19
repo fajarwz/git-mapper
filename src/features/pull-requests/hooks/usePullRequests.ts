@@ -14,14 +14,12 @@ const FOCUS_REFRESH_MS = 60_000;
 
 export type { PullScope };
 
-/** One scope's list, filled a page at a time. */
 export interface Feed {
   pulls: PullRequest[];
   /** What to ask for next; null when the last page is in (or nothing was read yet). */
   cursor: string | null;
   /** Every request in the scope when the provider says (GitHub); null otherwise. */
   total: number | null;
-  /** The first page has landed. */
   loaded: boolean;
   loading: boolean;
   loadingMore: boolean;
@@ -30,7 +28,6 @@ export interface Feed {
 }
 
 type Feeds = Record<PullScope, Feed>;
-/** Which of an entry's two sets of lists a read belongs to; the values are the entry's keys. */
 enum Target {
   Feeds = "feeds",
   Found = "found",
@@ -41,11 +38,8 @@ interface Entry {
   status: PullRequestsStatus | null;
   provider: PullRequestProvider | null;
   error: string | null;
-  /** The plain lists. Open is read on arrival; the others the first time they are shown. */
   [Target.Feeds]: Feeds;
-  /** The text being searched for; "" means the plain lists are on show. */
   query: string;
-  /** Results of that search per scope, read on demand and dropped when the text changes. */
   [Target.Found]: Feeds;
 }
 
@@ -119,7 +113,6 @@ export function usePullRequests(repo: Repository | null) {
       const id = (request.current[key] ?? 0) + 1;
       request.current[key] = id;
       patchFeed(dir, target, scope, more ? { loadingMore: true, moreError: null } : { loading: true, moreError: null });
-      // An answer for text that has since changed is for a list nobody is looking at.
       const current = () => request.current[key] === id && (target === Target.Feeds || store.current[dir]?.query === query);
       try {
         const result = await loadPullRequests(dir, scope, more ? feed.cursor : null, entry.provider, query);
@@ -161,7 +154,6 @@ export function usePullRequests(repo: Repository | null) {
     [change, patchFeed],
   );
 
-  /** Back to the first page of everything that has been read, plain lists and search results. */
   const refresh = useCallback(
     (dir: string) => {
       const entry = store.current[dir] ?? EMPTY;
@@ -191,13 +183,10 @@ export function usePullRequests(repo: Repository | null) {
   }, [path, refresh]);
 
   const entry = (path !== null ? entries[path] : undefined) ?? EMPTY;
-  // Chips come from the plain lists; a live PR wins over a finished one for the same branch.
   const byBranch = useMemo(
     () => pullRequestsByBranch(SCOPES.flatMap((scope) => entry.feeds[scope].pulls)),
     [entry.feeds],
   );
-  // A commit finds its request by the hash a merge made, from every list read so far (a search's
-  // too), or by the number its message names; the link base comes off any loaded request.
   const everyLoaded = useMemo(
     () => SCOPES.flatMap((scope) => [...entry.feeds[scope].pulls, ...entry.found[scope].pulls]),
     [entry.feeds, entry.found],
@@ -225,7 +214,6 @@ export function usePullRequests(repo: Repository | null) {
     },
     [path, run],
   );
-  /** Reads a scope's first page the first time it is shown; later shows reuse it. */
   const show = useCallback(
     (scope: PullScope) => {
       if (path === null) return;
@@ -235,7 +223,6 @@ export function usePullRequests(repo: Repository | null) {
     },
     [path, run],
   );
-  /** Searches for text; "" goes back to the plain lists. The new text's lists start empty. */
   const setQuery = useCallback(
     (query: string) => {
       if (path === null) return;
@@ -251,9 +238,7 @@ export function usePullRequests(repo: Repository | null) {
     error: entry.error,
     loading,
     query: entry.query,
-    /** The lists on show: the plain ones, or the search's results while there is a query. */
     view,
-    /** The plain lists, whatever is searched: the button's count comes from Open here. */
     feeds: entry.feeds,
     byBranch,
     /** The chip for a commit row: its merge's request, else the one its message names. */

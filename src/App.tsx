@@ -80,7 +80,6 @@ import type { NavLocation } from "./shared/lib/navigationHistory";
 import { useWipSide } from "./features/staging/useWipSide";
 import { usePullRequests } from "./features/pull-requests/hooks/usePullRequests";
 
-/** Auto-fetch window on refocus — often enough to notice a push, rare enough to stay quiet. */
 const FETCH_ON_FOCUS_MS = 180_000;
 
 function App() {
@@ -90,13 +89,11 @@ function App() {
   // renders the open-folder card for the length of the first git read — which reads as "nothing
   // is saved". A fresh install has nothing to hydrate, so it goes straight to that card.
   const [booting, setBooting] = useState(() => readStoredPaths().length > 0);
-  // Restored on launch: which tab was open, which commit/file was being read, panel state.
   const [activeRepoId, setActiveRepoId] = usePersistedState<string | null>(STORAGE_KEYS.activeRepo, null);
   const [selectedCommitByRepo, setSelectedCommitByRepo] = usePersistedState<Record<string, string>>(
     STORAGE_KEYS.selectedCommits,
     {},
   );
-  // null means "fall back to the first changed file", which is what a fresh commit selection wants.
   const [selectedFileByRepo, setSelectedFileByRepo] = usePersistedState<Record<string, string | null>>(
     STORAGE_KEYS.selectedFiles,
     {},
@@ -104,7 +101,6 @@ function App() {
   const [loadingMoreByRepo, setLoadingMoreByRepo] = useState<Record<string, boolean>>({});
   const [allLoadedByRepo, setAllLoadedByRepo] = useState<Record<string, boolean>>({});
   const [opening, setOpening] = useState(false);
-  // The sleeping tab being reloaded right now (its history was dropped; see the sleep timer).
   const [wakingId, setWakingId] = useState<string | null>(null);
   const [refreshing, setRefreshing] = useState(false);
   // One transient failure notice (a toast, bottom-right): opening a non-git folder, a failed
@@ -112,13 +108,11 @@ function App() {
   // its auto-dismiss timer.
   const [notice, setNotice] = useState<{ title: string; detail: string; id: number } | null>(null);
 
-  // Bottom panel: closable, and its height is draggable (null = the default percentage).
   const [detailsOpen, setDetailsOpen] = usePersistedState(STORAGE_KEYS.detailsOpen, true);
   const [detailsHeight, setDetailsHeight] = usePersistedState<number | null>(
     STORAGE_KEYS.detailsHeight,
     null,
   );
-  // Diff token palette: app tokens, GitHub's look, or One-Dark neon. Colours are the default.
   const [syntaxScheme, setSyntaxScheme] = usePersistedState<SyntaxScheme>(
     STORAGE_KEYS.syntaxScheme,
     "app",
@@ -126,38 +120,27 @@ function App() {
   // Diff pane scope: one file at a time (the default) or every file in one scroll. Persisted,
   // because a reader who prefers the stacked view wants it on every launch.
   const [diffScope, setDiffScope] = usePersistedState<DiffScope>(STORAGE_KEYS.diffScope, "file");
-  // Diff line layout: unified column (the default) or GitHub's side-by-side split.
   const [diffLayout, setDiffLayout] = usePersistedState<DiffLayout>(STORAGE_KEYS.diffLayout, "unified");
-  // Long lines soft-wrap (the pane is narrow); the wrap toggle switches back to horizontal scroll.
   const [diffWrap, setDiffWrap] = usePersistedState<boolean>(STORAGE_KEYS.diffWrap, true);
   // The initials avatar beside the username in the commit list; git itself has no picture.
   const [showAvatars, setShowAvatars] = usePersistedState<boolean>(STORAGE_KEYS.showAvatars, true);
 
-  // Updates: auto (background download on launch) by default, manual as the opt-out.
   const [updateMode, setUpdateMode] = usePersistedState<UpdateMode>(STORAGE_KEYS.updateMode, "auto");
   const [updateStatus, setUpdateStatus] = useState<UpdateStatus>(updateStatusSnapshot());
   const [appVersion, setAppVersion] = useState("");
 
-  // The staging rail, wired to real git: the rows are a read of the worktree reload on every
-  // digest move, and per-repo map persists which tab has the rail docked open. Unset + dirty
-  // means open by default — a launch into work starts at the work.
   const [worktreeFiles, setWorktreeFiles] = useState<WorktreeFile[]>([]);
   const [stageDrawerByRepo, setStageDrawerByRepo] = usePersistedState<Record<string, boolean>>(
     STORAGE_KEYS.stageDrawer,
     {},
   );
-  // True while one of the rail's git writes is in flight; the panel's buttons all wait.
   const [stagingBusy, setStagingBusy] = useState(false);
-  // The conflict view: which unmerged path the rail summoned, with both sides' patches.
-  // null kills it — switching tab, picking another commit, or the path resolving away.
   const [conflictView, setConflictView] = useState<{ path: string; snapshot: ConflictSnapshot } | null>(null);
   // Rail width: a pinned px value survives restarts (like the details height); null stays on
   // the tuned default. The drag pinning an ABSOLUTE width matters here too — never an offset.
   const [stageWidth, setStageWidth] = usePersistedState<number | null>(STORAGE_KEYS.stageWidth, null);
 
-  // Rows a refresh just added or re-pilled, highlighted for a moment then forgotten.
   const [flashHashes, setFlashHashes] = useState<string[]>([]);
-  // Right-click menu: what was clicked (position, commit, ref). null = closed.
   const [contextMenu, setContextMenu] = useState<ContextMenuTarget | null>(null);
   // Find over the loaded window: hashes, subjects, authors, ref pills. It highlights and steps,
   // it never filters. Not synced per tab — switching repos closes and clears it, because a
@@ -174,10 +157,8 @@ function App() {
     applyTheme(theme);
   }, [theme]);
 
-  // The updater store lives module-level; App just mirrors its status into state.
   useEffect(() => onUpdateStatus(setUpdateStatus), []);
 
-  // The release version, for the settings about line.
   useEffect(() => {
     getVersion()
       .then(setAppVersion)
@@ -285,8 +266,6 @@ function App() {
     return worktreeFiles.filter((file) => !conflicted.has(file.path));
   }, [worktreeFiles, repo]);
 
-  // The staging rail's dock state: per-repo persisted, falling back to open while the
-  // worktree has changes (a repo opened dirty starts with its rail up).
   const stageOpen = repo ? (stageDrawerByRepo[repo.id] ?? worktreeFiles.length > 0) : false;
   const setStageOpen = useCallback(
     (open: boolean) => {
@@ -296,15 +275,12 @@ function App() {
     [activeRepoId, setStageDrawerByRepo],
   );
 
-  // The commit whose payload the details panel reads (persisted per repo, default HEAD).
   const selectedCommit = repo
     ? (repo.commits.find(
         (commit) => commit.hash === (selectedCommitByRepo[repo.id] ?? repo.defaultCommitHash),
       ) ?? repo.commits[0] ?? null)
     : null;
 
-  // Docking is owned by the handlers (a commit or a discard-all close the burst), the user's
-  // exits (×, Esc, swipe), and the emptied-transition below the staging dispatcher.
   const selectedFilePath = selectedFileByRepo[repo?.id ?? ""] ?? null;
   const {
     files,
@@ -313,7 +289,6 @@ function App() {
     handlePatchNeeded,
     evictRepoFiles,
   } = useCommitFiles({ repo, selectedCommit, selectedFilePath });
-  // The uncommitted row shows one side at a time (staged / working tree) with hunk buttons.
   const isWipSelected = selectedCommit?.hash === UNCOMMITTED_HASH;
   const wipSide = useWipSide({
     repoPath: repo?.path ?? null,
@@ -388,7 +363,6 @@ function App() {
   }
 
   function handleCloseRepo(id: string) {
-    // Closing a tab closes the submodules opened inside it.
     const doomed = new Set([id]);
     for (const [child, parent] of parentOf) if (parent === id) doomed.add(child);
     for (const item of repos) if (doomed.has(item.id)) evictRepoFiles(item.path);
@@ -402,7 +376,6 @@ function App() {
     });
   }
 
-  // A top-level tab opens on whatever it showed last (its repo or one of its submodules).
   const lastItemByRoot = useRef<Record<string, string>>({});
   useEffect(() => {
     if (activeRepoId && rootId) lastItemByRoot.current[rootId] = activeRepoId;
@@ -428,7 +401,6 @@ function App() {
     [repos, topRepos, handleReorderRepos],
   );
 
-  // A submodule's first visit reads it and adds it to the repo list; later visits just switch.
   const [openingSubId, setOpeningSubId] = useState<string | null>(null);
   const handleSelectSubItem = useCallback(
     async (id: string, submodule?: Submodule) => {
@@ -472,15 +444,12 @@ function App() {
     setSelectedFileByRepo((previous) => ({ ...previous, [activeRepoId]: null }));
     setConflictView(null);
     wipSide.pickSide(null);
-    // Picking a commit is a request to read it, so bring the details panel back if it was closed.
     setDetailsOpen(true);
     // The uncommitted row is the rail's second door: it summons the staging state together
     // with its diff; a real commit dock it away — the rail is burst work, not a fixture.
     setStageOpen(hash === UNCOMMITTED_HASH);
     }, [activeRepoId, setDetailsOpen, setSelectedCommitByRepo, setSelectedFileByRepo, setStageOpen, wipSide.pickSide]);
 
-    // A rail-row click reads that file: the uncommitted row is selected and the details panel
-    // rises. The diff scope stays — the reader's preference; the stacked view scrolls to it.
     const handleRailSelectFile = useCallback(
       (file: WorktreeFile) => {
         if (!activeRepoId) return;
@@ -540,8 +509,6 @@ function App() {
     isValid: isNavTargetValid,
   });
 
-  // Infinite scroll: the commit rows file a near-bottom signal, one page loads at a time.
-  // Double-clicking a branch pill checks the branch out and reloads the repo.
   const handleCheckoutBranch = useCallback(async (branch: string) => {
     if (!activeRepoPath || opening) return;
     try {
@@ -577,17 +544,12 @@ function App() {
     }
   }
 
-  // Rows a refresh just touched land here. Clearing first is what restarts the CSS animation
-  // when the same hash flashes twice in a row — saving, looking, saving again while the wash is
-  // still fading. The class has to leave the DOM for an animation to start over.
   const showFlash = useCallback((hashes: string[]) => {
     if (hashes.length === 0) return;
     setFlashHashes([]);
     window.requestAnimationFrame(() => setFlashHashes(hashes));
   }, []);
 
-  // Merging a branch lands through the rail: a clean merge refreshes and flashes the new tip,
-  // a conflicted one opens the rail and the resolver takes over from there.
   const handleMergeBranch = useCallback(
     (branch: string) => {
       if (!activeRepoPath || !repo) return;
@@ -723,8 +685,6 @@ function App() {
   const handlePull = useCallback(() => void runSync("pull"), [runSync]);
   const handlePush = useCallback(() => void runSync("push"), [runSync]);
 
-  // The manual fetch: the same quiet pull into the tracking refs the open/focus path runs,
-  // except a failure speaks up — the user asked for it, so unresponsiveness is worth a toast.
   const [fetching, setFetching] = useState(false);
   const handleFetch = useCallback(async () => {
     const target = repo;
@@ -744,9 +704,6 @@ function App() {
     }
   }, [repo, fetching, fetchAndRefresh]);
 
-  // The refresh button: the same probe the focus path runs, minus the "nothing changed, return
-  // null" exit, so clicking it always re-reads the working tree. The uncommitted row refetches
-  // through the new worktree digest, and its icon spins while the reads are in flight.
   const handleRefresh = useCallback(async () => {
     if (!repo || refreshing) return;
     const startedAt = performance.now();
@@ -761,8 +718,6 @@ function App() {
     } catch (refreshError) {
       console.error("Could not refresh the repository", refreshError);
     } finally {
-      // Local reads come back in ~50ms; a spin that short reads as a flicker, so hold the
-      // animation long enough to be seen as "it did something".
       const elapsed = performance.now() - startedAt;
       if (elapsed < 550) {
         await new Promise((resolve) => window.setTimeout(resolve, 550 - elapsed));
@@ -798,8 +753,6 @@ function App() {
           );
           showFlash(refreshed.touched);
         }
-        // Remote state drifts even when the worktree and HEAD stand still; the fetch window
-        // keeps a focus parade from turning into a fetch parade.
         if (!cancelled && Date.now() - lastFetchStamp.current >= FETCH_ON_FOCUS_MS) {
           lastFetchStamp.current = Date.now();
           await fetchAndRefresh(activeRepo);
@@ -873,7 +826,6 @@ function App() {
 
   const flashSet = useMemo(() => new Set(flashHashes), [flashHashes]);
 
-  // The right-click menu's checkout reuses the branch checkout path; the menu closes itself.
   const closeContextMenu = useCallback(() => setContextMenu(null), []);
   const handleMenuCheckout = useCallback(
     (branch: string) => {
@@ -883,9 +835,6 @@ function App() {
     [closeContextMenu, handleCheckoutBranch],
   );
 
-  // Writes confirm? A commit checkout detaches HEAD and a drop/pop deletes a stash entry —
-  // the menu queues the intent, a dialog owns the warning. Confirming runs the action, then
-  // the same reload paths the other write (branch checkout) already uses.
   interface PendingConfirm {
     title: string;
     body: ReactNode;
@@ -908,9 +857,6 @@ function App() {
       !repo.conflicts?.length,
   );
 
-  // Esc closes the details panel — from a commit row (Esc undoes the summons) or inside it.
-  // Top layers (menu, modal, confirm) close themselves; the rail's Esc docks the drawer; a
-  // text field's Esc keeps its own story.
   useEffect(() => {
     function onKeyDown(event: KeyboardEvent) {
       if (event.key !== "Escape") return;
@@ -975,8 +921,6 @@ function App() {
       const runStash = async () => {
         try {
           await stashAction(target.path, index, action);
-          // The stash digest notices a drop, the worktree digest notices an apply, and a
-          // drop renumbers the survivors — the forced refresh handles all three at once.
           const refreshed = await refreshRepository(target, true);
           if (refreshed) {
             setRepos((previous) =>
@@ -1015,8 +959,6 @@ function App() {
     [repos, activeRepoId, showFlash],
   );
 
-  // Undoing the tip is the rail's commit in reverse: the dialog says it plainly (staged, not
-  // deleted), and a force-refresh re-lands the wip row and the stepped-back history at once.
   const handleMenuUndoCommit = useCallback(
     (hash: string) => {
       const target = repos.find((item) => item.id === activeRepoId);
@@ -1061,7 +1003,6 @@ function App() {
     () => (findOpen ? findMatches(repo?.commits ?? [], query) : []),
     [repo, query, findOpen],
   );
-  // Typing starts over at the first match; a refresh that moves the list just clamps.
   useEffect(() => {
     setFindIndex(0);
   }, [query, repo?.id]);
@@ -1103,7 +1044,6 @@ function App() {
     return () => window.removeEventListener("keydown", onKeyDown);
   }, [repo, openFind]);
 
-  // The find belongs to the visible repository: with none left the bar goes with it.
   useEffect(() => {
     if (!repo) setFindOpen(false);
   }, [repo]);
@@ -1175,8 +1115,6 @@ function App() {
           loadWorktree(activeRepoPath),
           refreshRepository(repo, true),
         ]);
-        // `force` always returns a repo; the null branch satisfies the type contract and
-        // rows read directly, so even a null load shows the post-action rail state.
         if (refreshed) {
           worktreeDigestRef.current = refreshed.repo.worktree;
           setRepos((previous) =>
@@ -1224,8 +1162,6 @@ function App() {
     (paths: string[]) => void runStaging((dir) => discardPaths(dir, paths)),
     [runStaging],
   );
-  // A hunk button: the action runs, the rail and repo refresh like any rail write, and the side
-  // reloads explicitly (a hunk moved between index and disk can leave the digest untouched).
   const reloadWipSide = wipSide.reload;
   const handleHunkAction = useCallback(
     (path: string, hunkIndex: number, hunkHeader: string, action: HunkAction) => {
@@ -1267,8 +1203,6 @@ function App() {
     void runStaging((dir) => completeMerge(dir));
   }, [runStaging]);
 
-  // A conflict row click: the uncommitted row is summoned (the conflict view is its diff),
-  // both sides read, and the details panel rises above them.
   const handleSelectConflict = useCallback(
     (path: string) => {
       if (!activeRepoId || !activeRepoPath) return;
@@ -1316,13 +1250,10 @@ function App() {
     [setStageOpen, runStaging],
   );
 
-  // The badge in the title bar is the rail's always-visible door.
   const handleToggleStage = useCallback(() => {
     setStageOpen(!stageOpen);
   }, [setStageOpen, stageOpen]);
 
-  // Swipe-to-dock: dragging the rail under the collapse threshold docks it just like the ×;
-  // anything above stays as a pinned px width between MIN and MAX.
   const handleStageResize = useCallback(
     (width: number) => {
       if (width < MIN_STAGE_WIDTH) setStageOpen(false);
@@ -1421,9 +1352,6 @@ function App() {
                 <ResizeHandle
                   label="Resize staging rail width"
                   edgeRule
-                  // left-full: the handle box starts at the wrapper's right edge, and the
-                  // splitter's own -translate-x-1/2 then centers its rule on the boundary —
-                  // right-0 parked it half the handle inside the glass.
                   className="left-full"
                   min={MIN_STAGE_WIDTH - 60}
                   max={MAX_STAGE_WIDTH}
