@@ -4,6 +4,8 @@ import { BranchIcon, CloseIcon, MinusIcon, PlusIcon, TrashIcon } from "../../sha
 import { STATUS_TONES, fileDirTone, fileNameTone, fileTitle, statusLetter } from "../../shared/lib/format";
 import type { WorktreeFile } from "./staging";
 import { PANEL } from "../../shared/lib/ui";
+import { KeyCombo } from "../shell/KeyCombo";
+import { SHORTCUTS, Shortcut, withShortcut } from "../shell/shortcuts";
 
 interface StagePanelProps {
   branch: string;
@@ -224,6 +226,7 @@ export function StagePanel({
   onClose,
 }: StagePanelProps) {
   const [message, setMessage] = useState("");
+  const [messageFocused, setMessageFocused] = useState(false);
   const [selectedPath, setSelectedPath] = useState<string | null>(null);
   const isSelected = (file: WorktreeFile) =>
     selection === undefined
@@ -461,6 +464,8 @@ export function StagePanel({
             rows={2}
             value={message}
             onChange={(event) => setMessage(event.target.value)}
+            onFocus={() => setMessageFocused(true)}
+            onBlur={() => setMessageFocused(false)}
             onKeyDown={(event) => {
               if ((event.ctrlKey || event.metaKey) && event.key === "Enter") {
                 event.preventDefault();
@@ -469,7 +474,7 @@ export function StagePanel({
             }}
             placeholder="Commit message"
             aria-label="Commit message"
-            title="Ctrl+Enter commits the staged files"
+            title={withShortcut("Commit the staged files", Shortcut.Commit)}
             className="block w-full resize-none rounded-lg border border-transparent bg-glass-soft px-2.5 py-1.5 text-[12px] leading-normal text-ink placeholder:text-ink-dim focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
           />
           <div className="mt-2 flex flex-wrap items-center gap-2">
@@ -484,12 +489,14 @@ export function StagePanel({
                     ? "Stage a file first"
                     : message.trim() === ""
                       ? "Write a commit message first"
-                      : "Ctrl+Enter commits the staged files"
+                      : withShortcut("Commit the staged files", Shortcut.Commit)
               }
+              aria-keyshortcuts="Control+Enter"
               className="h-7 rounded-lg bg-primary px-3 text-[12px] font-semibold text-white transition-filter hover:brightness-110 focus-visible:ring-2 focus-visible:ring-primary-ink/70 disabled:opacity-60"
             >
               Commit
             </button>
+            {messageFocused && <KeyCombo keys={SHORTCUTS[Shortcut.Commit].keys} />}
             <span className="font-mono text-[10.5px] text-ink-dim">
               {busy ? "…" : staged.length > 0 ? `${staged.length} staged` : ""}
             </span>
