@@ -61,3 +61,15 @@ test("the GitHub button opens the repository", () => {
 
   assert.equal(opened.mock.calls[0][0], "https://github.com/fajarwz/git-mapper");
 });
+
+test("the shortcut list starts collapsed and expands on demand", () => {
+  renderSettings();
+  const toggle = screen.getByRole("button", { name: /keyboard shortcuts/i });
+
+  assert.equal(screen.queryByLabelText("Ctrl+T"), null);
+  fireEvent.click(toggle);
+
+  assert.ok(screen.getByLabelText("Ctrl+T"));
+  assert.ok(screen.getByLabelText("Ctrl+Enter"));
+  assert.equal(toggle.getAttribute("aria-expanded"), "true");
+});

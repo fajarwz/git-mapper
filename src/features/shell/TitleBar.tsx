@@ -18,6 +18,7 @@ import type { Repository } from "../../types";
 import type { PullRequestsView } from "../pull-requests/hooks/usePullRequests";
 import { PullRequestMenu } from "../pull-requests/components/PullRequestMenu";
 import { GLASS_CONTROL } from "../../shared/lib/ui";
+import { Shortcut, withShortcut } from "./shortcuts";
 import {
   BranchIcon,
   ArrowDownIcon,
@@ -182,7 +183,7 @@ function SortableTab({ item, active, suppressed, onSelect, onClose }: SortableTa
           onClose(item.id);
         }}
         aria-label={`Close ${item.name}`}
-        title={`Close ${item.name}`}
+        title={active ? withShortcut(`Close ${item.name}`, Shortcut.CloseTab) : `Close ${item.name}`}
         className="mr-1 grid shrink-0 place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink size-4.5"
       >
         <CloseIcon size={8} />
@@ -357,7 +358,7 @@ export function TitleBar({
               onClick={onAdd}
               disabled={adding}
               aria-label="Open repository"
-              title="Open a repository folder"
+              title={withShortcut("Open a repository folder", Shortcut.NewTab)}
               className="grid shrink-0 place-items-center rounded-lg border border-dashed border-rule bg-glass-soft text-ink-soft backdrop-blur-md hover:bg-glass-strong hover:text-ink disabled:opacity-60 size-7"
             >
               <PlusIcon />

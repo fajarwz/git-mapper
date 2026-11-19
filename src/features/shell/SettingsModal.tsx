@@ -1,4 +1,6 @@
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
+import { KeyCombo } from "./KeyCombo";
+import { shortcutGroups } from "./shortcuts";
 import { useExit } from "../../shared/lib/useExit";
 import { openExternal } from "../../shared/lib/external";
 import type { SyntaxScheme } from "../diff/lib/highlight";
@@ -84,6 +86,46 @@ function updateStatusLine(status: UpdateStatus): string {
 }
 
 const DONATE_URL = "https://github.com/sponsors/fajarwz";
+
+function ShortcutList() {
+  const [open, setOpen] = useState(false);
+
+  return (
+    <div className="mt-3 rounded-xl border border-rule bg-sheet p-3">
+      <button
+        type="button"
+        aria-expanded={open}
+        aria-controls="shortcut-list"
+        onClick={() => setOpen(!open)}
+        className="flex w-full items-center justify-between gap-3 rounded bg-transparent p-0 text-left focus-visible:ring-2 focus-visible:ring-primary/70"
+      >
+        <span className="text-[12px] font-semibold text-ink">Keyboard shortcuts</span>
+        <span className="text-[11px] text-ink-dim">{open ? "Hide" : "Show"}</span>
+      </button>
+      {open && (
+        <div id="shortcut-list" className="mt-2.5">
+          {shortcutGroups().map(({ group, items }) => (
+            <section key={group} aria-label={group} className="mb-2.5 last:mb-0">
+              <h3 className="m-0 mb-1 text-[10.5px] font-semibold uppercase tracking-wide text-ink-dim">
+                {group}
+              </h3>
+              <dl className="m-0 grid grid-cols-[auto_1fr] items-baseline gap-x-3 gap-y-1">
+                {items.map((item) => (
+                  <div key={item.label} className="contents">
+                    <dt>
+                      <KeyCombo keys={item.keys} />
+                    </dt>
+                    <dd className="m-0 text-[11.5px] leading-snug text-ink-dim">{item.label}</dd>
+                  </div>
+                ))}
+              </dl>
+            </section>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
 
 function ThemePreview({ theme }: { theme: Theme }) {
   // The previews mock a FIXED theme, so they use literal colours, not tokens: a token like
@@ -172,7 +214,7 @@ export function SettingsModal({
         role="dialog"
         aria-modal="true"
         aria-labelledby="settings-title"
-        className={`${PANEL} w-full max-w-md p-5 ${leaving ? "pop-out" : "pop-in"}`}
+        className={`${PANEL} max-h-full w-full max-w-md overflow-y-auto p-5 ${leaving ? "pop-out" : "pop-in"}`}
       >
         <div className="flex items-start justify-between gap-4">
           <div>
@@ -324,6 +366,8 @@ export function SettingsModal({
             )}
           </div>
         </div>
+
+        <ShortcutList />
 
         <div className="mt-3 flex items-center justify-between gap-3 rounded-xl border border-rule bg-sheet p-3">
           <div className="min-w-0">
