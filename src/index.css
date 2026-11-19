@@ -256,6 +256,18 @@
   }
 }
 
+/* The find bar drops in from its top-right corner, the menu's timing without the overshoot. */
+@utility pop-in-bar {
+  transform-origin: top right;
+  --pop-y: -6px;
+  --pop-scale: 0.96;
+  animation: pop-in 150ms cubic-bezier(0.2, 0.9, 0.3, 1) both;
+
+  @media (prefers-reduced-motion: reduce) {
+    animation: none;
+  }
+}
+
 @utility slide-in-left {
   transform-origin: left;
   --pop-x: -16px;

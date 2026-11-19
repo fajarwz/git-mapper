@@ -213,7 +213,7 @@ test("the diff scope toggle stacks every file and is remembered", async () => {
   );
 });
 
-test("the search box filters the loaded rows and clears back to full history", async () => {
+test("the title-bar search button toggles the find bar, which highlights without filtering and steps", async () => {
   localStorage.setItem(STORAGE_KEYS.repos, JSON.stringify(["C:/repos/demo"]));
   const { container } = render(<App />);
 
@@ -221,21 +221,26 @@ test("the search box filters the loaded rows and clears back to full history", a
     assert.equal(container.querySelectorAll("[data-commit-row]").length, 3);
   });
 
-  const search = within(container).getByRole("textbox", { name: /search history/i });
-  fireEvent.change(search, { target: { value: "two" } });
+  const toggle = within(container).getByRole("button", { name: "Find in history" });
+  assert.equal(toggle.getAttribute("aria-pressed"), "false");
+  fireEvent.click(toggle);
+  assert.equal(toggle.getAttribute("aria-pressed"), "true");
 
-  await waitFor(() => {
-    assert.equal(container.querySelectorAll("[data-commit-row]").length, 1,
-      "only the matching row stays; the wip row does not match 'two'");
-  });
-  assert.ok(container.querySelector("[data-commit-row]")?.textContent?.includes("feat: two"));
+  const box = within(container).getByRole("textbox", { name: "Find in history" });
+  fireEvent.change(box, { target: { value: "two" } });
+  assert.equal(container.querySelectorAll("[data-commit-row]").length, 3, "every row stays, wip included");
+  const lit = [...container.querySelectorAll("[data-commit-row]:not([data-dim])")];
+  assert.equal(lit.length, 1, "only the matching row stays lit");
+  assert.ok(lit[0].textContent?.includes("feat: two"));
 
-  // Clearing through the X restores every row, wip included.
-  fireEvent.click(within(container).getByRole("button", { name: /clear search/i }));
-  await waitFor(() => {
-    assert.equal(container.querySelectorAll("[data-commit-row]").length, 3,
-      "clearing through the X restores every row, wip included");
-  });
+  // Enter and Shift+Enter wrap around a single match without losing it.
+  fireEvent.keyDown(box, { key: "Enter" });
+  fireEvent.keyDown(box, { key: "Enter", shiftKey: true });
+  assert.match(container.querySelector("[data-find-status]")?.textContent ?? "", /^1 of 1/);
+
+  fireEvent.click(toggle);
+  assert.equal(container.querySelector("[data-find-bar]"), null, "the button closes it again");
+  assert.equal(container.querySelectorAll("[data-commit-row][data-dim]").length, 0);
 });
 
 test("the graph svg spans every row, not just the first screen", async () => {
@@ -381,13 +386,47 @@ test("Esc closes the details panel from a commit row; a text field keeps its own
   await waitFor(() => {
     assert.ok(container.querySelector("[data-details]"), "a row click summons it back");
   });
-  fireEvent.keyDown(within(container).getByRole("textbox", { name: "Search history" }), {
+  fireEvent.keyDown(window, { key: "f", ctrlKey: true });
+  fireEvent.keyDown(within(container).getByRole("textbox", { name: "Find in history" }), {
     key: "Escape",
   });
   assert.ok(
     container.querySelector("[data-details]"),
-    "the search box's Esc clears the query, it never closes a panel",
+    "the find bar's Esc closes the bar, it never closes a panel",
   );
+  await waitFor(() => assert.ok(container.querySelector("[data-find-bar]") === null, "the bar closes"));
+});
+
+test("Ctrl+F opens a find bar that dims non-matches, steps on Enter and closes on Esc", async () => {
+  localStorage.setItem(STORAGE_KEYS.repos, JSON.stringify(["C:/repos/demo"]));
+  const { container } = render(<App />);
+  await waitFor(() => {
+    assert.equal(container.querySelectorAll("[data-commit-row]").length, 3);
+  });
+  assert.equal(container.querySelector("[data-find-bar]"), null, "no bar until asked for");
+  assert.equal(within(container).queryByRole("textbox", { name: "Search history" }), null, "no box in the title bar");
+
+  fireEvent.keyDown(window, { key: "f", ctrlKey: true });
+  const box = within(container).getByRole("textbox", { name: "Find in history" }) as HTMLInputElement;
+  assert.equal(document.activeElement, box, "the box takes focus");
+
+  // The text of the first and second rows, to build a query that hits some rows, not all.
+  const rows = [...container.querySelectorAll<HTMLElement>("[data-commit-row]")];
+  const hash = rows[1].dataset.commitHash as string;
+  fireEvent.change(box, { target: { value: hash.slice(0, 7) } });
+  const status = () => container.querySelector("[data-find-status]")?.textContent ?? "";
+  assert.match(status(), /^1 of 1/);
+  assert.equal(container.querySelectorAll("[data-commit-row]").length, 3, "rows are never removed");
+  assert.equal(container.querySelectorAll("[data-commit-row][data-dim]").length, 2, "the others recede");
+  assert.equal(container.querySelector("[data-find-current]")?.getAttribute("data-commit-hash"), hash);
+
+  fireEvent.change(box, { target: { value: "zzzz-no-such-commit" } });
+  assert.match(status(), /^No results/);
+  assert.equal(container.querySelectorAll("[data-commit-row][data-dim]").length, 3);
+
+  fireEvent.keyDown(box, { key: "Escape" });
+  await waitFor(() => assert.ok(container.querySelector("[data-find-bar]") === null, "Esc closes the bar"));
+  assert.equal(container.querySelectorAll("[data-commit-row][data-dim]").length, 0, "and the dimming goes");
 });
 
 test("the staging rail docks itself once the working tree goes clean", async () => {

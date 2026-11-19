@@ -15,7 +15,8 @@ import { useStarPrompt } from "./features/shell/useStarPrompt";
 import { ConfirmDialog } from "./shared/components/ConfirmDialog";
 import { SettingsModal } from "./features/shell/SettingsModal";
 import { STORAGE_KEYS, usePersistedState } from "./shared/lib/persisted";
-import { filterCommits } from "./features/history/lib/commitFilter";
+import { findMatches, queryTokens } from "./features/history/lib/commitFilter";
+import type { FindState } from "./features/history/components/FindBar";
 import type { SyntaxScheme } from "./features/diff/lib/highlight";
 import {
   checkForUpdates,
@@ -156,9 +157,14 @@ function App() {
   const [flashHashes, setFlashHashes] = useState<string[]>([]);
   // Right-click menu: what was clicked (position, commit, ref). null = closed.
   const [contextMenu, setContextMenu] = useState<ContextMenuTarget | null>(null);
-  // Search over the loaded window: hashes, subjects, authors, ref pills. Not synced per tab —
-  // switching repos clears it, because a filter carried into another tab would look like a bug.
+  // Find over the loaded window: hashes, subjects, authors, ref pills. It highlights and steps,
+  // it never filters. Not synced per tab — switching repos closes and clears it, because a
+  // highlight carried into another tab would look like a bug. Closing keeps the text, so a
+  // reopened bar still has it selected (the VS Code habit).
   const [query, setQuery] = useState("");
+  const [findOpen, setFindOpen] = useState(false);
+  const [findFocus, setFindFocus] = useState(0);
+  const [findIndex, setFindIndex] = useState(0);
   const [theme, setTheme] = useState<Theme>(initialTheme);
   const [settingsOpen, setSettingsOpen] = useState(false);
 
@@ -320,6 +326,7 @@ function App() {
     (id: string) => {
       setActiveRepoId(id);
       setQuery("");
+      setFindOpen(false);
       const target = repos.find((item) => item.id === id);
       if (!target?.sleeping) return;
       setWakingId(id);
@@ -435,6 +442,7 @@ function App() {
         );
         setActiveRepoId(loaded.id);
         setQuery("");
+        setFindOpen(false);
         void fetchAndRefresh(loaded);
       } catch (openError) {
         setNotice({
@@ -550,9 +558,7 @@ function App() {
   }, [activeRepoPath, opening]);
 
   async function handleNearBottom() {
-    // While a search filters the list the scrolled window no longer maps to pages: the
-    // "load more" trigger stays off until the query is cleared.
-    if (!repo || query || loadingMoreByRepo[repo.id] || allLoadedByRepo[repo.id]) return;
+    if (!repo || loadingMoreByRepo[repo.id] || allLoadedByRepo[repo.id]) return;
     setLoadingMoreByRepo((previous) => ({ ...previous, [repo.id]: true }));
     try {
       const result = await loadMoreCommits(repo);
@@ -1019,12 +1025,74 @@ function App() {
     [repos, activeRepoId, showFlash],
   );
 
-  // The search filters the loaded window only — the visible rows AND the lanes/graph re-layout
-  // over the subset. Searching unpaginated history stays out until the deep-search slice.
-  const visibleCommits = useMemo(
-    () => filterCommits(repo?.commits ?? [], query),
-    [repo, query],
+  // The find covers the loaded window only and never removes a row, so the graph keeps its lanes.
+  // A closed bar searches nothing. Paging stays on: scrolling to the end loads older commits
+  // and any matches among them join the count.
+  const findMatchHashes = useMemo(
+    () => (findOpen ? findMatches(repo?.commits ?? [], query) : []),
+    [repo, query, findOpen],
   );
+  // Typing starts over at the first match; a refresh that moves the list just clamps.
+  useEffect(() => {
+    setFindIndex(0);
+  }, [query, repo?.id]);
+  const activeFindIndex = Math.min(findIndex, Math.max(0, findMatchHashes.length - 1));
+
+  // The details panel paints the same tokens, but only for a commit the find actually matched.
+  const detailsTerms = useMemo(
+    () =>
+      findOpen && selectedCommit && findMatchHashes.includes(selectedCommit.hash)
+        ? queryTokens(query)
+        : undefined,
+    [findOpen, selectedCommit, findMatchHashes, query],
+  );
+
+  const openFind = useCallback(() => {
+    setFindOpen(true);
+    setFindFocus((token) => token + 1);
+  }, []);
+  const closeFind = useCallback(() => setFindOpen(false), []);
+  const stepFind = useCallback(
+    (delta: number) => {
+      const count = findMatchHashes.length;
+      if (count === 0) return;
+      setFindIndex((activeFindIndex + delta + count) % count);
+    },
+    [findMatchHashes.length, activeFindIndex],
+  );
+
+  // Ctrl+F opens the find bar (or refocuses it). The webview's own page-find is not the tool
+  // here, so the key is always taken — but with no repository open there is nothing to search.
+  useEffect(() => {
+    function onKeyDown(event: KeyboardEvent) {
+      if (event.ctrlKey && !event.altKey && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        if (repo) openFind();
+      }
+    }
+    window.addEventListener("keydown", onKeyDown);
+    return () => window.removeEventListener("keydown", onKeyDown);
+  }, [repo, openFind]);
+
+  // The find belongs to the visible repository: with none left the bar goes with it.
+  useEffect(() => {
+    if (!repo) setFindOpen(false);
+  }, [repo]);
+
+  const find: FindState | null =
+    repo && findOpen
+      ? {
+          query,
+          onQueryChange: setQuery,
+          matches: findMatchHashes,
+          activeIndex: activeFindIndex,
+          onStep: stepFind,
+          onClose: closeFind,
+          loadedCount: repo.commits.length,
+          allLoaded: allLoadedByRepo[repo.id] ?? false,
+          focusToken: findFocus,
+        }
+      : null;
 
   function handleThemeChange(nextTheme: Theme) {
     setTheme(nextTheme);
@@ -1244,8 +1312,8 @@ function App() {
         repo={repo}
         adding={opening}
         refreshing={refreshing}
-        query={query}
-        onQueryChange={setQuery}
+        findOpen={findOpen}
+        onToggleFind={() => (findOpen ? closeFind() : openFind())}
         onSelect={handleSelectTop}
         onAdd={handleAdd}
         onClose={handleCloseRepo}
@@ -1340,8 +1408,8 @@ function App() {
             <div className="relative grid min-h-0 flex-1 gap-2.5" style={workspaceStyle}>
               <CommitList
               repo={repo}
-              commits={visibleCommits}
-              query={query}
+              commits={repo.commits}
+              find={find}
               selectedHash={selectedCommit?.hash ?? ""}
               onSelect={handleSelectCommit}
               flashHashes={flashSet}
@@ -1388,6 +1456,7 @@ function App() {
                 showAvatars={showAvatars}
                 pullsByBranch={pulls.byBranch}
                 commitChip={pulls.commitChip}
+                terms={detailsTerms}
                 onCheckoutBranch={handleCheckoutBranch}
                 onRefContextMenu={(ref, x, y) => {
                   // The wip row never reaches here (no sidebar), so no empty-menu guard needed.

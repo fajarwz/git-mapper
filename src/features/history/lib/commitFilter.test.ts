@@ -1,8 +1,8 @@
-// commitFilter behaviour: tokens, case folding, field coverage, identity on clear.
+// findMatches behaviour: tokens, case folding, field coverage, nothing for a blank query.
 import assert from "node:assert/strict";
 import { test } from "vitest";
 
-import { filterCommits } from "./commitFilter";
+import { findMatches, splitByTokens } from "./commitFilter";
 import type { Commit } from "../../../types";
 
 /** A minimal commit-shaped row; everything not under test is blank. */
@@ -30,30 +30,50 @@ const rows = [
 
 test("a token matches hash, subject, body, author and email, case-insensitively", () => {
   const want = [
-    ["aa", [rows[0]]],
-    ["LANE", [rows[0]]],
-    ["max_lanes", [rows[0]]],
-    ["fajar@e", [rows[1]]],
-    ["stop", [rows[1]]],
+    ["aa", ["aaaa1111"]],
+    ["LANE", ["aaaa1111"]],
+    ["max_lanes", ["aaaa1111"]],
+    ["fajar@e", ["bbbb2222"]],
+    ["stop", ["bbbb2222"]],
   ] as const;
   for (const [query, expected] of want) {
-    assert.deepEqual(filterCommits(rows, query), expected, `"${query}" selects one row`);
+    assert.deepEqual(findMatches(rows, query), expected, `"${query}" selects one row`);
   }
 });
 
 test("ref pill names match too", () => {
-  assert.deepEqual(filterCommits(rows, "v2.0.1"), [rows[2]]);
-  assert.deepEqual(filterCommits(rows, "stash@{0}"), [rows[3]]);
+  assert.deepEqual(findMatches(rows, "v2.0.1"), ["cccc3333"]);
+  assert.deepEqual(findMatches(rows, "stash@{0}"), ["dddd4444"]);
+});
+
+test("several matches come back in list order", () => {
+  assert.deepEqual(findMatches(rows, "cccc3333"), ["cccc3333", "dddd4444"]);
 });
 
 test("space-separated tokens AND together across fields", () => {
-  assert.deepEqual(filterCommits(rows, "fix flash"), [rows[1]]);
+  assert.deepEqual(findMatches(rows, "fix flash"), ["bbbb2222"]);
   // Both tokens on one field is fine as well.
-  assert.deepEqual(filterCommits(rows, "lane cap"), [rows[0]]);
-  assert.deepEqual(filterCommits(rows, "fix v2.0.1"), [], "no row carries both");
+  assert.deepEqual(findMatches(rows, "lane cap"), ["aaaa1111"]);
+  assert.deepEqual(findMatches(rows, "fix v2.0.1"), [], "no row carries both");
 });
 
-test("an empty or blank query returns the input array itself", () => {
-  assert.equal(filterCommits(rows, ""), rows, "no query means no filtering, same identity");
-  assert.equal(filterCommits(rows, "   "), rows);
+test("an empty or blank query matches nothing", () => {
+  assert.deepEqual(findMatches(rows, ""), []);
+  assert.deepEqual(findMatches(rows, "   "), []);
+});
+
+test("splitByTokens marks every token hit, case-insensitively, and escapes regex characters", () => {
+  assert.deepEqual(splitByTokens("Fix the Flash fix", ["fix"]), [
+    { text: "Fix", hit: true },
+    { text: " the Flash ", hit: false },
+    { text: "fix", hit: true },
+  ]);
+  assert.deepEqual(splitByTokens("stash@{0} (a+b)", ["stash@{0}", "a+b"]), [
+    { text: "stash@{0}", hit: true },
+    { text: " (", hit: false },
+    { text: "a+b", hit: true },
+    { text: ")", hit: false },
+  ]);
+  assert.deepEqual(splitByTokens("nothing", []), [{ text: "nothing", hit: false }]);
+  assert.deepEqual(splitByTokens("nothing", ["zzz"]), [{ text: "nothing", hit: false }]);
 });

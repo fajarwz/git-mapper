@@ -21,6 +21,7 @@ import { DiffViewer, type DiffLayout, type DiffScope, type HunkActions } from ".
 import { ConflictViewer, type ConflictFile } from "../conflicts/ConflictViewer";
 import { FileList, type FileView } from "../diff/components/FileList";
 import { RefPill } from "../history/components/RefPill";
+import { Marked } from "../history/components/Marked";
 import type { CommitRef } from "../../types";
 import { ResizeHandle } from "../../shared/components/ResizeHandle";
 import { ChevronDownIcon, CloseIcon } from "../../shared/components/icons";
@@ -50,6 +51,8 @@ interface DetailsPanelProps {
   pullsByBranch?: Map<string, PullRequest>;
   /** The request this commit came from, next to its hash. */
   commitChip?: (commit: Commit) => PullChipData | null;
+  /** The find bar's tokens when this commit is one of its matches: the text they hit is painted. */
+  terms?: string[];
   /** Double-clicking a branch pill here checks the branch out, same as in the commit list. */
   onCheckoutBranch?: (branch: string) => void;
   /** Right-clicking a pill opens the same ref menu as the commit list's pills. */
@@ -93,6 +96,7 @@ export function DetailsPanel({
   showAvatars,
   pullsByBranch,
   commitChip,
+  terms,
   onCheckoutBranch,
   onRefContextMenu,
   isWorktree = false,
@@ -221,7 +225,7 @@ export function DetailsPanel({
                     summaryCollapsed ? "truncate" : "wrap-break-word leading-snug"
                   }`}
                 >
-                  {commit.subject}
+                  <Marked text={commit.subject} terms={terms} />
                 </span>
                 {commit.parents.length > 1 && (
                   <span className="shrink-0 rounded-full bg-warning/15 px-2 py-0.5 text-[10.5px] font-bold uppercase tracking-[0.08em] text-warning-ink">
@@ -250,10 +254,10 @@ export function DetailsPanel({
                     {showAvatars && <Avatar name={commit.author} email={commit.authorEmail} photos />}
                     <div className="flex min-w-0 flex-1 flex-col gap-0">
                       <span className="min-w-0 truncate text-[12.5px] font-semibold text-ink">
-                        {commit.author}
+                        <Marked text={commit.author} terms={terms} />
                       </span>
                       <span className="min-w-0 truncate text-[11px] text-ink-dim">
-                        {commit.authorEmail}
+                        <Marked text={commit.authorEmail} terms={terms} />
                       </span>
                     </div>
                     <time
@@ -272,7 +276,7 @@ export function DetailsPanel({
                       title={hashCopied ? undefined : "Copy full commit hash"}
                       className="w-fit rounded font-mono text-[11px] text-ink-soft hover:bg-hover-glass"
                     >
-                      {hashCopied ? "Copied!" : commit.hash.slice(0, 10)}
+                      {hashCopied ? "Copied!" : <Marked text={commit.hash.slice(0, 10)} terms={terms} />}
                     </button>
                     {(() => {
                       const chip = commit.stashIndex === undefined ? commitChip?.(commit) : null;
@@ -297,7 +301,7 @@ export function DetailsPanel({
 
                   {commit.body && (
                     <p className="mb-0 mt-0.5 whitespace-pre-wrap wrap-break-word text-[12.5px] leading-relaxed text-ink-soft">
-                      {commit.body}
+                      <Marked text={commit.body} terms={terms} />
                     </p>
                   )}
                 </div>
