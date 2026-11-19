@@ -78,7 +78,7 @@ useful bug on its own.
 
 ## Where things live
 
-- `src/App.tsx` is the shell. Per-domain state lives in `src/hooks/`, pure logic in `src/lib/`.
+- `src/App.tsx` is the shell. Code is grouped by feature in `src/features/<feature>/`; a big feature splits into `components/`, `hooks/` and `lib/` (pure logic), a small one stays flat. `src/shared/` holds what several features use and never imports from `features/`.
 - `src-tauri/src/git/` holds the commands that run git. One module per domain.
 - `src/data/gitLoader.ts` is the only place that calls the backend. Components never invoke.
 - `AGENTS.md` indexes the full map in `docs/`: architecture per file, conventions, known pitfalls.
@@ -86,7 +86,7 @@ useful bug on its own.
 ## House style
 
 - **Tokens, not hex.** Colours come from `src/index.css`. Panels and buttons use `PANEL` and
-  `GLASS_CONTROL` from `src/lib/ui.ts`.
+  `GLASS_CONTROL` from `src/shared/lib/ui.ts`.
 - **Small files.** A file past ~300 lines, or one mixing two domains, splits when you touch it.
 - **Tests live beside the code** (`foo.ts` and `foo.test.ts` in the same folder), and anything
   that parses git output gets one.

@@ -21,7 +21,7 @@ import {
   type Repository,
 } from "./gitLoader";
 import { PullRequestProvider, PullRequestsStatus, PullScope } from "../types";
-import { GitHubReview, GitHubRollup, GitHubState, GitLabState } from "../lib/pullRequests";
+import { GitHubReview, GitHubRollup, GitHubState, GitLabState } from "../features/pull-requests/lib/pullRequests";
 import { PullRequestState, ReviewState, ChecksState } from "../types";
 
 // gitLoader is one of the callers that sense `window.__TAURI_INTERNALS__` to pick

@@ -1,8 +1,16 @@
 # Architecture
 
+## Layout of `src/`
+
+- `features/<name>/` — one folder per feature (`history`, `diff`, `staging`, `conflicts`, `pull-requests`, `submodules`, `details`, `shell`). A feature stays flat until it passes about 8 files; then it splits into `components/` (React components), `hooks/` (`use*.ts`) and `lib/` (pure TypeScript: parsers, layout math — no React, no Tauri). Today `history`, `diff` and `pull-requests` are split; the rest are flat. Tests sit beside their source.
+- `shared/components/` and `shared/lib/` — generic components and helpers (including hooks like `useExit`, `usePersistedState`) used by more than one feature. `shared/` never imports from `features/`.
+- `data/gitLoader.ts` — the only `invoke()` surface. `App.tsx`, `main.tsx`, `types.ts` and `index.css` stay at the root.
+- Pure `lib/` files must not import React or `@tauri-apps/*` (enforced in `eslint.config.mjs`).
+- Do not put two files in one folder whose names differ only by case or extension (`StarPrompt.tsx` next to `starPrompt.ts` broke `tsc` on case-insensitive filesystems); the pure half is `starPromptState.ts`.
+
 - `src/App.tsx` — shell: `TitleBar` row (40px) over a flex-1 content area holding the commit list + details panel, per-repo selection state, details-panel open/height state. `Repository[]` lives in state (open tabs persisted to `localStorage` under `git-mapper:open-repos`, written only after the first load lands); empty state = `EmptyState.tsx`. Open/checkout/restore failures surface as a bottom-right toast (`Toast.tsx`, auto-dismisses in 6s) — with tabs open the empty state never renders, so an error line there would never be seen. Memory: the changed-files cache is an LRU (`FILES_CACHE_CAP` in `gitLoader.ts`), a tab inactive past `SLEEP_AFTER_MS` drops its history (`sleeping` flag; dimmed pill, reload on click), and closing a tab evicts its cache entries.
-- `src/components/BootScreen.tsx` — launch screen. `App` starts `booting` true whenever `readStoredPaths()` finds saved tabs (synchronous, so the decision exists before the first paint) and clears it in the hydration effect's `finally`. While it is up the content area shows the brand + dots, **not** `EmptyState` — the open-folder card must only ever mean "no repositories are open", never "still loading". Fresh installs skip it. Dots animate via the `boot-dot` utility in index.css.
-- `src/components/TitleBar.tsx` — the window IS undecorated (`decorations: false` in `tauri.conf.json`), so this bar doubles as the title bar: brand, repo tabs (Chrome-style shrink + `tab-fade` on clipped labels), toolbar actions (a search box that filters the active repo's loaded commits — Ctrl+F focuses it, Esc clears — plus a refresh button whose glyph spins for at least 550ms so a fast local read still reads as work, and settings) and the caption buttons. Tabs reorder through `@dnd-kit/sortable` (`horizontalListSortingStrategy` + `DragOverlay`); the sensors are **pointer only**, because the keyboard sensor claims Space/Enter on the focused tab and a tab must stay activatable from the keyboard. HTML5 drag-and-drop is not an option here: the webview routes drag events to Tauri's file-drop handler. `data-tauri-drag-region` covers the bar background and the tab strip; the caption buttons need the `core:window:allow-*` entries in `src-tauri/capabilities/default.json`.
+- `src/features/shell/BootScreen.tsx` — launch screen. `App` starts `booting` true whenever `readStoredPaths()` finds saved tabs (synchronous, so the decision exists before the first paint) and clears it in the hydration effect's `finally`. While it is up the content area shows the brand + dots, **not** `EmptyState` — the open-folder card must only ever mean "no repositories are open", never "still loading". Fresh installs skip it. Dots animate via the `boot-dot` utility in index.css.
+- `src/features/shell/TitleBar.tsx` — the window IS undecorated (`decorations: false` in `tauri.conf.json`), so this bar doubles as the title bar: brand, repo tabs (Chrome-style shrink + `tab-fade` on clipped labels), toolbar actions (a search box that filters the active repo's loaded commits — Ctrl+F focuses it, Esc clears — plus a refresh button whose glyph spins for at least 550ms so a fast local read still reads as work, and settings) and the caption buttons. Tabs reorder through `@dnd-kit/sortable` (`horizontalListSortingStrategy` + `DragOverlay`); the sensors are **pointer only**, because the keyboard sensor claims Space/Enter on the focused tab and a tab must stay activatable from the keyboard. HTML5 drag-and-drop is not an option here: the webview routes drag events to Tauri's file-drop handler. `data-tauri-drag-region` covers the bar background and the tab strip; the caption buttons need the `core:window:allow-*` entries in `src-tauri/capabilities/default.json`.
 - `src-tauri/src/git.rs` — Tauri commands running the `git` CLI: `open_repository` (validates + toplevel/name), `read_status` (branch / ahead / behind / head + the worktree digest), `read_refs` (`hash	fullref` lines), `read_log` (porcelain fields `\x00`-separated, records `\x1e`-separated, decorations lead each record), `read_log_delta` (`git log --all ^<head>`), `read_log_order` (hashes only, for splicing),
   `read_wip_side` + `apply_hunk` (hunk-level staging, `git/hunks.rs`),
   `read_commit_files` (numstat + name-status + patch, first-parent; root via `--root`; the
@@ -47,16 +55,16 @@
   named after its Rust module. `vite.config.ts` stays config only. Files are imported with their
   `.ts` extension (Vite's future native config loader needs it), and nothing type-checks this
   folder in CI, so probe a new handler with `curl` against `npm run dev`.
-- `src/lib/` parsers — `gitLogParser`, `gitDiffParser` (DiffLine text carries NO +/- prefix; the renderer adds it), `graphLanes` (git-shaped layout: dense lanes, tips append on the right, merge parents fork just right of the commit, closed lanes shift the rest left, and a commit reserved by several children keeps the leftmost and joins the rest — `MAX_LANES` is a hard width cap). All pure, no React — verifiable with `npx vite-node <probe>` against real git output.
+- Pure parsers in each feature's `lib/` folder — `gitLogParser`, `gitDiffParser` (DiffLine text carries NO +/- prefix; the renderer adds it), `graphLanes` (git-shaped layout: dense lanes, tips append on the right, merge parents fork just right of the commit, closed lanes shift the rest left, and a commit reserved by several children keeps the leftmost and joins the rest — `MAX_LANES` is a hard width cap). All pure, no React — verifiable with `npx vite-node <probe>` against real git output.
 - Changed files/diffs load lazily per selected commit (`App` keeps `filesByCommitHash`); the commit list never carries them.
-- `src/components/DiffViewer.tsx` — the diff pane has two scopes (`DiffScope`): `file` shows the
+- `src/features/diff/components/DiffViewer.tsx` — the diff pane has two scopes (`DiffScope`): `file` shows the
   selected file alone (the default), `all` stacks **every** changed file into one scroll with a
   sticky per-file header, so a whole commit can be read without a click per file. In `all` scope the
   file list on the left becomes a jump list: selecting a file scrolls its section into view (guarded
   `scrollIntoView`, jsdom has none). Each file keeps its own `DiffBody`, so highlighting follows that
   file's grammar rather than the previously selected file's. The body mounts are keyed by path —
   reusing the instance across files painted the previous file's token HTML onto the new file's rows
-  while the new grammar loaded. Image files (png/jpg/gif/webp/bmp/ico/avif/apng — `lib/imageDiff.ts`)
+  while the new grammar loaded. Image files (png/jpg/gif/webp/bmp/ico/avif/apng — `diff/lib/imageDiff.ts`)
   skip line rows entirely for a GitHub-style picture diff: `read_image_versions` (Rust, mirrored by
   the dev middleware) serves both blobs as data URLs, and `ImageDiff` renders 2-up / swipe /
   onion-peel with pixel dimensions and byte sizes, mode persisted (`git-mapper:image-diff-mode`).
@@ -86,14 +94,14 @@
   commit-list row and file totals is unchanged. The digest does NOT move when a hunk shifts
   between index and disk inside an already-`MM` file, hence `useWipSide.reload()` after every
   hunk action. The dev middleware mirrors both commands. Line-level: the `+`/`-` gutter cell of a changed line
-  ticks it (`useLineSelection`, `lib/lineSelection.ts`), and the hunk's buttons become Stage/Unstage/
+  ticks it (`useLineSelection`, `diff/lib/lineSelection.ts`), and the hunk's buttons become Stage/Unstage/
   Discard N lines via `apply_hunk_lines` — `trim_hunk` cuts the fresh hunk to the picked lines (ordinals
   count only `+`/`-` lines; a skipped line turns into context or vanishes depending on direction) and
   `git apply --recount` does the rest. Only for files present on both sides (`modified`): a new or deleted
   file's patch header says create/delete, so those keep the whole-hunk verbs.
-- `src/components/FileList.tsx` — the changed-file sidebar. A List/Tree toggle (same segmented
+- `src/features/diff/components/FileList.tsx` — the changed-file sidebar. A List/Tree toggle (same segmented
   pattern as the diff-scope toggle) sits beside the counts; DetailsPanel owns the choice and
-  persists it (`git-mapper:file-view`; `src/lib/fileTree.ts` builds the tree). The tree renders
+  persists it (`git-mapper:file-view`; `src/features/diff/lib/fileTree.ts` builds the tree). The tree renders
   one row per folder level (`data-file-dir`, folders start expanded, collapse survives while the
   same folder path returns) with the base name only — renames keep the `old → new` hint inline.
   Both shapes share `FileRow` and keep `data-file-item` on file rows, so the
@@ -110,7 +118,7 @@
   name → that one only; any other host asks gh, then glab) and returns `{status, provider, raw}`.
   `cli-missing` / `cli-unauthenticated` / `unsupported-remote` are answers, not errors, so the menu
   explains them in place (unsupported hides the button). Classify "no remote of my kind" BEFORE
-  "signed out": both CLIs end that message with a hint to `auth login`. `lib/pullRequests.ts` shapes
+  "signed out": both CLIs end that message with a hint to `auth login`. `pull-requests/lib/pullRequests.ts` shapes
   each provider's JSON into the neutral `PullRequest` (`parsePullRequestPage(provider, raw, cursor)`;
   GitLab's `iid` is the number, its list carries no approvals, and the pipeline may be absent → no
   checks). **A read is one page of 30** (`PAGE_SIZE` in `pulls.rs`, `PR_PAGE_SIZE` in TS — keep them
@@ -133,7 +141,7 @@
   live `glab mr list --all --output json` before trusting a new field. A third provider is one more
   arm in `pulls.rs` + `pullRequests.ts`; the UI only reads `provider` for wording (`#13` vs `!13`,
   "Pull" vs "Merge request", "Open on GitHub|GitLab"). It is NOT part of load/refresh — it is a
-  network call — so `hooks/usePullRequests.ts` owns it per repo path: re-read on a refs change and on
+  network call — so `pull-requests/hooks/usePullRequests.ts` owns it per repo path: re-read on a refs change and on
   focus (60s throttle), and automatic retries stop once the CLI is known missing/signed out (only the
   menu's Refresh retries). State is a drawn glyph (open / draft / merged / closed, `PullRequestStateIcon`)
   plus a tone from `pullRequestTone.ts`, never colour alone; only open speaks in colour, finished
@@ -152,10 +160,10 @@
   name, a remote past `<remote>/`; fork PRs never match), and `PullRequestMenu` in the title bar
   lists them, read-only — a row opens the request in the browser. The popover is portaled to
   `<body>` because the title bar's backdrop blur would become the containing block of a fixed panel.
-- `src/lib/graphGeometry.ts` — `ROW_HEIGHT` is shared between `CommitRow` and the SVG graph. Change both together or dots misalign with rows.
-- `src/lib/commitFilter.ts` — `filterCommits(commits, query)`: space-separated tokens AND together, case-insensitive substring over hash, subject, body, author, email and ref-pill names (literal text — no fuzzy `_`/`-` folding). An empty query returns the input array itself so rows keep object identity. Search covers ONLY the loaded window; paging is suspended while a query is active, and deep search over unpaginated history is a planned separate slice.
-- `src/lib/highlight.ts` — lazy highlight.js: the core is a dynamic import, and each grammar too (one small chunk per language, loaded the first time a diff of that type opens). `languageForPath` maps extension/basename → grammar, `loadHighlighter` + `highlightSync` produce ESCAPED token HTML (highlight.js escapes before wrapping — safe for dangerouslySetInnerHTML). The schemes are NOT highlight.js themes: index.css scopes palettes under `data-syntax` on the diff panel — `app` (design tokens, follows the theme), `github` and `neon` (literals with light/dark variants). The picker lives in settings, persisted as `git-mapper:syntax-scheme`, default `app` — there is no colour-off option.
-- `src/components/ContextMenu.tsx` — the right-click menu on commit rows and ref pills. Entries:
+- `src/features/history/lib/graphGeometry.ts` — `ROW_HEIGHT` is shared between `CommitRow` and the SVG graph. Change both together or dots misalign with rows.
+- `src/features/history/lib/commitFilter.ts` — `filterCommits(commits, query)`: space-separated tokens AND together, case-insensitive substring over hash, subject, body, author, email and ref-pill names (literal text — no fuzzy `_`/`-` folding). An empty query returns the input array itself so rows keep object identity. Search covers ONLY the loaded window; paging is suspended while a query is active, and deep search over unpaginated history is a planned separate slice.
+- `src/features/diff/lib/highlight.ts` — lazy highlight.js: the core is a dynamic import, and each grammar too (one small chunk per language, loaded the first time a diff of that type opens). `languageForPath` maps extension/basename → grammar, `loadHighlighter` + `highlightSync` produce ESCAPED token HTML (highlight.js escapes before wrapping — safe for dangerouslySetInnerHTML). The schemes are NOT highlight.js themes: index.css scopes palettes under `data-syntax` on the diff panel — `app` (design tokens, follows the theme), `github` and `neon` (literals with light/dark variants). The picker lives in settings, persisted as `git-mapper:syntax-scheme`, default `app` — there is no colour-off option.
+- `src/shared/components/ContextMenu.tsx` — the right-click menu on commit rows and ref pills. Entries:
   `Check out <branch>` (only for a local branch that is not current), `Check out commit <hash>…`
   (real history rows only — not the HEAD row, the `wip` row or a stash row; it opens
   `ConfirmDialog.tsx`, because checking out a commit detaches HEAD and commits made there are
@@ -167,13 +175,13 @@
   verb whitelist). The checked-out tip offers `Undo commit …` when the repo is ahead and the tip
   is a plain (non-merge) commit — `undo_commit`, a soft reset that returns the tip's files
   staged, behind a plain (non-danger) confirm. Dismisses on outside pointerdown, Escape, scroll (capture) and
-  resize. Clipboard goes through `src/lib/clipboard.ts` `copyText`, which falls back to a hidden
+  resize. Clipboard goes through `src/shared/lib/clipboard.ts` `copyText`, which falls back to a hidden
   textarea because WebView2 can deny the async clipboard API per-origin.
-- `src/lib/ui.ts` — `PANEL` and `GLASS_CONTROL` class strings; every panel/button picks these up.
-- `src/lib/tableLayout.ts` — column widths, grid templates, resize min/max.
-- `src/lib/persisted.ts` — `usePersistedState` (localStorage-backed `useState`) and the `STORAGE_KEYS`
+- `src/shared/lib/ui.ts` — `PANEL` and `GLASS_CONTROL` class strings; every panel/button picks these up.
+- `src/features/history/lib/tableLayout.ts` — column widths, grid templates, resize min/max.
+- `src/shared/lib/persisted.ts` — `usePersistedState` (localStorage-backed `useState`) and the `STORAGE_KEYS`
   registry every key goes through. Launch restores: open repo paths, the active tab, the selected
   commit and file per repo, the diff pane scope, and the details panel open/height. Window bounds come from
   `tauri-plugin-window-state` (Rust side, `window-state:default` capability), not from localStorage.
-- `src/lib/theme.ts` + inline script in `index.html` — theme resolution; storage key `git-mapper:theme`; the head script must stay in sync with that key.
+- `src/features/shell/theme.ts` + inline script in `index.html` — theme resolution; storage key `git-mapper:theme`; the head script must stay in sync with that key.
 - `src/index.css` — all design tokens (`@theme` block + `.dark` overrides) and the background aurora (`body::before`).

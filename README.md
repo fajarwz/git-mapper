@@ -124,8 +124,8 @@ Git has to be on `PATH`.
 
 ## How it works
 
-The Rust side (`src-tauri/src/git.rs`) runs `git` and returns its porcelain output; the parsers in
-`src/lib/` turn that text into the types in `src/types.ts`. Every backend call goes through
+The Rust side (`src-tauri/src/git.rs`) runs `git` and returns its porcelain output; the
+parsers in each `src/features/*/lib/` folder turn that text into the types in `src/types.ts`. Every backend call goes through
 `src/data/gitLoader.ts`, so components never invoke the backend themselves. `npm run dev` serves
 the same commands at `POST /api/git`, which is why the app also runs in a plain browser.
 

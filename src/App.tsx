@@ -1,22 +1,22 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import type { CSSProperties } from "react";
 import { getVersion } from "@tauri-apps/api/app";
-import { BootScreen } from "./components/BootScreen";
-import { CommitList } from "./components/CommitList";
-import { ContextMenu, type ContextMenuTarget, type StashAction } from "./components/ContextMenu";
-import { DetailsPanel } from "./components/DetailsPanel";
-import type { DiffLayout, DiffScope } from "./components/DiffViewer";
-import { EmptyState } from "./components/EmptyState";
-import { TitleBar } from "./components/TitleBar";
-import { SubmoduleStrip } from "./components/SubmoduleStrip";
-import { Toast } from "./components/Toast";
-import { StarPrompt } from "./components/StarPrompt";
-import { useStarPrompt } from "./hooks/useStarPrompt";
-import { ConfirmDialog } from "./components/ConfirmDialog";
-import { SettingsModal } from "./components/SettingsModal";
-import { STORAGE_KEYS, usePersistedState } from "./lib/persisted";
-import { filterCommits } from "./lib/commitFilter";
-import type { SyntaxScheme } from "./lib/highlight";
+import { BootScreen } from "./features/shell/BootScreen";
+import { CommitList } from "./features/history/components/CommitList";
+import { ContextMenu, type ContextMenuTarget, type StashAction } from "./shared/components/ContextMenu";
+import { DetailsPanel } from "./features/details/DetailsPanel";
+import type { DiffLayout, DiffScope } from "./features/diff/components/DiffViewer";
+import { EmptyState } from "./features/shell/EmptyState";
+import { TitleBar } from "./features/shell/TitleBar";
+import { SubmoduleStrip } from "./features/submodules/SubmoduleStrip";
+import { Toast } from "./shared/components/Toast";
+import { StarPrompt } from "./features/shell/StarPrompt";
+import { useStarPrompt } from "./features/shell/useStarPrompt";
+import { ConfirmDialog } from "./shared/components/ConfirmDialog";
+import { SettingsModal } from "./features/shell/SettingsModal";
+import { STORAGE_KEYS, usePersistedState } from "./shared/lib/persisted";
+import { filterCommits } from "./features/history/lib/commitFilter";
+import type { SyntaxScheme } from "./features/diff/lib/highlight";
 import {
   checkForUpdates,
   downloadUpdate,
@@ -25,9 +25,9 @@ import {
   updateStatusSnapshot,
   type UpdateMode,
   type UpdateStatus,
-} from "./lib/updater";
-import { applyTheme, initialTheme, storeTheme } from "./lib/theme";
-import type { Theme } from "./lib/theme";
+} from "./features/shell/updater";
+import { applyTheme, initialTheme, storeTheme } from "./features/shell/theme";
+import type { Theme } from "./features/shell/theme";
 import { checkoutBranch,
   checkoutCommit,
   fetchRemote,
@@ -66,14 +66,14 @@ import {
   MAX_STAGE_WIDTH,
   MIN_STAGE_WIDTH,
   StagePanel,
-} from "./components/StagePanel";
-import { ResizeHandle } from "./components/ResizeHandle";
-import type { WorktreeFile } from "./lib/staging";
+} from "./features/staging/StagePanel";
+import { ResizeHandle } from "./shared/components/ResizeHandle";
+import type { WorktreeFile } from "./features/staging/staging";
 import type { Repository, Submodule } from "./types";
-import { submoduleParents } from "./lib/submodule";
-import { useCommitFiles } from "./hooks/useCommitFiles";
-import { useWipSide } from "./hooks/useWipSide";
-import { usePullRequests } from "./hooks/usePullRequests";
+import { submoduleParents } from "./features/submodules/submodule";
+import { useCommitFiles } from "./features/diff/hooks/useCommitFiles";
+import { useWipSide } from "./features/staging/useWipSide";
+import { usePullRequests } from "./features/pull-requests/hooks/usePullRequests";
 
 /** Auto-fetch window on refocus — often enough to notice a push, rare enough to stay quiet. */
 const FETCH_ON_FOCUS_MS = 180_000;
