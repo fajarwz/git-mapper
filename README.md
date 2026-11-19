@@ -50,6 +50,8 @@ The links above always resolve to the newest release.
 
 <img src="website/src/assets/screens/graph.png" alt="The commit graph in lane colours with branch, tag and stash pills" width="70%">
 
+<img src="website/src/assets/screens/find.png" alt="The Ctrl+F find bar highlighting two matching commits and fading the rest" width="100%">
+
 - **Lane-coloured graph.** Every branch keeps its colour from tip to root, forks and merges bend at
   their own commit, and branch, remote and tag pills sit on the rows. Resize the graph gutter,
   or drag it wider on lane-heavy histories.
@@ -85,6 +87,8 @@ The links above always resolve to the newest release.
 <img src="website/src/assets/screens/hunk.png" alt="Picking single lines of a hunk to stage, unstage or discard" width="100%">
 
 <img src="website/src/assets/screens/conflict.png" alt="Resolving a merge conflict block by block, inline" width="100%">
+
+<img src="website/src/assets/screens/pulls.png" alt="The branch right-click menu with Create pull request" width="70%">
 
 - **Stage, commit, undo.** The `Uncommitted changes` row opens a staging rail: stage, unstage or
   discard by file, write the message and commit without leaving the window. Undo the tip commit
