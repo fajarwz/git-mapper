@@ -1,0 +1,22 @@
+{
+  "name": "git-mapper-video",
+  "private": true,
+  "version": "0.0.0",
+  "scripts": {
+    "sync": "node scripts/sync-assets.mjs",
+    "music": "node scripts/make-music.mjs",
+    "studio": "npm run sync && remotion studio",
+    "render": "npm run sync && remotion render src/index.ts Showcase out/git-mapper-showcase.mp4"
+  },
+  "dependencies": {
+    "@remotion/cli": "4.0.250",
+    "@remotion/transitions": "4.0.250",
+    "react": "^19.2.0",
+    "react-dom": "^19.2.0",
+    "remotion": "4.0.250"
+  },
+  "devDependencies": {
+    "@types/react": "^19.2.0",
+    "typescript": "5.6.3"
+  }
+}
