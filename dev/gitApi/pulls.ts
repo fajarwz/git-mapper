@@ -102,7 +102,34 @@ function known<T extends string>(all: Record<string, T>, value: unknown): T | nu
   return Object.values(all).find((member) => member === value) ?? null;
 }
 
+/** Mirror of `pull_request_url` in pulls.rs. */
+function pullRequestUrl(remoteUrl: string, branch: string): string | null {
+  const host = hostOf(remoteUrl);
+  const trimmed = remoteUrl.trim();
+  const scheme = trimmed.indexOf("://");
+  const rawPath = scheme === -1 ? trimmed.slice(trimmed.indexOf(":") + 1) : trimmed.slice(trimmed.indexOf("/", scheme + 3) + 1);
+  const path = rawPath.replace(/^\/+|\/+$/g, "").replace(/\.git$/, "");
+  if (!host || !path) return null;
+  const encoded = branch.split("/").map(encodeURIComponent).join("/");
+  if (host.includes("gitlab")) return `https://${host}/${path}/-/merge_requests/new?merge_request%5Bsource_branch%5D=${encoded}`;
+  if (host.includes("github")) return `https://${host}/${path}/compare/${encoded}?expand=1`;
+  return null;
+}
+
 export const pullsHandlers: Handlers = {
+  read_pull_request_url: ({ dir, branch }) => {
+    const name = String(branch).trim();
+    if (!name || name.startsWith("-")) throw new Error(`"${name}" is not a branch name`);
+    let url: string;
+    try {
+      url = run(String(dir), ["remote", "get-url", "origin"]);
+    } catch {
+      const first = run(String(dir), ["remote"]).split("\n")[0];
+      if (!first) return null;
+      url = run(String(dir), ["remote", "get-url", first]);
+    }
+    return pullRequestUrl(url, name);
+  },
   read_pull_requests: ({ dir, scope: askedScope, cursor, provider: asked, query }) => {
     const scope = known(PullScope, askedScope);
     if (scope === null) throw new Error(`unknown scope ${String(askedScope)}`);
