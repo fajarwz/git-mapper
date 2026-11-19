@@ -163,6 +163,20 @@ export function CommitList({ repo, commits, find = null, selectedHash, flashHash
     setStoredOrder([...moved, ...hidden]);
   }
 
+  // The rows are memoized, so their handlers must keep one identity across renders: a fresh
+  // arrow per row would re-render every row on every selection. The ref always holds the
+  // latest prop, so the stable wrappers never call a stale one.
+  const onContextMenuRef = useRef(onContextMenu);
+  onContextMenuRef.current = onContextMenu;
+  const hasContextMenu = onContextMenu !== undefined;
+  const handleRowContextMenu = useCallback((row: Commit, x: number, y: number) => {
+    const ref = row.refs.find((item) => item.type === "branch") ?? row.refs[0];
+    onContextMenuRef.current?.(row, ref, x, y);
+  }, []);
+  const handleRefContextMenu = useCallback((row: Commit, ref: CommitRef, x: number, y: number) => {
+    onContextMenuRef.current?.(row, ref, x, y);
+  }, []);
+
   const matchSet = useMemo(() => new Set(find?.matches ?? []), [find?.matches]);
   const dimming = find !== null && find.query.trim() !== "";
   const terms = useMemo(() => (dimming ? queryTokens(find.query) : undefined), [dimming, find?.query]);
@@ -356,11 +370,8 @@ export function CommitList({ repo, commits, find = null, selectedHash, flashHash
               commitChip={commitChip}
               onSelect={onSelect}
               onCheckoutBranch={onCheckoutBranch}
-              onContextMenu={onContextMenu ? (row, x, y) => {
-                const ref = row.refs.find((item) => item.type === "branch") ?? row.refs[0];
-                onContextMenu(row, ref, x, y);
-              } : undefined}
-              onRefContextMenu={onContextMenu ? (row, ref, x, y) => onContextMenu(row, ref, x, y) : undefined}
+              onContextMenu={hasContextMenu ? handleRowContextMenu : undefined}
+              onRefContextMenu={hasContextMenu ? handleRefContextMenu : undefined}
             />
           ))}
           {waking && commits.length === 0 && (
