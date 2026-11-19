@@ -93,9 +93,9 @@ interface TitleBarProps {
   adding: boolean;
   /** True while a manual reload is in flight; the refresh button spins with it. */
   refreshing: boolean;
-  /** Free-text filter over the active repo's loaded commits; empty means unfiltered. */
-  query: string;
-  onQueryChange: (query: string) => void;
+  /** Whether the floating find bar is open; the search button carries a pressed state. */
+  findOpen: boolean;
+  onToggleFind: () => void;
   onSelect: (id: string) => void;
   onAdd: () => void;
   onClose: (id: string) => void;
@@ -209,8 +209,8 @@ export function TitleBar({
   repo,
   adding,
   refreshing,
-  query,
-  onQueryChange,
+  findOpen,
+  onToggleFind,
   onSelect,
   onAdd,
   onClose,
@@ -238,20 +238,6 @@ export function TitleBar({
   const [draggedId, setDraggedId] = useState<string | null>(null);
   // The click that ends a drag must not also select the tab that was dropped.
   const suppressClick = useRef(false);
-
-  // Ctrl+F focuses (and selects) the search box; the browser's page-find is not the tool here.
-  const searchRef = useRef<HTMLInputElement>(null);
-  useEffect(() => {
-    function onKeyDown(event: KeyboardEvent) {
-      if (event.ctrlKey && event.key.toLowerCase() === "f") {
-        event.preventDefault();
-        searchRef.current?.focus();
-        searchRef.current?.select();
-      }
-    }
-    window.addEventListener("keydown", onKeyDown);
-    return () => window.removeEventListener("keydown", onKeyDown);
-  }, []);
 
   // Pointer only on purpose: the keyboard sensor claims Space and Enter on the focused tab, and a
   // tab has to stay activatable from the keyboard. Keyboard reordering would need a grip handle.
@@ -410,44 +396,19 @@ export function TitleBar({
 
       <div className="flex shrink-0 items-center gap-1.5">
         {repo && (
-          // The search box sits straight on the aurora, so it gets the glass backing like
-          // every other control in the bar. Esc clears the query first, then blurs.
-          <div className="relative flex items-center">
-            <span aria-hidden="true" className="pointer-events-none absolute left-2 text-ink-dim z-10">
-              <SearchIcon size={12} />
-            </span>
-            <input
-              ref={searchRef}
-              type="text"
-              value={query}
-              onChange={(event) => onQueryChange(event.target.value)}
-              onKeyDown={(event) => {
-                if (event.key === "Escape") {
-                  if (query) onQueryChange("");
-                  else event.currentTarget.blur();
-                }
-              }}
-              aria-label="Search history"
-              placeholder="Search history"
-              title="Search hashes, messages, authors and refs (Ctrl+F)"
-              className={`h-7 w-36 rounded-lg border border-hairline bg-glass-soft pl-7 text-[12.5px] text-ink outline-none backdrop-blur-md transition-all placeholder:text-ink-dim focus:w-52 focus:border-primary-ink/50 focus:bg-glass-strong ${query ? "pr-7" : "pr-2"}`}
-            />
-            {query !== "" && (
-              // A visible affordance, not a hover-only one: while there is a value there is an X.
-              <button
-                type="button"
-                onClick={() => {
-                  onQueryChange("");
-                  searchRef.current?.focus();
-                }}
-                aria-label="Clear search"
-                title="Clear search"
-                className="absolute right-1 grid place-items-center rounded-full text-ink-dim hover:bg-hover-glass hover:text-ink size-5"
-              >
-                <CloseIcon size={9} />
-              </button>
-            )}
-          </div>
+          // Search lives in a floating bar (Ctrl+F), so the bar only carries its summon.
+          <button
+            type="button"
+            onClick={onToggleFind}
+            aria-pressed={findOpen}
+            aria-label="Find in history"
+            title="Find in history (Ctrl+F)"
+            className={`${GLASS_CONTROL} grid place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-7 ${
+              findOpen ? "border-primary-ink/40 bg-glass-strong text-ink soft-shadow" : ""
+            }`}
+          >
+            <SearchIcon size={13} />
+          </button>
         )}
         {repo && (
           // The edge takes primary-ink, not primary: primary-ink is re-pointed in .dark
