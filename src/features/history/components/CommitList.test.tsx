@@ -37,7 +37,6 @@ function renderList() {
     <CommitList
       repo={repo}
       commits={repo.commits}
-      query=""
       selectedHash=""
       flashHashes={new Set()}
       onSelect={() => {}}
@@ -108,7 +107,6 @@ test("a row shows the request chip its commit came from, and a plain row shows n
     <CommitList
       repo={repo}
       commits={repo.commits}
-      query=""
       selectedHash=""
       flashHashes={new Set()}
       onSelect={() => {}}

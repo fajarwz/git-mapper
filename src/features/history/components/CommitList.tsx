@@ -8,6 +8,7 @@ import type { CSSProperties } from "react";
 import type { Commit, CommitRef, PullRequest, Repository } from "../../../types";
 import type { PullChipData } from "../../pull-requests/lib/pullRequests";
 import { UNCOMMITTED_HASH, isStashRow } from "../../../data/gitLoader";
+import { queryTokens } from "../lib/commitFilter";
 import { layoutGraph } from "../lib/graphLanes";
 import { graphWidth } from "../lib/graphGeometry";
 import {
@@ -39,17 +40,16 @@ import { PANEL } from "../../../shared/lib/ui";
 import { CommitGraph } from "./CommitGraph";
 import { ColumnsMenu } from "./ColumnsMenu";
 import { CommitRow } from "./CommitRow";
+import { FindBar } from "./FindBar";
+import type { FindState } from "./FindBar";
 import { ResizeHandle } from "../../../shared/components/ResizeHandle";
 
 interface CommitListProps {
   repo: Repository;
-  /**
-   * The commits to render: repo.commits when no search query is active, the filtered subset
-   * otherwise. The graph layout and the rows both work off this list, and the "no matches"
-   * notice keys off the query.
-   */
+  /** Every loaded commit: a find highlights within them and never removes rows or lanes. */
   commits: Commit[];
-  query: string;
+  /** The find bar's state; absent or closed means no bar and no dimming. */
+  find?: FindState | null;
   selectedHash: string;
   /** Commits a refresh just added or re-pilled; they flash once. */
   flashHashes: Set<string>;
@@ -122,7 +122,7 @@ function HeaderCell({
   );
 }
 
-export function CommitList({ repo, commits, query, selectedHash, flashHashes, onSelect, loadingMore, waking = false, showAvatars, onNearBottom, pullsByBranch, commitChip, onCheckoutBranch, onContextMenu }: CommitListProps) {
+export function CommitList({ repo, commits, find = null, selectedHash, flashHashes, onSelect, loadingMore, waking = false, showAvatars, onNearBottom, pullsByBranch, commitChip, onCheckoutBranch, onContextMenu }: CommitListProps) {
   // One layout for the graph column and the SVG. Sizing the column from the dot lanes alone used to
   // clip the graph whenever a line ran right of every dot.
   // Same inputs as gitLoader.withLanes (stash rows float, the uncommitted row is flagged) —
@@ -171,6 +171,26 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
     const hidden = order.filter((id) => !shown.includes(id));
     setStoredOrder([...moved, ...hidden]);
   }
+
+  // Rows outside the find's matches recede; with a blank query nothing dims.
+  const matchSet = useMemo(() => new Set(find?.matches ?? []), [find?.matches]);
+  const dimming = find !== null && find.query.trim() !== "";
+  const terms = useMemo(() => (dimming ? queryTokens(find.query) : undefined), [dimming, find?.query]);
+  const currentHash = find !== null && dimming ? (find.matches[find.activeIndex] ?? null) : null;
+
+  // Bring the current match into view as it changes (typing, Enter, the arrows). Centred, so
+  // it clears the floating bar over the top-right. scrollIntoView is absent in jsdom. Rows are
+  // found by comparing the attribute, not by a selector: the working-copy row's hash is empty.
+  useEffect(() => {
+    if (currentHash === null) return;
+    const rows = scrollRef.current?.querySelectorAll<HTMLElement>("[data-commit-hash]") ?? [];
+    for (const row of rows) {
+      if (row.dataset.commitHash === currentHash) {
+        row.scrollIntoView?.({ block: "center" });
+        break;
+      }
+    }
+  }, [currentHash]);
 
   const graphColumnRef = useRef<HTMLDivElement>(null);
   const messageCellRef = useRef<HTMLSpanElement>(null);
@@ -345,6 +365,9 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
               commit={commit}
               selected={commit.hash === selectedHash}
               fresh={flashHashes.has(commit.hash)}
+              dim={dimming && !matchSet.has(commit.hash)}
+              current={commit.hash === currentHash}
+              terms={dimming && matchSet.has(commit.hash) ? terms : undefined}
               showAvatar={showAvatars}
               columns={visible}
               order={order}
@@ -360,12 +383,7 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
               onRefContextMenu={onContextMenu ? (row, ref, x, y) => onContextMenu(row, ref, x, y) : undefined}
             />
           ))}
-          {commits.length === 0 && query !== "" && (
-            <p className="m-0 py-2 text-center text-[12px] text-ink-dim">
-              No commits in the loaded history match this search.
-            </p>
-          )}
-          {waking && commits.length === 0 && query === "" && (
+          {waking && commits.length === 0 && (
             <p className="m-0 py-2 text-center text-[12px] text-ink-dim">Loading history…</p>
           )}
           {loadingMore && (
@@ -387,6 +405,7 @@ export function CommitList({ repo, commits, query, selectedHash, flashHashes, on
         onResize={handleGraphResize}
         onReset={() => setPinnedGraphWidth(null)}
       />
+      {find && <FindBar find={find} />}
       {columnsMenu && (
         <ColumnsMenu {...columnsMenu} visible={visible} onToggle={toggleColumn} onClose={closeColumnsMenu} />
       )}

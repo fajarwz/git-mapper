@@ -15,12 +15,19 @@ import { RefPill } from "./RefPill";
 import { PullRequestChip } from "../../pull-requests/components/PullRequestChip";
 import type { PullChipData } from "../../pull-requests/lib/pullRequests";
 import { Avatar } from "./Avatar";
+import { Marked } from "./Marked";
 
 interface CommitRowProps {
   commit: Commit;
   selected: boolean;
   /** Just arrived (or its refs changed) in the last refresh: flash the row once. */
   fresh?: boolean;
+  /** A find is running and this row is not a match: it recedes, the graph beside it stays intact. */
+  dim?: boolean;
+  /** The match the find bar is on right now. */
+  current?: boolean;
+  /** The find's tokens, on a matching row only: the text they hit is painted. Keep it stable for the memo. */
+  terms?: string[];
   /** The initials avatar sits left of the username; the settings toggle owns its visibility. */
   showAvatar?: boolean;
   /** Which optional columns are shown; keep the object stable so the memo holds. */
@@ -48,6 +55,9 @@ export const CommitRow = memo(function CommitRow({
   commit,
   selected,
   fresh = false,
+  dim = false,
+  current = false,
+  terms,
   showAvatar = false,
   columns = DEFAULT_COLUMNS,
   order = DEFAULT_ORDER,
@@ -75,7 +85,7 @@ export const CommitRow = memo(function CommitRow({
             style={{ backgroundColor: isWorktreeRow ? UNCOMMITTED_COLOR : branchColor(commit.branchColor) }}
           />
           <span className={`truncate text-[13px] text-ink ${weight}`}>
-            {commit.subject}
+            <Marked text={commit.subject} terms={terms} />
           </span>
           {isWorktreeRow ? (
             <span
@@ -111,7 +121,7 @@ export const CommitRow = memo(function CommitRow({
           ) : (
             <>
               {showAvatar && <Avatar name={commit.author} email={commit.authorEmail} photos />}
-              <span className="truncate">{commit.author}</span>
+              <span className="truncate"><Marked text={commit.author} terms={terms} /></span>
             </>
           )}
         </span>
@@ -130,7 +140,7 @@ export const CommitRow = memo(function CommitRow({
     hash: (
       <Fragment key="hash">
         <span className={`font-mono text-[11px] text-ink-dim ${weight}`}>
-          {isWorktreeRow ? "—" : commit.hash.slice(0, 8)}
+          {isWorktreeRow ? "—" : <Marked text={commit.hash.slice(0, 8)} terms={terms} />}
         </span>
       </Fragment>
     ),
@@ -140,7 +150,10 @@ export const CommitRow = memo(function CommitRow({
     <button
       type="button"
       data-commit-row
-      className={`group grid h-8 w-full items-center gap-2 border-b border-rule/70 bg-transparent p-0 text-left transition-colors hover:bg-hover-glass focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/60 data-[selected=true]:bg-selected-glass data-[selected=true]:hover:bg-selected-glass ${COMMIT_ROW_GRID} ${fresh ? "row-flash" : ""}`}
+      data-commit-hash={commit.hash}
+      data-dim={dim ? "true" : undefined}
+      data-find-current={current ? "true" : undefined}
+      className={`group grid h-8 w-full items-center gap-2 border-b border-rule/70 bg-transparent p-0 text-left transition-[background-color,opacity] hover:bg-hover-glass focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-primary/60 data-[selected=true]:bg-selected-glass data-[selected=true]:hover:bg-selected-glass data-[dim=true]:opacity-15 data-[dim=true]:hover:opacity-100 data-[find-current=true]:bg-primary/25 data-[find-current=true]:shadow-[inset_3px_0_0_var(--color-primary)] ${COMMIT_ROW_GRID} ${fresh ? "row-flash" : ""}`}
       data-selected={selected}
       aria-pressed={selected}
       onClick={() => onSelect(commit.hash)}
