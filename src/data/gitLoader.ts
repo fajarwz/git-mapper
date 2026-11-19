@@ -640,6 +640,15 @@ export async function loadPullRequests(
   });
 }
 
+/**
+ * The provider page that opens a pull/merge request for `branch` (GitHub's compare page,
+ * GitLab's new merge request), built from the origin URL — no CLI or network involved.
+ * Null when there is no remote or its host is neither GitHub nor GitLab.
+ */
+export async function loadPullRequestUrl(dir: string, branch: string): Promise<string | null> {
+  return call("read_pull_request_url", { dir, branch }, (raw) => (typeof raw === "string" ? raw : null));
+}
+
 /** Pushes the current branch to origin with `-u`, so the first push sets the upstream. */
 export async function pushBranch(dir: string): Promise<string> {
   return call("push_branch", { dir }, (raw) => raw as string);

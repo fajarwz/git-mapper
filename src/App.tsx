@@ -15,6 +15,7 @@ import { useStarPrompt } from "./features/shell/useStarPrompt";
 import { ConfirmDialog } from "./shared/components/ConfirmDialog";
 import { SettingsModal } from "./features/shell/SettingsModal";
 import { STORAGE_KEYS, usePersistedState } from "./shared/lib/persisted";
+import { openExternal } from "./shared/lib/external";
 import { findMatches, queryTokens } from "./features/history/lib/commitFilter";
 import type { FindState } from "./features/history/components/FindBar";
 import type { SyntaxScheme } from "./features/diff/lib/highlight";
@@ -37,6 +38,7 @@ import { checkoutBranch,
   loadMoreCommits,
   loadRepository,
   mergeBranch,
+  loadPullRequestUrl,
   pickAndLoadRepository,
   pullBranch,
   pushBranch,
@@ -627,6 +629,33 @@ function App() {
       });
     },
     [activeRepoPath, repo, showFlash, setStageOpen],
+  );
+
+  // "Create pull request…" opens the provider's new-PR page for the branch in the browser; the
+  // URL comes from the origin remote, so an unsupported host is a notice, not a dead click.
+  const handleCreatePullRequest = useCallback(
+    async (branch: string) => {
+      if (!activeRepoPath) return;
+      try {
+        const url = await loadPullRequestUrl(activeRepoPath, branch);
+        if (url) {
+          openExternal(url);
+          return;
+        }
+        setNotice({
+          title: "No pull request page for this remote",
+          detail: "Only GitHub and GitLab remotes are supported.",
+          id: Date.now(),
+        });
+      } catch (urlError) {
+        setNotice({
+          title: `Could not open a pull request for ${branch}`,
+          detail: urlError instanceof Error ? urlError.message : String(urlError),
+          id: Date.now(),
+        });
+      }
+    },
+    [activeRepoPath],
   );
 
   // Opening a repository — or refocusing the app — quietly pulls every remote into the
@@ -1516,6 +1545,7 @@ function App() {
           onUndoCommit={() => handleMenuUndoCommit(contextMenu.commit.hash)}
           head={repo?.head ?? ""}
           onMerge={handleMergeBranch}
+          onCreatePullRequest={handleCreatePullRequest}
           currentBranch={
             repo !== null && !repo.branch.startsWith("HEAD") ? repo.branch : undefined
           }
