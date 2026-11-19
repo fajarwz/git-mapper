@@ -55,8 +55,11 @@ The links above always resolve to the newest release.
   or drag it wider on lane-heavy histories.
 - **Repository tabs.** Each tab remembers its selected commit, file and panel state; drag tabs
   into any order. Tabs you leave alone go to sleep to save memory and wake on click.
-- **Search.** Filter the loaded history by hash, message, author or ref name. Ctrl+F focuses the
-  title-bar box, Esc clears.
+- **Keyboard first.** Ctrl+T, Ctrl+W, Ctrl+1–9 and Ctrl+Tab drive the tabs, Ctrl+P jumps to any tab
+  by name or number, and Alt+Left / Alt+Right step back and forward through your selections.
+  Every shortcut is listed in Settings, and in the tooltip of the button it belongs to.
+- **Search.** Ctrl+F opens a floating find bar over the loaded history: match by hash, message,
+  author or ref name, the other rows dim, Enter and Shift+Enter step through the hits, Esc closes.
 - **Your columns, your way.** Resize the commit / author / date columns, drag their headers to
   reorder them, right-click a header to hide one.
 - **Stashes as rows.** Each stash sits above the commit it was taken on. Apply, pop or drop from
@@ -85,7 +88,8 @@ The links above always resolve to the newest release.
 
 - **Stage, commit, undo.** The `Uncommitted changes` row opens a staging rail: stage, unstage or
   discard by file, write the message and commit without leaving the window. Undo the tip commit
-  and its files come back staged. The rail docks itself when the tree goes clean.
+  and its files come back staged. Ctrl+Enter commits from the message box. The rail docks itself
+  when the tree goes clean.
 - **Hunks and single lines.** Stage, unstage or discard one hunk, or tick individual `+`/`-`
   lines and act on just those. Staged and unstaged sides are shown one at a time, like VS Code.
 - **Sync.** Fetch, pull (fast-forward only) and push the checked-out branch from the counters
@@ -95,6 +99,9 @@ The links above always resolve to the newest release.
 - **Merge and resolve.** Merge a local branch from its pill's menu. Conflicts land in the rail:
   take current or incoming per file, or open the file with its conflict blocks inline and choose
   current, incoming or both per block. Finish with git's own message, or abort.
+- **Pull requests.** GitHub pull requests and GitLab merge requests show as badges on branch
+  pills and in a title-bar list (open, merged, searchable; read-only). Right-click a branch and pick
+  **Create pull request…** to open the provider's new-PR page for it in your browser.
 - **Copy** hashes and branch, remote, tag and stash names from the right-click menu.
 
 **Stays out of your way**
@@ -133,7 +140,7 @@ the same commands at `POST /api/git`, which is why the app also runs in a plain 
 
 - Searching history beyond the loaded 500-commit window.
 - Rebasing and cherry-picking.
-- Pull requests (a `gh` passthrough is the planned next slice).
+- Pull request diffs, and closing or merging them from the app (the badges and list are read-only).
 
 ## Support
 
