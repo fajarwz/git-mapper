@@ -10,6 +10,8 @@ import shotStage from "../assets/screens/stage.png";
 import shotHunk from "../assets/screens/hunk.png";
 import shotConflict from "../assets/screens/conflict.png";
 import shotSplit from "../assets/screens/split.png";
+import shotFind from "../assets/screens/find.png";
+import shotPulls from "../assets/screens/pulls.png";
 import logoRaw from "../assets/logo.svg?raw";
 import iconDownload from "../assets/icons/download.svg?raw";
 import iconGithub from "../assets/icons/github-mark.svg?raw";
@@ -35,13 +37,26 @@ const features = [
     body: "Every branch owns a hue from tip to root. Forks bend exactly at their commit, merges join back cleanly, and dense lanes stay readable hundreds of rows in.",
     points: [
       "Branch, remote and tag pills on every row; double-click to check out",
-      "Search by hash, message, author or ref with Ctrl+F",
+      "Stashes sit as rows above the commit they were taken on",
       "Reorder, resize and hide columns to suit you",
       "Each repository in its own tab, restored on launch",
     ],
     img: shotGraph,
     alt: "The commit graph: five branches in their own colours forking and merging back into main, with branch, tag and stash pills on the rows",
     layout: "side",
+  },
+  {
+    title: "Find it, jump to it",
+    body: "Search the history without leaving it, hop between repositories by name, and step back through what you were just looking at. All of it from the keyboard.",
+    points: [
+      "Ctrl+F opens a floating find bar: hits are highlighted, the rest fade, Enter steps through them",
+      "Ctrl+P jumps to any open repository by name, path or number",
+      "Alt+Left and Alt+Right step back and forward through your selections",
+      "Ctrl+T, Ctrl+W, Ctrl+1–9 and Ctrl+Tab drive the tabs; every shortcut is listed in Settings",
+    ],
+    img: shotFind,
+    alt: "The find bar open over the commit list with the word lane typed: two matching rows are highlighted and every other row is faded, with a count of 1 of 2 and arrows to step through them",
+    layout: "text-first",
   },
   {
     title: "Down to the single line",
@@ -83,6 +98,19 @@ const features = [
     layout: "text-first",
   },
   {
+    title: "Pull requests, one click away",
+    body: "Branch pills carry a badge for their GitHub pull request or GitLab merge request, and a list in the title bar shows the open and merged ones. Ready to open one? It is in the branch's right-click menu.",
+    points: [
+      "Open, merged and closed states, with a searchable list",
+      "Create pull request… opens the new-PR page for that branch in your browser",
+      "Works with GitHub and GitLab remotes",
+      "Read-only: Git Mapper never changes your pull requests",
+    ],
+    img: shotPulls,
+    alt: "The right-click menu on the feat/tabs branch pill, offering Check out, Merge into main, Create pull request, and copy actions",
+    layout: "side-reverse",
+  },
+  {
     title: "Diffs that read",
     body: "Unified or split like GitHub, syntax highlighted in three colour schemes, with word-level marks showing exactly what changed.",
     points: [
@@ -101,6 +129,8 @@ const extras = [
   { title: "Stashes", body: "Each stash gets its own row above the commit it was taken on. Apply, pop or drop from its menu." },
   { title: "Always current", body: "Focus the window and it re-checks branches and the worktree. A background fetch keeps ahead/behind honest." },
   { title: "Tabs that remember", body: "Selected commit, file and panel state per repository. Drag to reorder; idle tabs sleep to save memory." },
+  { title: "Shortcut cheatsheet", body: "Every shortcut is listed in Settings, and in the tooltip of the button it belongs to." },
+  { title: "Commit from the keyboard", body: "Ctrl+Enter commits the staged files while the message box is focused." },
   { title: "Right-click menus", body: "Check out a branch or commit, copy hashes and ref names, merge, undo the tip, handle stashes." },
   { title: "Light and dark", body: "Two themes, zoom the whole window with Ctrl plus, minus and zero, window position restored on launch." },
   { title: "Submodules", body: "A strip under the tab lists them. Open one in its own view, and a commit that moves a pointer shows exactly which commit it moved from and to." },
