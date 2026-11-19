@@ -7,6 +7,8 @@ import { ContextMenu, type ContextMenuTarget, type StashAction } from "./shared/
 import { DetailsPanel } from "./features/details/DetailsPanel";
 import type { DiffLayout, DiffScope } from "./features/diff/components/DiffViewer";
 import { EmptyState } from "./features/shell/EmptyState";
+import { TabSwitcher } from "./features/shell/TabSwitcher";
+import { useTabShortcuts } from "./features/shell/tabShortcuts";
 import { TitleBar } from "./features/shell/TitleBar";
 import { SubmoduleStrip } from "./features/submodules/SubmoduleStrip";
 import { Toast } from "./shared/components/Toast";
@@ -1048,6 +1050,21 @@ function App() {
     if (!repo) setFindOpen(false);
   }, [repo]);
 
+  const [switcherOpen, setSwitcherOpen] = useState(false);
+  const switcherTabs = useMemo(
+    () => topRepos.map((item, index) => ({ id: item.id, name: item.name, path: item.path, number: index + 1 })),
+    [topRepos],
+  );
+  useTabShortcuts({
+    enabled: !booting && !settingsOpen && !contextMenu && !pendingConfirm && !switcherOpen && !opening,
+    count: topRepos.length,
+    activeIndex: topRepos.findIndex((item) => item.id === rootId),
+    onSelectIndex: (index) => handleSelectTop(topRepos[index].id),
+    onNew: () => void handleAdd(),
+    onClose: () => rootId && handleCloseRepo(rootId),
+    onSwitcher: () => setSwitcherOpen(true),
+  });
+
   const find: FindState | null =
     repo && findOpen
       ? {
@@ -1451,6 +1468,15 @@ function App() {
           onDownloadUpdate={handleDownloadUpdate}
           onRestartToUpdate={handleRestartToUpdate}
           onClose={() => setSettingsOpen(false)}
+        />
+      )}
+
+      {switcherOpen && (
+        <TabSwitcher
+          tabs={switcherTabs}
+          activeId={rootId}
+          onSelect={handleSelectTop}
+          onClose={() => setSwitcherOpen(false)}
         />
       )}
 
