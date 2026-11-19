@@ -20,3 +20,13 @@
    *Mechanics:* plain `enum`, not `const enum` (`isolatedModules` is on). Code that touches an
    existing string union converts it then — like the file-size rule, not "someday". Tests build and
    compare with the members too, so a renamed option breaks the build, not just a string match.
+
+2. **Don't add unnecessary comments.** A comment earns its place only by saying *why*: a hidden
+   constraint, a workaround, an ordering or race that would bite, a choice a reader would
+   otherwise "fix". Never narrate *what* the code does, label a JSX block, restate a prop, state
+   or function name, or describe a change (that belongs in the commit message).
+   *Why:* narration rots the moment the code changes, doubles the reading, and buries the few
+   comments that matter.
+   *How:* prefer a clearer name or a smaller function over a comment. Delete a comment you touch
+   that only restates the code. Keep directives (`@ts-expect-error` with its reason,
+   `/// <reference …>`) as they are.
