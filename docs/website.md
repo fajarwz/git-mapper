@@ -8,6 +8,11 @@ root sets `base = "website"`. Gate: `npm run build` + `npm run check` inside
 - Tokens in `website/src/styles/global.css` are copied from `src/index.css`
   `@theme` (light values only — the site never renders dark). Re-copy on token
   retunes; fonts and screenshots in `website/public/` mirror the app the same way.
+- **Feature rows follow one pattern** (`features` in `index.astro`): the `side` and
+  `side-reverse` rows come first and strictly alternate (image right, image left, image
+  right, …); every full-width `text-first` row follows after them, stacked to the end.
+  A new feature is slotted into whichever group its screenshot fits (a wide crop goes
+  last), never between two side rows, so the left/right rhythm is not broken.
 - The teach-sweep in `ThemeSlider` is skipped under `navigator.webdriver`, so
   headless captures always see the neutral 50% divider.
 - Mobile overflow rule from the first build: a flex child with an intrinsic
