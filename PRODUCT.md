@@ -59,4 +59,4 @@ Lightweight zero-config viewer that runs real `git` for its data but looks like 
 
 ## Accessibility & Inclusion
 
-Windows keyboard operation is expected: tabs stay activatable via keyboard (dnd sensors are pointer-only for this reason), Ctrl+F/Ctrl+R paths behave, and confirm dialogs use real buttons. Contrast targets from the design rules (AA on the danger confirm; no unreadable chrome on the aurora). No other product-specific standard established.
+Windows keyboard operation is expected: tabs stay activatable via keyboard (dnd sensors are pointer-only for this reason), Ctrl+F/Ctrl+R paths behave, and confirm dialogs use real buttons. Tab shortcuts (`features/shell/tabShortcuts.ts`): Ctrl+1–8 select, Ctrl+9 last, Ctrl+Tab / Ctrl+Shift+Tab cycle, Ctrl+T new, Ctrl+W close (no confirm, like the × button), Ctrl+P quick switcher (name, path or tab number, so tab 12+ is reachable). Ctrl+Enter commits, and the Commit button shows that hint. Contrast targets from the design rules (AA on the danger confirm; no unreadable chrome on the aurora). No other product-specific standard established.
