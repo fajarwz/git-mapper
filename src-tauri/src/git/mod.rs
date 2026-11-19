@@ -57,6 +57,11 @@ pub async fn read_pull_requests(
     })
     .await
 }
+/// The provider page that opens a pull request for a branch; null for an unsupported remote.
+#[tauri::command]
+pub async fn read_pull_request_url(dir: String, branch: String) -> Result<Option<String>, String> {
+    run_blocking("pull request url", move || pull_request_url_in(&dir, &branch)).await
+}
 /// Direct submodules of the repository with their state; empty without a `.gitmodules`.
 #[tauri::command]
 pub async fn read_submodules(dir: String) -> Result<Vec<SubmoduleInfo>, String> {

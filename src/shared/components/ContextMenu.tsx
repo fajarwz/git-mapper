@@ -30,6 +30,9 @@ interface ContextMenuProps {
   currentBranch?: string;
   /** Merges a local, non-current branch into the checked-out one; App confirms first. */
   onMerge?: (branch: string) => void;
+  /** Opens the provider's new pull request page for a branch (a remote ref passes its bare
+   * name). Offered for any branch or remote pill; the branch must already be pushed. */
+  onCreatePullRequest?: (branch: string) => void;
   onClose: () => void;
 }
 
@@ -59,6 +62,7 @@ export function ContextMenu({
   head,
   currentBranch,
   onMerge,
+  onCreatePullRequest,
   onClose,
 }: ContextMenuProps) {
   // The entry that just copied shows "Copied!" for a beat; the others keep their labels.
@@ -97,6 +101,14 @@ export function ContextMenu({
   // The merge target is exactly the checkoutable case (a local, non-current branch), so
   // the entry rides the same mount condition — App passes the handler when one is valid.
   const mergeable = checkoutable && branch !== null && Boolean(onMerge) && Boolean(currentBranch);
+  // A pull request is opened for a branch name; a remote pill ("origin/feat") means "feat".
+  const pullBranch =
+    target.ref?.type === "branch"
+      ? target.ref.name
+      : target.ref?.type === "remote"
+        ? target.ref.name.slice(target.ref.name.indexOf("/") + 1)
+        : null;
+  const pullable = pullBranch !== null && pullBranch !== "" && Boolean(onCreatePullRequest);
   // The commit checkout detaches HEAD: real history rows only — the HEAD row itself offers
   // nothing (it is already out), the uncommitted row ("wip") is not a commit, and stash rows
   // check out nothing. The app confirms first.
@@ -114,6 +126,7 @@ export function ContextMenu({
   const entries =
     (checkoutable ? 1 : 0) +
     (mergeable ? 1 : 0) +
+    (pullable ? 1 : 0) +
     (commitCheckoutable ? 1 : 0) +
     (undoable ? 1 : 0) +
     (stashIndex !== undefined ? 3 : 0) +
@@ -154,6 +167,17 @@ export function ContextMenu({
           }}
         >
           Merge into {currentBranch}
+        </button>
+      )}
+      {pullable && pullBranch && (
+        <button type="button" role="menuitem" className={ITEM}
+          title={`Opens the new pull request page for ${pullBranch} in your browser — push the branch first`}
+          onClick={() => {
+            onClose();
+            onCreatePullRequest?.(pullBranch);
+          }}
+        >
+          Create pull request…
         </button>
       )}
       {commitCheckoutable && (

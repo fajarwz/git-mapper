@@ -3,6 +3,20 @@ use super::test_support::*;
 use super::*;
 
 #[test]
+fn builds_the_new_pull_request_page_for_each_provider() {
+    use super::pulls::pull_request_url;
+    assert_eq!(
+        pull_request_url("git@github.com:o/r.git", "feat/x y").as_deref(),
+        Some("https://github.com/o/r/compare/feat/x%20y?expand=1")
+    );
+    assert_eq!(
+        pull_request_url("https://user:tok@gitlab.example.org:8443/g/sub/p.git", "fix").as_deref(),
+        Some("https://gitlab.example.org/g/sub/p/-/merge_requests/new?merge_request%5Bsource_branch%5D=fix")
+    );
+    assert_eq!(pull_request_url("git@bitbucket.org:o/r.git", "x"), None);
+}
+
+#[test]
 fn no_remote_wins_over_the_auth_hint_its_message_ends_with() {
     // gh's real text for a repo whose remote is not GitHub: it mentions `gh auth login`.
     let gh = "none of the git remotes configured for this repository point to a known GitHub host. \

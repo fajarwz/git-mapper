@@ -233,6 +233,60 @@ fn remote_host(dir: &str) -> Option<String> {
     url.ok().and_then(|url| host_of(&url))
 }
 
+/// `https://user@host:8443/g/p.git`, `ssh://git@host/g/p` and `git@host:g/p.git` all give `g/p`.
+pub fn path_of(url: &str) -> Option<String> {
+    let url = url.trim();
+    let path = match url.split_once("://") {
+        Some((_, rest)) => rest.split_once('/')?.1,
+        None => url.split_once(':')?.1,
+    };
+    let path = path.trim_matches('/');
+    let path = path.strip_suffix(".git").unwrap_or(path);
+    (!path.is_empty()).then(|| path.to_string())
+}
+
+/// Percent-encodes everything but the unreserved set and `/`, so a branch name is safe in a URL.
+fn encode_branch(branch: &str) -> String {
+    let mut out = String::new();
+    for byte in branch.bytes() {
+        match byte {
+            b'A'..=b'Z' | b'a'..=b'z' | b'0'..=b'9' | b'-' | b'.' | b'_' | b'~' | b'/' => out.push(byte as char),
+            _ => out.push_str(&format!("%{byte:02X}")),
+        }
+    }
+    out
+}
+
+/// The page that opens a pull/merge request for `branch`, built from a remote URL: GitHub's
+/// compare page, GitLab's new-merge-request page. A host that names neither is `None`.
+pub fn pull_request_url(remote_url: &str, branch: &str) -> Option<String> {
+    let host = host_of(remote_url)?;
+    let path = path_of(remote_url)?;
+    let branch = encode_branch(branch);
+    if host.contains("gitlab") {
+        Some(format!("https://{host}/{path}/-/merge_requests/new?merge_request%5Bsource_branch%5D={branch}"))
+    } else if host.contains("github") {
+        Some(format!("https://{host}/{path}/compare/{branch}?expand=1"))
+    } else {
+        None
+    }
+}
+
+/// Where to open a pull request for a pushed branch, from the origin remote (or the first one).
+/// `None` when no remote exists or its host is neither GitHub nor GitLab.
+pub fn pull_request_url_in(dir: &str, branch: &str) -> Result<Option<String>, String> {
+    let branch = branch.trim();
+    if branch.is_empty() || branch.starts_with('-') {
+        return Err(format!("\"{branch}\" is not a branch name"));
+    }
+    let url = run_git(dir, &["remote", "get-url", "origin"]).or_else(|_| {
+        let remotes = run_git(dir, &["remote"])?;
+        let first = remotes.lines().next().ok_or_else(String::new)?.to_string();
+        run_git(dir, &["remote", "get-url", &first])
+    });
+    Ok(url.ok().and_then(|url| pull_request_url(&url, branch)))
+}
+
 fn attempt(dir: &str, provider: Provider, scope: Scope, cursor: Option<&str>, query: Option<&str>) -> Attempt {
     let out = match cli_command(provider.program(), dir).args(provider.args(scope, cursor, query)).output() {
         Ok(out) => out,

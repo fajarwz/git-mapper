@@ -92,6 +92,44 @@ test("the merge entry only exists for mergeable pills", () => {
   assert.ok(getByText("Copy branch name"), "the copy entries still speak for the pill");
 });
 
+test("a branch pill offers a pull request, a remote pill passes the bare branch name", () => {
+  const onCreatePullRequest = vi.fn();
+  for (const [ref, expected] of [
+    [{ type: "branch", name: "main", isCurrent: true }, "main"],
+    [{ type: "remote", name: "origin/feat/x" }, "feat/x"],
+  ] as const) {
+    const { getByRole } = render(
+      <ContextMenu
+        target={target({ ref })}
+        onCheckout={vi.fn()}
+        onCheckoutCommit={vi.fn()}
+        onStashAction={vi.fn()}
+        head={HEAD}
+        onCreatePullRequest={onCreatePullRequest}
+        onClose={vi.fn()}
+      />,
+    );
+    fireEvent.click(getByRole("menuitem", { name: "Create pull request…" }));
+    assert.equal(onCreatePullRequest.mock.calls.at(-1)?.[0], expected);
+    cleanup();
+  }
+});
+
+test("a tag or plain commit offers no pull request", () => {
+  const { queryByRole } = render(
+    <ContextMenu
+      target={target({ ref: { type: "tag", name: "v1" } })}
+      onCheckout={vi.fn()}
+      onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
+      head={HEAD}
+      onCreatePullRequest={vi.fn()}
+      onClose={vi.fn()}
+    />,
+  );
+  assert.equal(queryByRole("menuitem", { name: /pull request/i }), null);
+});
+
 test("the checked-out branch offers no checkout entry", () => {
   const { queryByRole, getByRole } = render(
     <ContextMenu

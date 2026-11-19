@@ -169,6 +169,10 @@
   (real history rows only — not the HEAD row, the `wip` row or a stash row; it opens
   `ConfirmDialog.tsx`, because checking out a commit detaches HEAD and commits made there are
   lost without a branch — the command is `checkout_commit`, hash-format-gated, `--detach`),
+  `Create pull request…` (branch and remote pills; a remote pill passes the bare branch name):
+  `read_pull_request_url` (`git/pulls.rs`, mirrored in `dev/gitApi/pulls.ts`) builds GitHub's
+  compare page or GitLab's new-merge-request page from the origin URL — no CLI, no network — and
+  the app opens it in the browser; any other host gets a notice. The branch must already be pushed.
   `Copy commit hash` and `Copy branch|remote|tag|stash name`; a copy flips that entry to "Copied!"
   for 700ms, then the menu closes. A stash row additionally offers `Apply stash` (no confirm —
   git refuses an apply that would conflict and keeps the entry) plus `Pop stash…` / `Drop stash…`
