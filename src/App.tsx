@@ -72,6 +72,8 @@ import type { WorktreeFile } from "./features/staging/staging";
 import type { Repository, Submodule } from "./types";
 import { submoduleParents } from "./features/submodules/submodule";
 import { useCommitFiles } from "./features/diff/hooks/useCommitFiles";
+import { useNavigationHistory } from "./features/shell/useNavigationHistory";
+import type { NavLocation } from "./shared/lib/navigationHistory";
 import { useWipSide } from "./features/staging/useWipSide";
 import { usePullRequests } from "./features/pull-requests/hooks/usePullRequests";
 
@@ -485,6 +487,48 @@ function App() {
     if (!activeRepoId) return;
     setSelectedFileByRepo((previous) => ({ ...previous, [activeRepoId]: path }));
   }, [activeRepoId, setSelectedFileByRepo]);
+
+  // Back/forward across tabs. A location is (repo, commit, file); replaying one wakes its tab,
+  // selects the commit and file, and mirrors what a click would do to the panels.
+  const handleNavigate = useCallback(
+    (location: NavLocation) => {
+      if (location.repoId !== activeRepoId) handleSelectRepo(location.repoId);
+      setSelectedCommitByRepo((previous) => ({ ...previous, [location.repoId]: location.commitHash }));
+      setSelectedFileByRepo((previous) => ({ ...previous, [location.repoId]: location.filePath }));
+      setStageDrawerByRepo((previous) => ({
+        ...previous,
+        [location.repoId]: location.commitHash === UNCOMMITTED_HASH,
+      }));
+      setConflictView(null);
+      wipSide.pickSide(null);
+      setDetailsOpen(true);
+    },
+    [
+      activeRepoId,
+      handleSelectRepo,
+      setSelectedCommitByRepo,
+      setSelectedFileByRepo,
+      setStageDrawerByRepo,
+      setDetailsOpen,
+      wipSide.pickSide,
+    ],
+  );
+  // A closed tab or a commit a rebase removed is skipped; a sleeping tab has no commits loaded,
+  // so it is trusted until it wakes.
+  const isNavTargetValid = useCallback(
+    (location: NavLocation) => {
+      const target = repos.find((item) => item.id === location.repoId);
+      if (!target) return false;
+      if (target.sleeping || location.commitHash === UNCOMMITTED_HASH) return true;
+      return target.commits.some((commit) => commit.hash === location.commitHash);
+    },
+    [repos],
+  );
+  const navigation = useNavigationHistory({
+    current: repo && selectedCommit ? { repoId: repo.id, commitHash: selectedCommit.hash, filePath: selectedFilePath } : null,
+    navigate: handleNavigate,
+    isValid: isNavTargetValid,
+  });
 
   // Infinite scroll: the commit rows file a near-bottom signal, one page loads at a time.
   // Double-clicking a branch pill checks the branch out and reloads the repo.
@@ -1220,6 +1264,10 @@ function App() {
         stageOpen={stageOpen}
         onToggleStage={handleToggleStage}
         pulls={pulls}
+        canGoBack={navigation.canGoBack}
+        canGoForward={navigation.canGoForward}
+        onBack={navigation.goBack}
+        onForward={navigation.goForward}
       />
 
       {rootRepo !== null && (rootRepo.submodules?.length ?? 0) > 0 && (
