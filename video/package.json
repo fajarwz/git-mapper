@@ -5,6 +5,8 @@
   "scripts": {
     "sync": "node scripts/sync-assets.mjs",
     "music": "node scripts/make-music.mjs",
+    "sfx": "node scripts/prepare-sfx.mjs",
+    "record": "node scripts/record.mjs",
     "studio": "npm run sync && remotion studio",
     "render": "npm run sync && remotion render src/index.ts Showcase out/git-mapper-showcase.mp4"
   },
@@ -17,6 +19,7 @@
   },
   "devDependencies": {
     "@types/react": "^19.2.0",
+    "playwright-core": "^1.50.1",
     "typescript": "5.6.3"
   }
 }
