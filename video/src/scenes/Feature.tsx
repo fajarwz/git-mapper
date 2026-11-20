@@ -1,9 +1,10 @@
 import { useCurrentFrame } from "remotion";
 import { Backdrop, C, Caption, useIn } from "../theme";
-import { Shot, type Focus } from "../Shot";
+import { Clip } from "../Clip";
+import type { ClipSpec } from "../clips";
 
 interface Props {
-  eyebrow: string; title: string; sub: string; chips: string[]; shotWidth?: number; src: string; aspect: number; from: Focus; to: Focus; flip?: boolean;
+  eyebrow: string; title: string; sub: string; chips: string[]; shotWidth?: number; clip: ClipSpec; flip?: boolean;
 }
 
 const Chip = ({ label, delay }: { label: string; delay: number }) => {
@@ -16,7 +17,7 @@ const Chip = ({ label, delay }: { label: string; delay: number }) => {
   );
 };
 
-export const Feature = ({ eyebrow, title, sub, chips, shotWidth = 1080, src, aspect, from, to, flip }: Props) => (
+export const Feature = ({ eyebrow, title, sub, chips, shotWidth = 1080, clip, flip }: Props) => (
   <Backdrop>
     <div style={{ position: "absolute", inset: 0, display: "flex", alignItems: "center", flexDirection: flip ? "row-reverse" : "row", padding: "0 110px", gap: 70 }}>
       <div style={{ width: 560, flexShrink: 0 }}>
@@ -26,7 +27,7 @@ export const Feature = ({ eyebrow, title, sub, chips, shotWidth = 1080, src, asp
         </div>
       </div>
       <div style={{ flex: 1, display: "flex", justifyContent: "center" }}>
-        <Shot src={src} aspect={aspect} from={from} to={to} width={shotWidth} />
+        <Clip spec={clip} width={shotWidth} />
       </div>
     </div>
   </Backdrop>
