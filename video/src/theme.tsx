@@ -34,8 +34,8 @@ export const Backdrop = ({ children }: { children?: ReactNode }) => {
   const frame = useCurrentFrame();
   const drift = Math.sin(frame / 40) * 70;
   const glow = (color: string, x: number, y: number, size: number): CSSProperties => ({
-    position: "absolute", left: x, top: y, width: size, height: size, borderRadius: "50%",
-    background: color, filter: "blur(160px)", opacity: 0.5,
+    position: "absolute", left: x, top: y, width: size * 1.6, height: size * 1.6, marginLeft: -size * 0.3, marginTop: -size * 0.3,
+    background: `radial-gradient(closest-side, ${color} 0%, transparent 100%)`, opacity: 0.55,
   });
   return (
     <div style={{ position: "absolute", inset: 0, background: C.canvas, overflow: "hidden", fontFamily: SANS, color: C.text }}>
