@@ -7,6 +7,7 @@ import type { SyntaxScheme } from "../diff/lib/highlight";
 import { GITHUB_URL, type UpdateMode, type UpdateStatus } from "./updater";
 import type { Theme } from "./theme";
 import { PANEL } from "../../shared/lib/ui";
+import { Button, ButtonVariant } from "../../shared/components/Button";
 import { CheckIcon, CloseIcon, HeartIcon } from "../../shared/components/icons";
 
 interface SettingsModalProps {
@@ -39,7 +40,7 @@ const SYNTAX_SCHEMES: { value: SyntaxScheme; label: string; hint: string }[] = [
 
 interface UpdateAction {
   label: string;
-  tone: "primary" | "ghost";
+  variant: ButtonVariant;
   disabled?: boolean;
 }
 
@@ -49,13 +50,13 @@ function updateAction(status: UpdateStatus): UpdateAction | null {
     case "idle":
     case "current":
     case "error":
-      return { label: "Check for updates", tone: "ghost" };
+      return { label: "Check for updates", variant: ButtonVariant.Secondary };
     case "available":
-      return { label: "Download update", tone: "ghost" };
+      return { label: "Download update", variant: ButtonVariant.Secondary };
     case "downloading":
-      return { label: "Downloading…", tone: "ghost", disabled: true };
+      return { label: "Downloading…", variant: ButtonVariant.Secondary, disabled: true };
     case "ready":
-      return { label: "Restart to apply update", tone: "primary" };
+      return { label: "Restart to apply update", variant: ButtonVariant.Primary };
     default:
       return null;
   }
@@ -347,22 +348,18 @@ export function SettingsModal({
               {updateStatusLine(updateStatus)}
             </span>
             {updateAction(updateStatus) && (
-              <button
-                type="button"
+              <Button
+                variant={updateAction(updateStatus)!.variant}
                 onClick={() => {
                   if (updateStatus.phase === "ready") onRestartToUpdate();
                   else if (updateStatus.phase === "available") onDownloadUpdate();
                   else onCheckForUpdates();
                 }}
                 disabled={updateAction(updateStatus)!.disabled}
-                className={`shrink-0 rounded-lg px-3 py-1.5 text-[12px] font-semibold transition-colors disabled:opacity-60 ${
-                  updateAction(updateStatus)!.tone === "primary"
-                    ? "bg-primary text-white soft-shadow hover:brightness-110"
-                    : "border border-hairline bg-glass-strong text-ink hover:bg-hover-glass"
-                }`}
+                className="shrink-0"
               >
                 {updateAction(updateStatus)!.label}
-              </button>
+              </Button>
             )}
           </div>
         </div>
@@ -392,14 +389,13 @@ export function SettingsModal({
               Support this project
             </button>
           </div>
-          <button
-            type="button"
+          <Button
             onClick={() => openExternal(GITHUB_URL)}
             title="Open the GitHub repository"
-            className="shrink-0 rounded-lg border border-hairline bg-glass-strong px-3 py-1.5 text-[12px] font-semibold text-ink hover:bg-hover-glass"
+            className="shrink-0"
           >
             GitHub
-          </button>
+          </Button>
         </div>
 
         <p className="m-0 mt-3 text-[10.5px] text-ink-dim">Settings are saved on this device.</p>

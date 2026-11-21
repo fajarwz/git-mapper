@@ -2,6 +2,7 @@ import { useEffect, useRef, type ReactNode } from "react";
 import { createPortal } from "react-dom";
 import { useExit } from "../lib/useExit";
 import { PANEL } from "../lib/ui";
+import { Button, ButtonVariant } from "./Button";
 
 interface ConfirmDialogProps {
   title: string;
@@ -66,25 +67,12 @@ export function ConfirmDialog({ title, body, confirmLabel, danger = false, onCon
           {body}
         </div>
         <div className="mt-4 flex justify-end gap-2">
-          <button
-            ref={closeRef}
-            type="button"
-            onClick={close}
-            className="rounded-lg border border-hairline bg-glass-strong px-3 py-1.5 text-[12px] font-semibold text-ink hover:bg-hover-glass"
-          >
+          <Button ref={closeRef} onClick={close}>
             Cancel
-          </button>
-          <button
-            type="button"
-            onClick={onConfirm}
-            className={`rounded-lg px-3 py-1.5 text-[12px] font-semibold soft-shadow transition-colors hover:brightness-110 ${
-              danger
-                ? "border border-danger/30 bg-danger/15 text-danger-ink hover:bg-danger/25"
-                : "bg-primary text-white"
-            }`}
-          >
+          </Button>
+          <Button variant={danger ? ButtonVariant.Danger : ButtonVariant.Primary} onClick={onConfirm}>
             {confirmLabel}
-          </button>
+          </Button>
         </div>
       </div>
     </div>,
