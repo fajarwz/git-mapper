@@ -14,7 +14,6 @@ Standalone Git history viewer for Windows (Tauri 2 + React 19 + TypeScript + Tai
 | Things that have bitten before | [docs/known-pitfalls.md](docs/known-pitfalls.md) |
 | Shipping a release | [docs/releasing.md](docs/releasing.md) |
 | The landing site in `website/` | [docs/website.md](docs/website.md) |
-| What is planned next | [docs/roadmap.md](docs/roadmap.md) |
 
 Product and design context for the UI: [PRODUCT.md](PRODUCT.md) and [DESIGN.md](DESIGN.md).
 

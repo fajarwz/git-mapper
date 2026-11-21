@@ -37,8 +37,7 @@ the branch names only, not the code.
 
 Open an issue and describe the situation first. "I scroll 12k commits and lose the branch I was
 following" says more than "add a filter". Ideas that make history easier to read win over ideas
-that add a mode. The honest gaps are listed at the bottom of the README, and `docs/roadmap.md`
-shows what is already planned.
+that add a mode.
 
 ## Setting up
 
