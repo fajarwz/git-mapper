@@ -2,6 +2,7 @@ import type { CommitRef, PullRequest } from "../../../types";
 import { branchColor } from "../lib/graphGeometry";
 import { chipOf } from "../../pull-requests/lib/pullRequests";
 import { BranchIcon, RemoteIcon, StashIcon, TagIcon } from "../../../shared/components/icons";
+import { isCheckoutableRemote } from "../../../shared/lib/remoteBranch";
 import { PullRequestChip } from "../../pull-requests/components/PullRequestChip";
 
 interface RefPillProps {
@@ -11,6 +12,7 @@ interface RefPillProps {
   color: number;
   /** Only local branches are checkout-able; double-clicking the pill switches to it. */
   onCheckout?: (branch: string) => void;
+  onCheckoutRemote?: (remoteRef: string) => void;
   onContextMenu?: (ref: CommitRef, x: number, y: number) => void;
 }
 
@@ -23,16 +25,24 @@ const ICONS: Record<CommitRef["type"], typeof BranchIcon> = {
 };
 
 /** Branch / remote / tag / stash / detached-HEAD label shown inline after a commit subject. */
-export function RefPill({ ref, pullRequest, color, onCheckout, onContextMenu }: RefPillProps) {
+export function RefPill({ ref, pullRequest, color, onCheckout, onCheckoutRemote, onContextMenu }: RefPillProps) {
   const Icon = ICONS[ref.type];
-  const checkoutable = ref.type === "branch" && !ref.isCurrent && onCheckout !== undefined;
+  const checkoutableRemote = isCheckoutableRemote(ref) && onCheckoutRemote !== undefined;
+  const checkoutable =
+    (ref.type === "branch" && !ref.isCurrent && onCheckout !== undefined) || checkoutableRemote;
   const colorValue = branchColor(color);
   // A detached HEAD copies as plain "HEAD"; the longer story is display-only.
   const label = ref.type === "head" ? "HEAD (detached)" : ref.name;
 
   return (
     <span
-      onDoubleClick={checkoutable ? () => onCheckout?.(ref.name) : undefined}
+      onDoubleClick={
+        checkoutableRemote
+          ? () => onCheckoutRemote?.(ref.name)
+          : checkoutable
+            ? () => onCheckout?.(ref.name)
+            : undefined
+      }
       onContextMenu={
         onContextMenu
           ? (event) => {

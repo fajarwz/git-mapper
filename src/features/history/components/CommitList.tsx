@@ -61,6 +61,7 @@ interface CommitListProps {
   pullsByBranch?: Map<string, PullRequest>;
   commitChip?: (commit: Commit) => PullChipData | null;
   onCheckoutBranch: (branch: string) => void;
+  onCheckoutRemote?: (remoteRef: string) => void;
   onContextMenu?: (commit: Commit, ref: CommitRef | undefined, x: number, y: number) => void;
 }
 
@@ -117,7 +118,7 @@ function HeaderCell({
   );
 }
 
-export function CommitList({ repo, commits, find = null, selectedHash, flashHashes, onSelect, loadingMore, waking = false, showAvatars, onNearBottom, pullsByBranch, commitChip, onCheckoutBranch, onContextMenu }: CommitListProps) {
+export function CommitList({ repo, commits, find = null, selectedHash, flashHashes, onSelect, loadingMore, waking = false, showAvatars, onNearBottom, pullsByBranch, commitChip, onCheckoutBranch, onCheckoutRemote, onContextMenu }: CommitListProps) {
   const layout = useMemo(
     () =>
       layoutGraph(
@@ -370,6 +371,7 @@ export function CommitList({ repo, commits, find = null, selectedHash, flashHash
               commitChip={commitChip}
               onSelect={onSelect}
               onCheckoutBranch={onCheckoutBranch}
+              onCheckoutRemote={onCheckoutRemote}
               onContextMenu={hasContextMenu ? handleRowContextMenu : undefined}
               onRefContextMenu={hasContextMenu ? handleRefContextMenu : undefined}
             />

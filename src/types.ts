@@ -7,6 +7,11 @@ export interface CommitRef {
   withRemote?: string;
 }
 
+export enum RemoteCheckoutMode {
+  Create = "create",
+  Existing = "existing",
+}
+
 export type FileStatus = "added" | "modified" | "deleted" | "renamed";
 
 export type DiffLineType = "hunk" | "context" | "add" | "remove";

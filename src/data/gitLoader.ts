@@ -9,7 +9,7 @@ import type {
   Repository,
   Submodule,
 } from "../types";
-import { PullRequestProvider, PullRequestsStatus } from "../types";
+import { PullRequestProvider, PullRequestsStatus, RemoteCheckoutMode } from "../types";
 import { parsePullRequestPage, type PullRequestPage } from "../features/pull-requests/lib/pullRequests";
 import { sameSubmodules, shapeSubmodules, type RawSubmodule } from "../features/submodules/submodule";
 import { STORAGE_KEYS } from "../shared/lib/persisted";
@@ -570,6 +570,23 @@ interface RawFilePayload {
 
 export async function checkoutBranch(dir: string, branch: string): Promise<void> {
   await call("checkout_branch", { dir, branch }, (raw) => raw as void);
+}
+
+export async function localBranchExists(dir: string, name: string): Promise<boolean> {
+  return call("local_branch_exists", { dir, name }, (raw) => raw as boolean);
+}
+
+export async function checkoutRemoteBranch(
+  dir: string,
+  remoteRef: string,
+  localName: string,
+  mode: RemoteCheckoutMode,
+): Promise<void> {
+  await call(
+    "checkout_remote_branch",
+    { dir, remoteRef, localName, mode },
+    (raw) => raw as void,
+  );
 }
 
 export async function checkoutCommit(dir: string, hash: string): Promise<void> {

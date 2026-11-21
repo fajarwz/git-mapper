@@ -315,3 +315,37 @@ test("a right-click anywhere else than the menu closes it", async () => {
   await new Promise((resolve) => window.setTimeout(resolve, 5));
   assert.ok(onClose.mock.calls.length > 0, "a pointer down outside dismisses the menu");
 });
+
+test("a remote branch offers a checkout that hands over its full ref", () => {
+  const onCheckoutRemote = vi.fn();
+  const { getByRole, queryByRole } = render(
+    <ContextMenu
+      target={target({ ref: { type: "remote", name: "origin/feature/x" } })}
+      onCheckout={vi.fn()}
+      onCheckoutRemote={onCheckoutRemote}
+      onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
+      head={HEAD}
+      onClose={vi.fn()}
+    />,
+  );
+
+  fireEvent.click(getByRole("menuitem", { name: "Check out origin/feature/x…" }));
+  assert.equal(onCheckoutRemote.mock.calls[0][0], "origin/feature/x");
+  assert.equal(queryByRole("menuitem", { name: /Merge into/ }), null);
+});
+
+test("the remote's symbolic HEAD offers no checkout", () => {
+  const { queryByRole } = render(
+    <ContextMenu
+      target={target({ ref: { type: "remote", name: "origin/HEAD" } })}
+      onCheckout={vi.fn()}
+      onCheckoutRemote={vi.fn()}
+      onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
+      head={HEAD}
+      onClose={vi.fn()}
+    />,
+  );
+  assert.equal(queryByRole("menuitem", { name: /Check out origin\/HEAD/ }), null);
+});

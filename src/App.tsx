@@ -15,6 +15,7 @@ import { Toast } from "./shared/components/Toast";
 import { StarPrompt } from "./features/shell/StarPrompt";
 import { useStarPrompt } from "./features/shell/useStarPrompt";
 import { ConfirmDialog } from "./shared/components/ConfirmDialog";
+import { CheckoutRemoteDialog } from "./features/history/components/CheckoutRemoteDialog";
 import { SettingsModal } from "./features/shell/SettingsModal";
 import { STORAGE_KEYS, usePersistedState } from "./shared/lib/persisted";
 import { openExternal } from "./shared/lib/external";
@@ -34,6 +35,8 @@ import { applyTheme, initialTheme, storeTheme } from "./features/shell/theme";
 import type { Theme } from "./features/shell/theme";
 import { checkoutBranch,
   checkoutCommit,
+  checkoutRemoteBranch,
+  localBranchExists,
   fetchRemote,
   loadConflictFiles,
   writeConflictResolution,
@@ -74,7 +77,7 @@ import {
 } from "./features/staging/StagePanel";
 import { ResizeHandle } from "./shared/components/ResizeHandle";
 import type { WorktreeFile } from "./features/staging/staging";
-import type { Repository, Submodule } from "./types";
+import { RemoteCheckoutMode, type Repository, type Submodule } from "./types";
 import { submoduleParents } from "./features/submodules/submodule";
 import { useCommitFiles } from "./features/diff/hooks/useCommitFiles";
 import { useNavigationHistory } from "./features/shell/useNavigationHistory";
@@ -528,6 +531,39 @@ function App() {
     }
   }, [activeRepoPath, opening]);
 
+  const [remoteCheckout, setRemoteCheckout] = useState<string | null>(null);
+  const handleCheckoutRemote = useCallback(
+    (remoteRef: string) => {
+      if (!activeRepoPath || opening) return;
+      setRemoteCheckout(remoteRef);
+    },
+    [activeRepoPath, opening],
+  );
+  const runRemoteCheckout = useCallback(
+    async (remoteRef: string, name: string, mode: RemoteCheckoutMode) => {
+      if (!activeRepoPath) return;
+      setRemoteCheckout(null);
+      try {
+        await checkoutRemoteBranch(activeRepoPath, remoteRef, name, mode);
+      } catch (checkoutError) {
+        setNotice({
+          title: `Could not check out ${remoteRef}`,
+          detail: checkoutError instanceof Error ? checkoutError.message : String(checkoutError),
+          id: Date.now(),
+        });
+      }
+      try {
+        const refreshed = await loadRepository(activeRepoPath);
+        setRepos((previous) =>
+          previous.map((item) => (item.id === refreshed.id ? refreshed : item)),
+        );
+      } catch (loadError) {
+        console.error("Could not reload after the checkout", loadError);
+      }
+    },
+    [activeRepoPath],
+  );
+
   async function handleNearBottom() {
     if (!repo || loadingMoreByRepo[repo.id] || allLoadedByRepo[repo.id]) return;
     setLoadingMoreByRepo((previous) => ({ ...previous, [repo.id]: true }));
@@ -874,6 +910,14 @@ function App() {
     window.addEventListener("keydown", onKeyDown, true);
     return () => window.removeEventListener("keydown", onKeyDown, true);
   }, [contextMenu, settingsOpen, pendingConfirm, detailsOpen, setDetailsOpen]);
+
+  const handleMenuCheckoutRemote = useCallback(
+    (remoteRef: string) => {
+      closeContextMenu();
+      handleCheckoutRemote(remoteRef);
+    },
+    [closeContextMenu, handleCheckoutRemote],
+  );
 
   const handleMenuCheckoutCommit = useCallback(
     (hash: string) => {
@@ -1394,6 +1438,7 @@ function App() {
               pullsByBranch={pulls.byBranch}
               commitChip={pulls.commitChip}
               onCheckoutBranch={handleCheckoutBranch}
+              onCheckoutRemote={handleCheckoutRemote}
               onContextMenu={(commit, ref, x, y) => {
                 // The uncommitted row owns no menu (empty pseudo hash, no refs): a right-click
                 // there would only ever draw an empty box, so it draws nothing.
@@ -1432,6 +1477,7 @@ function App() {
                 commitChip={pulls.commitChip}
                 terms={detailsTerms}
                 onCheckoutBranch={handleCheckoutBranch}
+                onCheckoutRemote={handleCheckoutRemote}
                 onRefContextMenu={(ref, x, y) => {
                   // The wip row never reaches here (no sidebar), so no empty-menu guard needed.
                   setContextMenu({ commit: selectedCommit, ref, x, y });
@@ -1484,6 +1530,7 @@ function App() {
         <ContextMenu
           target={contextMenu}
           onCheckout={handleMenuCheckout}
+          onCheckoutRemote={handleMenuCheckoutRemote}
           onCheckoutCommit={handleMenuCheckoutCommit}
           onStashAction={handleMenuStashAction}
           // The offer exists only on the checked-out tip itself, only while it is unpushed
@@ -1504,6 +1551,15 @@ function App() {
             repo !== null && !repo.branch.startsWith("HEAD") ? repo.branch : undefined
           }
           onClose={closeContextMenu}
+        />
+      )}
+
+      {remoteCheckout !== null && activeRepoPath && (
+        <CheckoutRemoteDialog
+          remoteRef={remoteCheckout}
+          exists={(name) => localBranchExists(activeRepoPath, name)}
+          onCheckout={(name, mode) => void runRemoteCheckout(remoteCheckout, name, mode)}
+          onClose={() => setRemoteCheckout(null)}
         />
       )}
 
