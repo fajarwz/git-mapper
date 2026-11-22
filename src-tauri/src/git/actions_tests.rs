@@ -344,3 +344,65 @@ fn push_tag_and_delete_remote_tag_round_trip_through_origin() {
 
     assert!(push_tag_in(repo.path(), "ghost").is_err());
 }
+
+#[test]
+fn set_upstream_needs_a_known_remote_and_an_existing_remote_branch() {
+    let (_remote, repo) = clone_with_remote_branch("set-upstream");
+    git(&repo.0, &["branch", "topic"]);
+
+    set_upstream_in(repo.path(), "topic", "origin", "feature/x").expect("upstream set");
+    assert_eq!(git_out(&repo.0, &["rev-parse", "--abbrev-ref", "topic@{u}"]), "origin/feature/x");
+
+    let err = set_upstream_in(repo.path(), "topic", "origin", "nope").unwrap_err();
+    assert!(err.contains("does not exist"), "got: {err}");
+    let err = set_upstream_in(repo.path(), "topic", "ghost", "main").unwrap_err();
+    assert!(err.contains("no remote named"), "got: {err}");
+    let err = set_upstream_in(repo.path(), "ghost", "origin", "main").unwrap_err();
+    assert!(err.contains("no local branch"), "got: {err}");
+    let err = set_upstream_in(repo.path(), "topic", "origin", "-x").unwrap_err();
+    assert!(err.contains("not a valid branch name"), "got: {err}");
+}
+
+#[test]
+fn push_branch_to_publishes_under_the_chosen_name_and_tracks_it() {
+    let (remote, repo) = clone_with_remote_branch("push-to");
+    git(&repo.0, &["branch", "topic"]);
+
+    push_branch_to_in(repo.path(), "topic", "origin", "review/topic").expect("pushed");
+    let published = std::process::Command::new("git")
+        .args(["rev-parse", "refs/heads/review/topic"])
+        .current_dir(&remote.0)
+        .output()
+        .expect("git ran");
+    assert!(published.status.success(), "the remote has review/topic");
+    assert_eq!(git_out(&repo.0, &["rev-parse", "--abbrev-ref", "topic@{u}"]), "origin/review/topic");
+
+    assert!(push_branch_to_in(repo.path(), "topic", "ghost", "x").is_err());
+    assert!(push_branch_to_in(repo.path(), "ghost", "origin", "x").is_err());
+}
+
+#[test]
+fn push_follows_the_branch_upstream_and_falls_back_to_origin() {
+    let (_remote, repo) = clone_with_remote_branch("push-args");
+    assert_eq!(push_args_in(repo.path()), ["push", "-u", "origin", "HEAD"], "no upstream yet");
+
+    let second = bare_repo("push-args-second");
+    git(&repo.0, &["remote", "add", "mirror", second.to_str().expect("path")]);
+    push_branch_to_in(repo.path(), "main", "mirror", "trunk").expect("published");
+    assert_eq!(
+        push_args_in(repo.path()),
+        ["push", "-u", "mirror", "HEAD:refs/heads/trunk"],
+        "the upstream's remote and branch name win"
+    );
+    let _ = std::fs::remove_dir_all(&second);
+}
+
+#[test]
+fn status_reports_the_upstream_or_an_empty_string() {
+    let (_remote, repo) = clone_with_remote_branch("status-upstream");
+    assert_eq!(read_status_in(repo.path()).expect("status").upstream, "");
+
+    git(&repo.0, &["branch", "-u", "origin/main"]);
+    let info = read_status_in(repo.path()).expect("status");
+    assert_eq!(info.upstream, "origin/main");
+}

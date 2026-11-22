@@ -6,6 +6,7 @@ import type {
   CommitRef,
   DiffLine,
   PullScope,
+  RemoteInfo,
   Repository,
   Submodule,
 } from "../types";
@@ -64,6 +65,7 @@ interface StatusInfo {
   branch: string;
   ahead: number;
   behind: number;
+  upstream?: string;
   dirty: boolean;
   changed: number;
   head: string;
@@ -329,6 +331,7 @@ export async function loadRepository(dir: string): Promise<Repository> {
     branch: status.branch || "HEAD detached",
     ahead: status.ahead,
     behind: status.behind,
+    upstream: status.upstream ?? "",
     head: status.head,
     changed: status.changed,
     worktree: status.worktree,
@@ -499,6 +502,7 @@ export async function refreshRepository(
       branch,
       ahead: status.ahead,
       behind: status.behind,
+      upstream: status.upstream ?? "",
       head: status.head,
       changed: status.changed,
       worktree: status.worktree,
@@ -908,4 +912,28 @@ export function readStoredPaths(): string[] {
 
 export function storePaths(paths: string[]): void {
   localStorage.setItem(OPEN_REPOS_KEY, JSON.stringify(paths));
+}
+
+export async function listRemotes(dir: string): Promise<RemoteInfo[]> {
+  return call("list_remotes", { dir }, (raw) => raw as RemoteInfo[]);
+}
+
+export async function addRemote(dir: string, name: string, url: string): Promise<void> {
+  await call("add_remote", { dir, name, url }, (raw) => raw as void);
+}
+
+export async function renameRemote(dir: string, old: string, next: string): Promise<void> {
+  await call("rename_remote", { dir, old, new: next }, (raw) => raw as void);
+}
+
+export async function removeRemote(dir: string, name: string): Promise<void> {
+  await call("remove_remote", { dir, name }, (raw) => raw as void);
+}
+
+export async function setUpstream(dir: string, branch: string, remote: string, remoteBranch: string): Promise<void> {
+  await call("set_upstream", { dir, branch, remote, remoteBranch }, (raw) => raw as void);
+}
+
+export async function pushBranchTo(dir: string, branch: string, remote: string, remoteBranch: string): Promise<void> {
+  await call("push_branch_to", { dir, branch, remote, remoteBranch }, (raw) => raw as void);
 }

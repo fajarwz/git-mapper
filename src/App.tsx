@@ -19,6 +19,8 @@ import { CheckoutRemoteDialog } from "./features/history/components/CheckoutRemo
 import { CreateBranchDialog } from "./features/history/components/CreateBranchDialog";
 import { CreateTagDialog } from "./features/history/components/CreateTagDialog";
 import { SettingsModal } from "./features/shell/SettingsModal";
+import { RemotesDialog } from "./features/shell/RemotesDialog";
+import { UpstreamDialog, UpstreamMode } from "./features/history/components/UpstreamDialog";
 import { STORAGE_KEYS, usePersistedState } from "./shared/lib/persisted";
 import { openExternal } from "./shared/lib/external";
 import { findMatches, queryTokens } from "./features/history/lib/commitFilter";
@@ -39,8 +41,14 @@ import { checkoutBranch,
   checkoutCommit,
   checkoutRemoteBranch,
   createBranch,
+  addRemote,
   createTag,
   deleteBranch,
+  listRemotes,
+  pushBranchTo,
+  removeRemote,
+  renameRemote,
+  setUpstream,
   deleteRemoteTag,
   deleteTag,
   pushTag,
@@ -1017,6 +1025,57 @@ function App() {
     [closeContextMenu, runDeleteBranch],
   );
 
+  const [remotesOpen, setRemotesOpen] = useState(false);
+  const loadRemotes = useCallback(
+    () => (activeRepoPath ? listRemotes(activeRepoPath) : Promise.resolve([])),
+    [activeRepoPath],
+  );
+  // Each change reloads the repo behind the dialog: a rename or remove moves the remote pills.
+  const handleAddRemote = useCallback(
+    async (name: string, url: string) => {
+      if (!activeRepoPath) return;
+      await addRemote(activeRepoPath, name, url);
+      await reloadActiveRepo();
+    },
+    [activeRepoPath, reloadActiveRepo],
+  );
+  const handleRenameRemote = useCallback(
+    async (name: string, next: string) => {
+      if (!activeRepoPath) return;
+      await renameRemote(activeRepoPath, name, next);
+      await reloadActiveRepo();
+    },
+    [activeRepoPath, reloadActiveRepo],
+  );
+  const handleRemoveRemote = useCallback(
+    async (name: string) => {
+      if (!activeRepoPath) return;
+      await removeRemote(activeRepoPath, name);
+      await reloadActiveRepo();
+    },
+    [activeRepoPath, reloadActiveRepo],
+  );
+
+  const [upstreamTarget, setUpstreamTarget] = useState<{ mode: UpstreamMode; branch: string } | null>(null);
+  const handleMenuUpstream = useCallback(
+    (mode: UpstreamMode, branch: string) => {
+      closeContextMenu();
+      if (!activeRepoPath || opening) return;
+      setUpstreamTarget({ mode, branch });
+    },
+    [closeContextMenu, activeRepoPath, opening],
+  );
+  const submitUpstream = useCallback(
+    async (remote: string, remoteBranch: string) => {
+      if (!activeRepoPath || !upstreamTarget) return;
+      const { mode, branch } = upstreamTarget;
+      await (mode === UpstreamMode.Set ? setUpstream : pushBranchTo)(activeRepoPath, branch, remote, remoteBranch);
+      setUpstreamTarget(null);
+      await reloadActiveRepo();
+    },
+    [activeRepoPath, upstreamTarget, reloadActiveRepo],
+  );
+
   const [createTagHash, setCreateTagHash] = useState<string | null>(null);
   const handleMenuCreateTag = useCallback(
     (hash: string) => {
@@ -1518,6 +1577,7 @@ function App() {
         onReorder={handleReorderTop}
         onRefresh={() => void handleRefresh()}
         onFetch={() => void handleFetch()}
+        onOpenRemotes={() => setRemotesOpen(true)}
         fetching={fetching}
         onOpenSettings={() => setSettingsOpen(true)}
         updateReady={updateStatus.phase === "ready"}
@@ -1713,6 +1773,8 @@ function App() {
           onCreateTag={handleMenuCreateTag}
           onDeleteTag={handleMenuDeleteTag}
           onPushTag={(name) => void handleMenuPushTag(name)}
+          onSetUpstream={(branch) => handleMenuUpstream(UpstreamMode.Set, branch)}
+          onPushBranchTo={(branch) => handleMenuUpstream(UpstreamMode.Push, branch)}
           onCheckoutCommit={handleMenuCheckoutCommit}
           onStashAction={handleMenuStashAction}
           // The offer exists only on the checked-out tip itself, only while it is unpushed
@@ -1751,6 +1813,31 @@ function App() {
           exists={(name) => localBranchExists(activeRepoPath, name)}
           onCreate={(name, checkout) => void runCreateBranch(createBranchHash, name, checkout)}
           onClose={() => setCreateBranchHash(null)}
+        />
+      )}
+
+      {remotesOpen && activeRepoPath && (
+        <RemotesDialog
+          load={loadRemotes}
+          onAdd={handleAddRemote}
+          onRename={handleRenameRemote}
+          onRemove={handleRemoveRemote}
+          onClose={() => setRemotesOpen(false)}
+        />
+      )}
+
+      {upstreamTarget !== null && activeRepoPath && (
+        <UpstreamDialog
+          mode={upstreamTarget.mode}
+          branch={upstreamTarget.branch}
+          defaultRemote={
+            repo?.branch === upstreamTarget.branch && repo.upstream
+              ? repo.upstream.slice(0, repo.upstream.indexOf("/"))
+              : "origin"
+          }
+          load={loadRemotes}
+          onSubmit={submitUpstream}
+          onClose={() => setUpstreamTarget(null)}
         />
       )}
 

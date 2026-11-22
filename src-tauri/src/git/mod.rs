@@ -4,6 +4,7 @@ mod pulls;
 mod hunks;
 mod log;
 mod merge;
+mod remotes;
 mod shell;
 mod staging;
 mod status;
@@ -21,6 +22,8 @@ mod log_tests;
 #[cfg(test)]
 mod merge_tests;
 #[cfg(test)]
+mod remotes_tests;
+#[cfg(test)]
 mod staging_tests;
 #[cfg(test)]
 mod status_tests;
@@ -37,6 +40,7 @@ pub use pulls::*;
 pub use hunks::*;
 pub use log::*;
 pub use merge::*;
+pub use remotes::*;
 pub use shell::*;
 pub use staging::*;
 pub use status::*;
@@ -209,6 +213,30 @@ pub async fn create_tag(dir: String, name: String, hash: String, message: String
     run_blocking("create tag", move || create_tag_in(&dir, &name, &hash, &message)).await
 }
 #[tauri::command]
+pub async fn set_upstream(dir: String, branch: String, remote: String, remote_branch: String) -> Result<(), String> {
+    run_blocking("set upstream", move || set_upstream_in(&dir, &branch, &remote, &remote_branch)).await
+}
+#[tauri::command]
+pub async fn push_branch_to(dir: String, branch: String, remote: String, remote_branch: String) -> Result<(), String> {
+    run_blocking("push branch", move || push_branch_to_in(&dir, &branch, &remote, &remote_branch)).await
+}
+#[tauri::command]
+pub async fn list_remotes(dir: String) -> Result<Vec<RemoteInfo>, String> {
+    run_blocking("remotes read", move || list_remotes_in(&dir)).await
+}
+#[tauri::command]
+pub async fn add_remote(dir: String, name: String, url: String) -> Result<(), String> {
+    run_blocking("add remote", move || add_remote_in(&dir, &name, &url)).await
+}
+#[tauri::command]
+pub async fn rename_remote(dir: String, old: String, new: String) -> Result<(), String> {
+    run_blocking("rename remote", move || rename_remote_in(&dir, &old, &new)).await
+}
+#[tauri::command]
+pub async fn remove_remote(dir: String, name: String) -> Result<(), String> {
+    run_blocking("remove remote", move || remove_remote_in(&dir, &name)).await
+}
+#[tauri::command]
 pub async fn push_tag(dir: String, name: String) -> Result<(), String> {
     run_blocking("push tag", move || push_tag_in(&dir, &name)).await
 }
@@ -283,7 +311,7 @@ pub async fn pull_branch(dir: String) -> Result<String, String> {
 pub async fn push_branch(dir: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
         git_command(&dir)
-            .args(["push", "-u", "origin", "HEAD"])
+            .args(push_args_in(&dir))
             .env("GIT_TERMINAL_PROMPT", "0")
             .output()
             .map_err(|e| format!("failed to run git: {e}"))
