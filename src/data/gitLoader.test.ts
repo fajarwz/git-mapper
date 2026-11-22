@@ -121,6 +121,8 @@ class FakeGit {
         return Promise.resolve(this.refs);
       case "read_stashes":
         return Promise.resolve(this.stashes);
+      case "read_submodules":
+        return Promise.resolve([]);
       default:
         throw new Error(`FakeGit does not implement ${op}`);
     }

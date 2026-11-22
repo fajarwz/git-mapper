@@ -105,6 +105,12 @@ class FakeGit {
               part.includes(`+++ b/${String(args.path)}`),
             ) ?? ""),
         );
+      case "read_submodules":
+        return Promise.resolve([]);
+      case "fetch_remote":
+        return Promise.resolve(null);
+      case "read_wip_side":
+        return Promise.resolve({ numstat: "", name_status: "", diff: "" });
       default:
         throw new Error(`FakeGit does not implement ${op}`);
     }
