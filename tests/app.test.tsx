@@ -367,10 +367,18 @@ test("saved tabs that no longer open are announced instead of vanishing", async 
       : fake.respond(op, args),
   );
 
+  // The app logs the failed reopen on purpose; keep it out of the test output.
+  const logged = vi.spyOn(console, "error").mockImplementation(() => {});
+
   const { container } = render(<App />);
   await waitFor(() => {
     assert.equal(container.querySelectorAll("[data-commit-row]").length, 3, "the good tab loads");
   });
+  assert.ok(
+    logged.mock.calls.some(([message]) => String(message).includes("C:/repos/gone")),
+    "the failure is still logged",
+  );
+  logged.mockRestore();
   const toast = container.querySelector("[data-toast]");
   assert.ok(toast, "the failed tab gets a notice");
   assert.ok(toast?.textContent?.includes("A saved repository could not be reopened"));
