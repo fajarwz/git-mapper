@@ -14,6 +14,7 @@ import {
   useSortable,
 } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import type { Repository } from "../../types";
 import type { PullRequestsView } from "../pull-requests/hooks/usePullRequests";
 import { PullRequestMenu } from "../pull-requests/components/PullRequestMenu";
@@ -52,7 +53,6 @@ type WindowAction = "minimize" | "toggleMaximize" | "close";
 async function windowAction(action: WindowAction): Promise<void> {
   // Browser tabs have no window to drive; the dev server still renders the bar.
   if (!IN_TAURI) return;
-  const { getCurrentWindow } = await import("@tauri-apps/api/window");
   const current = getCurrentWindow();
   await current[action]();
 }
@@ -264,7 +264,6 @@ export function TitleBar({
     let stop: (() => void) | undefined;
     let cancelled = false;
     void (async () => {
-      const { getCurrentWindow } = await import("@tauri-apps/api/window");
       const current = getCurrentWindow();
       const sync = async () => {
         const value = await current.isMaximized();

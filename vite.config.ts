@@ -15,6 +15,21 @@ const underTauriCli = process.env.TAURI_ENV_PLATFORM !== undefined;
 export default defineConfig(() => ({
   plugins: [react(), tailwindcss(), svgr(), gitDevApi()],
 
+  build: {
+    rolldownOptions: {
+      output: {
+        // Keep third-party code out of the app chunk so each stays well under the size warning.
+        codeSplitting: {
+          groups: [
+            { name: "react", test: /node_modules[\\/](react|react-dom|scheduler)[\\/]/, priority: 3 },
+            { name: "dnd-kit", test: /node_modules[\\/]@dnd-kit[\\/]/, priority: 2 },
+            { name: "tauri", test: /node_modules[\\/]@tauri-apps[\\/]/, priority: 2 },
+          ],
+        },
+      },
+    },
+  },
+
   // Vite options tailored for Tauri development and only applied in `tauri dev` or `tauri build`
   //
   // 1. prevent Vite from obscuring rust errors
