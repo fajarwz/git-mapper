@@ -20,6 +20,7 @@ import { CreateBranchDialog } from "./features/history/components/CreateBranchDi
 import { CreateTagDialog } from "./features/history/components/CreateTagDialog";
 import { SettingsModal } from "./features/shell/SettingsModal";
 import { RemotesDialog } from "./features/shell/RemotesDialog";
+import { TagRemoteDialog, TagRemoteMode } from "./features/history/components/TagRemoteDialog";
 import { UpstreamDialog, UpstreamMode } from "./features/history/components/UpstreamDialog";
 import { STORAGE_KEYS, usePersistedState } from "./shared/lib/persisted";
 import { openExternal } from "./shared/lib/external";
@@ -1102,30 +1103,33 @@ function App() {
     },
     [activeRepoPath, reloadActiveRepo],
   );
-  const handleMenuPushTag = useCallback(
-    async (name: string) => {
+  const [tagRemoteTarget, setTagRemoteTarget] = useState<{ mode: TagRemoteMode; tag: string } | null>(null);
+  const handleMenuTagRemote = useCallback(
+    (mode: TagRemoteMode, tag: string) => {
       closeContextMenu();
-      if (!activeRepoPath) return;
-      try {
-        await pushTag(activeRepoPath, name);
-      } catch (pushError) {
-        setNotice({
-          title: `Could not push tag ${name}`,
-          detail: pushError instanceof Error ? pushError.message : String(pushError),
-          id: Date.now(),
-        });
-      }
+      if (!activeRepoPath || opening) return;
+      setTagRemoteTarget({ mode, tag });
     },
-    [closeContextMenu, activeRepoPath],
+    [closeContextMenu, activeRepoPath, opening],
+  );
+  const submitTagRemote = useCallback(
+    async (remote: string) => {
+      if (!activeRepoPath || !tagRemoteTarget) return;
+      const { mode, tag } = tagRemoteTarget;
+      await (mode === TagRemoteMode.Push ? pushTag : deleteRemoteTag)(activeRepoPath, tag, remote);
+      setTagRemoteTarget(null);
+      if (mode === TagRemoteMode.Delete) await reloadActiveRepo();
+    },
+    [activeRepoPath, tagRemoteTarget, reloadActiveRepo],
   );
   const runDeleteTag = useCallback(
-    async (name: string, remote: boolean) => {
+    async (name: string) => {
       if (!activeRepoPath) return;
       try {
-        await (remote ? deleteRemoteTag : deleteTag)(activeRepoPath, name);
+        await deleteTag(activeRepoPath, name);
       } catch (deleteError) {
         setNotice({
-          title: `Could not delete ${remote ? "remote " : ""}tag ${name}`,
+          title: `Could not delete tag ${name}`,
           detail: deleteError instanceof Error ? deleteError.message : String(deleteError),
           id: Date.now(),
         });
@@ -1136,15 +1140,14 @@ function App() {
   );
   const handleMenuDeleteTag = useCallback(
     (name: string, remote: boolean) => {
+      if (remote) {
+        handleMenuTagRemote(TagRemoteMode.Delete, name);
+        return;
+      }
       closeContextMenu();
       setPendingConfirm({
-        title: remote ? `Delete remote tag ${name}?` : `Delete tag ${name}?`,
-        body: remote ? (
-          <p>
-            This removes <span className="font-semibold text-ink">{name}</span> from the remote
-            for everyone, not just you. Your local tag stays.
-          </p>
-        ) : (
+        title: `Delete tag ${name}?`,
+        body: (
           <p>
             This removes <span className="font-semibold text-ink">{name}</span> from your machine.
             A copy already pushed to the remote stays there.
@@ -1152,10 +1155,10 @@ function App() {
         ),
         confirmLabel: "Delete tag",
         danger: true,
-        run: () => runDeleteTag(name, remote),
+        run: () => runDeleteTag(name),
       });
     },
-    [closeContextMenu, runDeleteTag],
+    [closeContextMenu, handleMenuTagRemote, runDeleteTag],
   );
 
   const handleMenuCheckoutCommit = useCallback(
@@ -1772,7 +1775,7 @@ function App() {
           onDeleteBranch={handleMenuDeleteBranch}
           onCreateTag={handleMenuCreateTag}
           onDeleteTag={handleMenuDeleteTag}
-          onPushTag={(name) => void handleMenuPushTag(name)}
+          onPushTag={(name) => handleMenuTagRemote(TagRemoteMode.Push, name)}
           onSetUpstream={(branch) => handleMenuUpstream(UpstreamMode.Set, branch)}
           onPushBranchTo={(branch) => handleMenuUpstream(UpstreamMode.Push, branch)}
           onCheckoutCommit={handleMenuCheckoutCommit}
@@ -1823,6 +1826,16 @@ function App() {
           onRename={handleRenameRemote}
           onRemove={handleRemoveRemote}
           onClose={() => setRemotesOpen(false)}
+        />
+      )}
+
+      {tagRemoteTarget !== null && activeRepoPath && (
+        <TagRemoteDialog
+          mode={tagRemoteTarget.mode}
+          tag={tagRemoteTarget.tag}
+          load={loadRemotes}
+          onSubmit={submitTagRemote}
+          onClose={() => setTagRemoteTarget(null)}
         />
       )}
 
