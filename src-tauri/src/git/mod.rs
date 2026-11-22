@@ -237,12 +237,12 @@ pub async fn remove_remote(dir: String, name: String) -> Result<(), String> {
     run_blocking("remove remote", move || remove_remote_in(&dir, &name)).await
 }
 #[tauri::command]
-pub async fn push_tag(dir: String, name: String) -> Result<(), String> {
-    run_blocking("push tag", move || push_tag_in(&dir, &name)).await
+pub async fn push_tag(dir: String, name: String, remote: String) -> Result<(), String> {
+    run_blocking("push tag", move || push_tag_in(&dir, &name, &remote)).await
 }
 #[tauri::command]
-pub async fn delete_remote_tag(dir: String, name: String) -> Result<(), String> {
-    run_blocking("delete remote tag", move || delete_remote_tag_in(&dir, &name)).await
+pub async fn delete_remote_tag(dir: String, name: String, remote: String) -> Result<(), String> {
+    run_blocking("delete remote tag", move || delete_remote_tag_in(&dir, &name, &remote)).await
 }
 #[tauri::command]
 pub async fn delete_tag(dir: String, name: String) -> Result<(), String> {
@@ -304,14 +304,15 @@ pub async fn pull_branch(dir: String) -> Result<String, String> {
     .await
     .map_err(|e| format!("the pull task failed: {e}"))?
 }
-/// Pushes the current branch to origin. `-u` sets the upstream on the first push and is
-/// harmless on every later one; a rejected push comes back as git's own error text. Blocking
+/// Pushes the current branch to its upstream, or to `origin` (else the only remote) the first
+/// time. `-u` sets the upstream on the first push and is harmless on every later one; a rejected push comes back as git's own error text. Blocking
 /// thread for the same reason as the pull.
 #[tauri::command]
 pub async fn push_branch(dir: String) -> Result<String, String> {
     tauri::async_runtime::spawn_blocking(move || {
+        let args = push_args_in(&dir)?;
         git_command(&dir)
-            .args(push_args_in(&dir))
+            .args(args)
             .env("GIT_TERMINAL_PROMPT", "0")
             .output()
             .map_err(|e| format!("failed to run git: {e}"))

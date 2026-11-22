@@ -182,14 +182,14 @@
   (merged-ness is decided with `merge-base --is-ancestor`, not by parsing `git branch -d`'s localised
   refusal); a remote delete is `push --delete`. `Create tag here…` (same rows; `CreateTagDialog.tsx`, name plus an
   "annotated" toggle that reveals a required message) runs `create_tag`: an empty message is a lightweight tag,
-  anything else `tag -a -m`; a taken name is an inline error (`tag_exists`). Tag pills also offer `Push tag <name>`
-  (`push_tag`, `push origin refs/tags/<name>`, no force), `Delete tag <name>…` (`delete_tag`, local only) and
-  `Delete remote tag <name>…` (`delete_remote_tag`, `push origin --delete`); both deletes confirm first.
+  anything else `tag -a -m`; a taken name is an inline error (`tag_exists`). Tag pills also offer `Push tag <name>…`
+  (`push_tag`, `push <remote> refs/tags/<name>`, no force), `Delete tag <name>…` (`delete_tag`, local only, a confirm) and
+  `Delete remote tag <name>…` (`delete_remote_tag`, `push <remote> --delete`); both remote actions open `TagRemoteDialog.tsx`, a remote picker preselecting `origin`, else the first remote.
   `Set upstream…` and `Push to…` (every local branch pill, the checked-out one included; `UpstreamDialog.tsx`, a
   remote picker plus the remote branch name, defaulting to the branch's own name) run `set_upstream`
   (`branch --set-upstream-to`, the remote branch must already exist) and `push_branch_to` (`push -u
   <remote> refs/heads/<b>:refs/heads/<name>`). The title bar's push follows the checked-out branch's upstream
-  (`push_args_in`: `push -u <remote> HEAD:refs/heads/<upstream branch>`, `origin` when it has none), and its
+  (`push_args_in`: `push -u <remote> HEAD:refs/heads/<upstream branch>`, else `default_push_remote_in`: `origin`, or the only remote, or an error that points at `Push to…` when several remotes and no `origin` leave it ambiguous), and its
   tooltip names the target from `StatusInfo.upstream`; pull already used the upstream.
   `Check out commit <hash>…`
   (real history rows only — not the HEAD row, the `wip` row or a stash row; it opens

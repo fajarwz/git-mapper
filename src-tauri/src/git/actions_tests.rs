@@ -335,14 +335,16 @@ fn push_tag_and_delete_remote_tag_round_trip_through_origin() {
     };
     assert!(!remote_has());
 
-    push_tag_in(repo.path(), "v1").expect("pushed");
+    push_tag_in(repo.path(), "v1", "origin").expect("pushed");
     assert!(remote_has(), "the remote has the tag");
 
-    delete_remote_tag_in(repo.path(), "v1").expect("deleted on the remote");
+    delete_remote_tag_in(repo.path(), "v1", "origin").expect("deleted on the remote");
     assert!(!remote_has());
     assert!(tag_exists_in(repo.path(), "v1").unwrap(), "the local tag stays");
 
-    assert!(push_tag_in(repo.path(), "ghost").is_err());
+    assert!(push_tag_in(repo.path(), "ghost", "origin").is_err());
+    assert!(push_tag_in(repo.path(), "v1", "nowhere").is_err(), "an unknown remote is refused");
+    assert!(delete_remote_tag_in(repo.path(), "v1", "nowhere").is_err());
 }
 
 #[test]
@@ -384,13 +386,13 @@ fn push_branch_to_publishes_under_the_chosen_name_and_tracks_it() {
 #[test]
 fn push_follows_the_branch_upstream_and_falls_back_to_origin() {
     let (_remote, repo) = clone_with_remote_branch("push-args");
-    assert_eq!(push_args_in(repo.path()), ["push", "-u", "origin", "HEAD"], "no upstream yet");
+    assert_eq!(push_args_in(repo.path()).unwrap(), ["push", "-u", "origin", "HEAD"], "no upstream yet");
 
     let second = bare_repo("push-args-second");
     git(&repo.0, &["remote", "add", "mirror", second.to_str().expect("path")]);
     push_branch_to_in(repo.path(), "main", "mirror", "trunk").expect("published");
     assert_eq!(
-        push_args_in(repo.path()),
+        push_args_in(repo.path()).unwrap(),
         ["push", "-u", "mirror", "HEAD:refs/heads/trunk"],
         "the upstream's remote and branch name win"
     );
@@ -405,4 +407,26 @@ fn status_reports_the_upstream_or_an_empty_string() {
     git(&repo.0, &["branch", "-u", "origin/main"]);
     let info = read_status_in(repo.path()).expect("status");
     assert_eq!(info.upstream, "origin/main");
+}
+
+#[test]
+fn first_push_falls_back_to_the_only_remote_and_asks_when_it_is_ambiguous() {
+    let repo = TempRepo::new("push-fallback");
+    repo.commit("a.txt", "a\n", "first");
+    let err = push_args_in(repo.path()).unwrap_err();
+    assert!(err.contains("no remotes"), "got: {err}");
+
+    let one = bare_repo("push-fallback-one");
+    let two = bare_repo("push-fallback-two");
+    git(&repo.0, &["remote", "add", "fork", one.to_str().expect("path")]);
+    assert_eq!(push_args_in(repo.path()).unwrap(), ["push", "-u", "fork", "HEAD"], "the only remote");
+
+    git(&repo.0, &["remote", "add", "mirror", two.to_str().expect("path")]);
+    let err = push_args_in(repo.path()).unwrap_err();
+    assert!(err.contains("Push to…"), "got: {err}");
+
+    git(&repo.0, &["remote", "add", "origin", one.to_str().expect("path")]);
+    assert_eq!(push_args_in(repo.path()).unwrap(), ["push", "-u", "origin", "HEAD"], "origin wins when present");
+    let _ = std::fs::remove_dir_all(&one);
+    let _ = std::fs::remove_dir_all(&two);
 }
