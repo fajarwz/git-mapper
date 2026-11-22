@@ -222,23 +222,25 @@ pub fn delete_tag_in(dir: &str, name: &str) -> Result<(), String> {
     run_git(dir, &["tag", "-d", "--", name]).map(|_| ())
 }
 
-/// Pushes one tag to origin, the remote the app's own push uses. An existing remote tag that
-/// differs is refused by git (no force), and that error surfaces.
-pub fn push_tag_in(dir: &str, name: &str) -> Result<(), String> {
-    let name = name.trim();
+/// Pushes one tag to a remote. An existing remote tag that differs is refused by git (no
+/// force), and that error surfaces.
+pub fn push_tag_in(dir: &str, name: &str, remote: &str) -> Result<(), String> {
+    let (name, remote) = (name.trim(), remote.trim());
     if !tag_exists_in(dir, name)? {
         return Err(format!("There is no tag named \"{name}\""));
     }
-    run_git_no_prompt(dir, &["push", "origin", &format!("refs/tags/{name}")]).map(|_| ())
+    require_known_remote(dir, remote)?;
+    run_git_no_prompt(dir, &["push", "--", remote, &format!("refs/tags/{name}")]).map(|_| ())
 }
 
-/// Deletes a tag from origin only; the local tag stays.
-pub fn delete_remote_tag_in(dir: &str, name: &str) -> Result<(), String> {
-    let name = name.trim();
+/// Deletes a tag from one remote only; the local tag stays.
+pub fn delete_remote_tag_in(dir: &str, name: &str, remote: &str) -> Result<(), String> {
+    let (name, remote) = (name.trim(), remote.trim());
     if name.is_empty() || name.starts_with('-') {
         return Err(format!("\"{name}\" is not a valid tag name"));
     }
-    run_git_no_prompt(dir, &["push", "origin", "--delete", &format!("refs/tags/{name}")]).map(|_| ())
+    require_known_remote(dir, remote)?;
+    run_git_no_prompt(dir, &["push", "--delete", "--", remote, &format!("refs/tags/{name}")]).map(|_| ())
 }
 
 /// The remote a branch pushes to and the branch name it maps to there; `None` without an upstream.
@@ -250,15 +252,28 @@ fn upstream_target_in(dir: &str, branch: &str) -> Option<(String, String)> {
     (!remote.is_empty() && remote != ".").then(|| (remote.to_string(), merge.to_string()))
 }
 
-/// What `push_branch` hands git: the branch's own upstream when it has one, else `origin`.
-pub fn push_args_in(dir: &str) -> Vec<String> {
+/// The remote a branch with no upstream publishes to: `origin` when it exists, else the only
+/// remote there is. Several remotes and none called `origin` is a choice only the user can make.
+fn default_push_remote_in(dir: &str) -> Result<String, String> {
+    let listed = run_git(dir, &["remote"])?;
+    let remotes: Vec<&str> = listed.lines().map(str::trim).filter(|name| !name.is_empty()).collect();
+    match remotes.as_slice() {
+        [] => Err("This repository has no remotes. Add one first.".into()),
+        _ if remotes.contains(&"origin") => Ok("origin".into()),
+        [only] => Ok((*only).to_string()),
+        _ => Err("This branch has no upstream and there is no origin. Use Push to… on the branch to pick a remote.".into()),
+    }
+}
+
+/// What `push_branch` hands git: the branch's own upstream when it has one, else the default remote.
+pub fn push_args_in(dir: &str) -> Result<Vec<String>, String> {
     let branch = run_git(dir, &["symbolic-ref", "--short", "-q", "HEAD"]).unwrap_or_default();
     let branch = branch.trim();
     match upstream_target_in(dir, branch) {
         Some((remote, target)) if !branch.is_empty() => {
-            vec!["push".into(), "-u".into(), remote, format!("HEAD:refs/heads/{target}")]
+            Ok(vec!["push".into(), "-u".into(), remote, format!("HEAD:refs/heads/{target}")])
         }
-        _ => vec!["push".into(), "-u".into(), "origin".into(), "HEAD".into()],
+        _ => Ok(vec!["push".into(), "-u".into(), default_push_remote_in(dir)?, "HEAD".into()]),
     }
 }
 
