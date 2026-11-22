@@ -3,6 +3,7 @@ import { createPortal } from "react-dom";
 import { useExit } from "../../../shared/lib/useExit";
 import { PANEL } from "../../../shared/lib/ui";
 import { Button, ButtonVariant } from "../../../shared/components/Button";
+import { Toggle } from "../../../shared/components/Toggle";
 
 interface CreateBranchDialogProps {
   hash: string;
@@ -87,9 +88,9 @@ export function CreateBranchDialog({ hash, exists, onCreate, onClose }: CreateBr
             A branch named {trimmed} already exists.
           </p>
         )}
-        <label className="mt-3 flex items-center gap-2 text-[12.5px] text-ink-dim">
-          <input type="checkbox" checked={checkout} onChange={(event) => setCheckout(event.target.checked)} />
+        <label className="mt-3 flex items-center justify-between gap-3 text-[12.5px] text-ink-dim">
           Check out the new branch
+          <Toggle checked={checkout} onChange={setCheckout} label="Check out the new branch" />
         </label>
         <div className="mt-4 flex justify-end gap-2">
           <Button onClick={close}>Cancel</Button>

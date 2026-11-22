@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 
+import { Toggle } from "../../../shared/components/Toggle";
 import { COLUMN_LABELS, type ColumnKey, type ColumnVisibility } from "../lib/tableLayout";
 
 interface ColumnsMenuProps {
@@ -45,19 +46,14 @@ export function ColumnsMenu({ x, y, visible, onToggle, onClose }: ColumnsMenuPro
       className="fixed z-50 flex w-44 flex-col gap-0.5 rounded-xl border border-hairline bg-glass p-1.5 panel-shadow backdrop-blur-sm pop-in-menu"
       style={{ left: Math.max(4, Math.min(x, window.innerWidth - 184)), top: Math.max(4, Math.min(y, window.innerHeight - 160)) }}
     >
-      <label className={`${ITEM} opacity-60`}>
-        <input type="checkbox" checked disabled className="accent-primary" />
+      <label className={`${ITEM} justify-between`}>
         Commit
+        <Toggle checked disabled label="Commit" onChange={() => {}} />
       </label>
       {entries.map(({ column, checked }) => (
-        <label key={column} className={`${ITEM} cursor-pointer`}>
-          <input
-            type="checkbox"
-            checked={checked}
-            onChange={() => onToggle(column)}
-            className="accent-primary"
-          />
+        <label key={column} className={`${ITEM} cursor-pointer justify-between`}>
           {COLUMN_LABELS[column]}
+          <Toggle checked={checked} onChange={() => onToggle(column)} label={COLUMN_LABELS[column]} />
         </label>
       ))}
     </div>
