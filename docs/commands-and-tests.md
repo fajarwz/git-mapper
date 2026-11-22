@@ -27,3 +27,5 @@ linter. `npm run build` + `npm test` + `npm run lint:check` + `cargo test` pass 
 `.github/workflows/ci.yml` runs exactly that gate on every push and pull request (ubuntu runner:
 `npm ci`, lint, build, vitest, then `cargo test` — tauri-build needs `dist/`, hence the build first),
 and the README's Tests badge points at it.
+
+`src/data/gitLoader.contract.test.ts` reads the `#[tauri::command]` signatures out of `src-tauri/src/git/*.rs` and checks that each listed `gitLoader` wrapper sends exactly those parameters (camelCased) and that the command is in `generate_handler!` in `lib.rs`. A new command that the UI calls gets one row in its `CASES` table.
