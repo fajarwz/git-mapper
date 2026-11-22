@@ -968,7 +968,7 @@ function App() {
             body: (
               <p>
                 <span className="font-semibold text-ink">{name}</span> has commits that are not
-                merged anywhere else. Deleting it makes them unreachable.
+                merged anywhere else. They will be hard to get back once it is deleted.
               </p>
             ),
             confirmLabel: "Delete anyway",
@@ -996,12 +996,12 @@ function App() {
         body: remote ? (
           <p>
             This removes <span className="font-semibold text-ink">{name}</span> from the remote
-            itself, so everyone who uses it loses it too.
+            for everyone, not just you.
           </p>
         ) : (
           <p>
-            The local branch <span className="font-semibold text-ink">{name}</span> is deleted;
-            you are warned first if it holds commits that exist nowhere else.
+            This removes <span className="font-semibold text-ink">{name}</span> from your machine.
+            If it has commits that are not merged anywhere, you will be asked once more.
           </p>
         ),
         confirmLabel: "Delete branch",
