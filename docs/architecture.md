@@ -172,7 +172,14 @@
   `checkout_remote_branch` (`git/actions.rs`; no browser-tab mirror in `dev/gitApi`, it only runs in the desktop app) takes a typed
   `RemoteCheckoutMode`: `create` runs `checkout -b <name> --track <remote>/<branch>`, `existing` switches and
   runs `pull --ff-only <remote> <branch>` — a diverged branch stays checked out and the pull's error
-  surfaces, so the app reloads after the call even on failure. `Check out commit <hash>…`
+  surfaces, so the app reloads after the call even on failure. `Create branch here…` (real history
+  rows; `CreateBranchDialog.tsx`, name plus a "check out" box, a taken name is an inline error) runs
+  `create_branch`, hash-gated like `checkout_commit`. `Delete branch <name>…` / `Delete remote branch
+  <ref>…` (non-current local pills, remote pills) confirm through `ConfirmDialog` and run
+  `delete_branch`: a local branch that is not an ancestor of HEAD or its upstream answers
+  `DeleteOutcome.NotMerged` instead of deleting, and a second danger confirm re-runs it forced
+  (merged-ness is decided with `merge-base --is-ancestor`, not by parsing `git branch -d`'s localised
+  refusal); a remote delete is `push --delete`. `Check out commit <hash>…`
   (real history rows only — not the HEAD row, the `wip` row or a stash row; it opens
   `ConfirmDialog.tsx`, because checking out a commit detaches HEAD and commits made there are
   lost without a branch — the command is `checkout_commit`, hash-format-gated, `--detach`),

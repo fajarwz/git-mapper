@@ -25,3 +25,5 @@
 - **design references:** target look is a frosted-glass commit feed (Dribbble-style, violet/rose/warm palette). The user judges ugliness by: row density, font-scale hierarchy, background saturation. "Ours should be close to the reference" means those three.
 
 - **Labelled action buttons use `shared/components/Button.tsx`** with a `ButtonVariant` (`Primary`, `Secondary`, `Danger`); layout extras (`h-7`, `w-full`, `shrink-0`) go in `className`. Toggle segments, icon buttons, the title-bar pills and text-only links (`Later`, `Discard all…`) stay bespoke.
+
+- **On/off options are toggles, never checkboxes.** Use `shared/components/Toggle.tsx` (a `role="switch"` button with a required `label`); put its text beside it in a `<label>` row. Native `<input type="checkbox">` is not used for settings or dialog options. The line-pick gutter cells in the diff are ticks over a selection, not an option, and stay checkbox-role.

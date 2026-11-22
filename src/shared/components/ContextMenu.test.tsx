@@ -349,3 +349,64 @@ test("the remote's symbolic HEAD offers no checkout", () => {
   );
   assert.equal(queryByRole("menuitem", { name: /Check out origin\/HEAD/ }), null);
 });
+
+test("a history row offers Create branch here with its hash, a stash row does not", () => {
+  const onCreateBranch = vi.fn();
+  const first = render(
+    <ContextMenu
+      target={target({})}
+      onCheckout={vi.fn()}
+      onCreateBranch={onCreateBranch}
+      onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
+      head={HEAD}
+      onClose={vi.fn()}
+    />,
+  );
+  fireEvent.click(first.getByRole("menuitem", { name: "Create branch here…" }));
+  assert.equal(onCreateBranch.mock.calls[0][0], "aaaa1111");
+  cleanup();
+
+  const stash = render(
+    <ContextMenu
+      target={target({ commit: commit({ stashIndex: 0 }) })}
+      onCheckout={vi.fn()}
+      onCreateBranch={onCreateBranch}
+      onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
+      head={HEAD}
+      onClose={vi.fn()}
+    />,
+  );
+  assert.equal(stash.queryByRole("menuitem", { name: "Create branch here…" }), null);
+});
+
+test("local and remote branch pills offer their own delete, the checked-out branch none", () => {
+  const onDeleteBranch = vi.fn();
+  const render_ = (ref: ContextMenuTarget["ref"]) =>
+    render(
+      <ContextMenu
+        target={target({ ref })}
+        onCheckout={vi.fn()}
+        onCheckoutRemote={vi.fn()}
+        onDeleteBranch={onDeleteBranch}
+        onCheckoutCommit={vi.fn()}
+        onStashAction={vi.fn()}
+        head={HEAD}
+        onClose={vi.fn()}
+      />,
+    );
+
+  const local = render_({ type: "branch", name: "feature" });
+  fireEvent.click(local.getByRole("menuitem", { name: "Delete branch feature…" }));
+  assert.deepEqual(onDeleteBranch.mock.calls[0], ["feature", false]);
+  cleanup();
+
+  const remote = render_({ type: "remote", name: "origin/feature" });
+  fireEvent.click(remote.getByRole("menuitem", { name: "Delete remote branch origin/feature…" }));
+  assert.deepEqual(onDeleteBranch.mock.calls[1], ["origin/feature", true]);
+  cleanup();
+
+  const current = render_({ type: "branch", name: "main", isCurrent: true });
+  assert.equal(current.queryByRole("menuitem", { name: /Delete branch/ }), null);
+});

@@ -187,6 +187,19 @@ pub async fn checkout_remote_branch(
     })
     .await
 }
+#[tauri::command]
+pub async fn create_branch(dir: String, name: String, hash: String, checkout: bool) -> Result<(), String> {
+    run_blocking("create branch", move || create_branch_in(&dir, &name, &hash, checkout)).await
+}
+#[tauri::command]
+pub async fn delete_branch(
+    dir: String,
+    name: String,
+    remote: bool,
+    force: bool,
+) -> Result<DeleteOutcome, String> {
+    run_blocking("delete branch", move || delete_branch_in(&dir, &name, remote, force)).await
+}
 /// Detaches HEAD onto a commit. The app asks first — the dialog warns that new commits made
 /// on a detached HEAD are lost unless a branch is created — so this never runs unconfirmed.
 #[tauri::command]

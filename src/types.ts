@@ -12,6 +12,11 @@ export enum RemoteCheckoutMode {
   Existing = "existing",
 }
 
+export enum DeleteOutcome {
+  Deleted = "deleted",
+  NotMerged = "not-merged",
+}
+
 export type FileStatus = "added" | "modified" | "deleted" | "renamed";
 
 export type DiffLineType = "hunk" | "context" | "add" | "remove";

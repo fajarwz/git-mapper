@@ -8,6 +8,7 @@ import { GITHUB_URL, type UpdateMode, type UpdateStatus } from "./updater";
 import type { Theme } from "./theme";
 import { PANEL } from "../../shared/lib/ui";
 import { Button, ButtonVariant } from "../../shared/components/Button";
+import { Toggle } from "../../shared/components/Toggle";
 import { CheckIcon, CloseIcon, HeartIcon } from "../../shared/components/icons";
 
 interface SettingsModalProps {
@@ -243,23 +244,12 @@ export function SettingsModal({
                 email
               </p>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={showAvatars}
-              aria-label="Show avatars"
+            <Toggle
+              checked={showAvatars}
+              onChange={onShowAvatarsChange}
+              label="Show avatars"
               title={showAvatars ? "Avatars are on" : "Avatars are off"}
-              onClick={() => onShowAvatarsChange(!showAvatars)}
-              className={`relative inline-flex h-5.5 w-10 shrink-0 items-center rounded-full border border-hairline transition-colors ${
-                showAvatars ? "bg-primary" : "bg-ink/15"
-              }`}
-            >
-              <span
-                className={`absolute left-0.5 size-4.5 rounded-full bg-white soft-shadow transition-transform ${
-                  showAvatars ? "translate-x-4.5" : ""
-                }`}
-              />
-            </button>
+            />
           </div>
         </div>
 
@@ -324,23 +314,12 @@ export function SettingsModal({
                 Download releases in the background at launch
               </p>
             </div>
-            <button
-              type="button"
-              role="switch"
-              aria-checked={updateMode === "auto"}
-              aria-label="Update automatically"
+            <Toggle
+              checked={updateMode === "auto"}
+              onChange={(auto) => onUpdateModeChange(auto ? "auto" : "manual")}
+              label="Update automatically"
               title={updateMode === "auto" ? "Automatic updates are on" : "Updates are manual"}
-              onClick={() => onUpdateModeChange(updateMode === "auto" ? "manual" : "auto")}
-              className={`relative inline-flex h-5.5 w-10 shrink-0 items-center rounded-full border border-hairline transition-colors ${
-                updateMode === "auto" ? "bg-primary" : "bg-ink/15"
-              }`}
-            >
-              <span
-                className={`absolute left-0.5 size-4.5 rounded-full bg-white soft-shadow transition-transform ${
-                  updateMode === "auto" ? "translate-x-4.5" : ""
-                }`}
-              />
-            </button>
+            />
           </div>
 
           <div className="mt-2.5 flex items-center justify-between gap-3">

@@ -9,7 +9,7 @@ import type {
   Repository,
   Submodule,
 } from "../types";
-import { PullRequestProvider, PullRequestsStatus, RemoteCheckoutMode } from "../types";
+import { DeleteOutcome, PullRequestProvider, PullRequestsStatus, RemoteCheckoutMode } from "../types";
 import { parsePullRequestPage, type PullRequestPage } from "../features/pull-requests/lib/pullRequests";
 import { sameSubmodules, shapeSubmodules, type RawSubmodule } from "../features/submodules/submodule";
 import { STORAGE_KEYS } from "../shared/lib/persisted";
@@ -587,6 +587,24 @@ export async function checkoutRemoteBranch(
     { dir, remoteRef, localName, mode },
     (raw) => raw as void,
   );
+}
+
+export async function createBranch(
+  dir: string,
+  name: string,
+  hash: string,
+  checkout: boolean,
+): Promise<void> {
+  await call("create_branch", { dir, name, hash, checkout }, (raw) => raw as void);
+}
+
+export async function deleteBranch(
+  dir: string,
+  name: string,
+  remote: boolean,
+  force: boolean,
+): Promise<DeleteOutcome> {
+  return call("delete_branch", { dir, name, remote, force }, (raw) => raw as DeleteOutcome);
 }
 
 export async function checkoutCommit(dir: string, hash: string): Promise<void> {
