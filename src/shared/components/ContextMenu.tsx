@@ -19,7 +19,10 @@ interface ContextMenuProps {
   onCheckoutRemote?: (remoteRef: string) => void;
   onCreateBranch?: (hash: string) => void;
   onDeleteBranch?: (name: string, remote: boolean) => void;
-  onCheckoutCommit: (hash: string) => void;
+  onCreateTag?: (hash: string) => void;
+  onDeleteTag?: (name: string, remote: boolean) => void;
+  onPushTag?: (name: string) => void;
+  onCheckoutCommit:(hash: string) => void;
   onStashAction: (index: number, action: StashAction) => void;
   /** Undoing the tip commit: the menu entry exists only when the target IS the tip, the
    * branch is ahead of its remote, and the tip is a plain (non-merge) commit. */
@@ -57,6 +60,9 @@ export function ContextMenu({
   onCheckoutRemote,
   onCreateBranch,
   onDeleteBranch,
+  onCreateTag,
+  onDeleteTag,
+  onPushTag,
   onCheckoutCommit,
   onStashAction,
   undoable = false,
@@ -103,8 +109,11 @@ export function ContextMenu({
     target.ref && isCheckoutableRemote(target.ref) && Boolean(onCheckoutRemote) ? target.ref : null;
   const branchCreatable =
     Boolean(onCreateBranch) && target.commit.stashIndex === undefined && target.commit.hash !== UNCOMMITTED_HASH;
+  const taggable =
+    Boolean(onCreateTag) && target.commit.stashIndex === undefined && target.commit.hash !== UNCOMMITTED_HASH;
   const deletableLocal = checkoutable && branch !== null && Boolean(onDeleteBranch);
   const deletableRemote = remoteBranch !== null && Boolean(onDeleteBranch);
+  const deletableTag = target.ref?.type === "tag" && Boolean(onDeleteTag) ? target.ref : null;
   const mergeable = checkoutable && branch !== null && Boolean(onMerge) && Boolean(currentBranch);
   const pullBranch =
     target.ref?.type === "branch"
@@ -131,6 +140,9 @@ export function ContextMenu({
     (remoteBranch ? 1 : 0) +
     (branchCreatable ? 1 : 0) +
     (deletableLocal || deletableRemote ? 1 : 0) +
+    (taggable ? 1 : 0) +
+    (deletableTag ? 2 : 0) +
+    (deletableTag && onPushTag ? 1 : 0) +
     (mergeable ? 1 : 0) +
     (pullable ? 1 : 0) +
     (commitCheckoutable ? 1 : 0) +
@@ -186,6 +198,17 @@ export function ContextMenu({
           Create branch here…
         </button>
       )}
+      {taggable && onCreateTag && (
+        <button type="button" role="menuitem" className={ITEM}
+          title="Tags this commit — lightweight, or annotated with a message"
+          onClick={() => {
+            onClose();
+            onCreateTag(target.commit.hash);
+          }}
+        >
+          Create tag here…
+        </button>
+      )}
       {mergeable && branch && (
         <button type="button" role="menuitem" className={ITEM}
           title={`Merges ${branch.name} into ${currentBranch} — a confirm shows first`}
@@ -229,6 +252,39 @@ export function ContextMenu({
         >
           Delete remote branch {remoteBranch.name}…
         </button>
+      )}
+      {deletableTag && onPushTag && (
+        <button type="button" role="menuitem" className={ITEM}
+          title="Pushes this tag to origin"
+          onClick={() => {
+            onClose();
+            onPushTag(deletableTag.name);
+          }}
+        >
+          Push tag {deletableTag.name}
+        </button>
+      )}
+      {deletableTag && (
+        <>
+          <button type="button" role="menuitem" className={ITEM}
+            title="Deletes the local tag — a confirm shows first"
+            onClick={() => {
+              onClose();
+              onDeleteTag?.(deletableTag.name, false);
+            }}
+          >
+            Delete tag {deletableTag.name}…
+          </button>
+          <button type="button" role="menuitem" className={ITEM}
+            title="Deletes the tag on origin itself — a confirm shows first"
+            onClick={() => {
+              onClose();
+              onDeleteTag?.(deletableTag.name, true);
+            }}
+          >
+            Delete remote tag {deletableTag.name}…
+          </button>
+        </>
       )}
       {commitCheckoutable && (
         <button type="button" role="menuitem" className={ITEM}

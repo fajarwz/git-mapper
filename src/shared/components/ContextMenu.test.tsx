@@ -410,3 +410,44 @@ test("local and remote branch pills offer their own delete, the checked-out bran
   const current = render_({ type: "branch", name: "main", isCurrent: true });
   assert.equal(current.queryByRole("menuitem", { name: /Delete branch/ }), null);
 });
+
+test("a commit offers Create tag here, and a tag pill offers its own delete", () => {
+  const onCreateTag = vi.fn();
+  const onDeleteTag = vi.fn();
+  const onPushTag = vi.fn();
+  const render_ = (fields: Partial<ContextMenuTarget>) =>
+    render(
+      <ContextMenu
+        target={target(fields)}
+        onCheckout={vi.fn()}
+        onCreateTag={onCreateTag}
+        onDeleteTag={onDeleteTag}
+        onPushTag={onPushTag}
+        onCheckoutCommit={vi.fn()}
+        onStashAction={vi.fn()}
+        head={HEAD}
+        onClose={vi.fn()}
+      />,
+    );
+
+  const plain = render_({});
+  fireEvent.click(plain.getByRole("menuitem", { name: "Create tag here…" }));
+  assert.equal(onCreateTag.mock.calls.length, 1);
+  assert.equal(plain.queryByRole("menuitem", { name: /Delete tag/ }), null);
+  cleanup();
+
+  const tag = render_({ ref: { type: "tag", name: "v1" } });
+  fireEvent.click(tag.getByRole("menuitem", { name: "Delete tag v1…" }));
+  assert.deepEqual(onDeleteTag.mock.calls[0], ["v1", false]);
+  cleanup();
+
+  const remoteTag = render_({ ref: { type: "tag", name: "v1" } });
+  fireEvent.click(remoteTag.getByRole("menuitem", { name: "Delete remote tag v1…" }));
+  assert.deepEqual(onDeleteTag.mock.calls[1], ["v1", true]);
+  fireEvent.click(remoteTag.getByRole("menuitem", { name: "Push tag v1" }));
+  assert.deepEqual(onPushTag.mock.calls[0], ["v1"]);
+  cleanup();
+
+  const stash = render_({ commit: commit({ stashIndex: 0 }) });
+  assert.equal(stash.queryByRole("menuitem", { name: "Create tag here…" }), null);
+});

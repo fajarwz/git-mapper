@@ -17,6 +17,7 @@ import { useStarPrompt } from "./features/shell/useStarPrompt";
 import { ConfirmDialog } from "./shared/components/ConfirmDialog";
 import { CheckoutRemoteDialog } from "./features/history/components/CheckoutRemoteDialog";
 import { CreateBranchDialog } from "./features/history/components/CreateBranchDialog";
+import { CreateTagDialog } from "./features/history/components/CreateTagDialog";
 import { SettingsModal } from "./features/shell/SettingsModal";
 import { STORAGE_KEYS, usePersistedState } from "./shared/lib/persisted";
 import { openExternal } from "./shared/lib/external";
@@ -38,7 +39,12 @@ import { checkoutBranch,
   checkoutCommit,
   checkoutRemoteBranch,
   createBranch,
+  createTag,
   deleteBranch,
+  deleteRemoteTag,
+  deleteTag,
+  pushTag,
+  tagExists,
   localBranchExists,
   fetchRemote,
   loadConflictFiles,
@@ -1011,6 +1017,88 @@ function App() {
     [closeContextMenu, runDeleteBranch],
   );
 
+  const [createTagHash, setCreateTagHash] = useState<string | null>(null);
+  const handleMenuCreateTag = useCallback(
+    (hash: string) => {
+      closeContextMenu();
+      if (!activeRepoPath || opening) return;
+      setCreateTagHash(hash);
+    },
+    [closeContextMenu, activeRepoPath, opening],
+  );
+  const runCreateTag = useCallback(
+    async (hash: string, name: string, message: string) => {
+      if (!activeRepoPath) return;
+      setCreateTagHash(null);
+      try {
+        await createTag(activeRepoPath, name, hash, message);
+      } catch (createError) {
+        setNotice({
+          title: `Could not create tag ${name}`,
+          detail: createError instanceof Error ? createError.message : String(createError),
+          id: Date.now(),
+        });
+      }
+      await reloadActiveRepo();
+    },
+    [activeRepoPath, reloadActiveRepo],
+  );
+  const handleMenuPushTag = useCallback(
+    async (name: string) => {
+      closeContextMenu();
+      if (!activeRepoPath) return;
+      try {
+        await pushTag(activeRepoPath, name);
+      } catch (pushError) {
+        setNotice({
+          title: `Could not push tag ${name}`,
+          detail: pushError instanceof Error ? pushError.message : String(pushError),
+          id: Date.now(),
+        });
+      }
+    },
+    [closeContextMenu, activeRepoPath],
+  );
+  const runDeleteTag = useCallback(
+    async (name: string, remote: boolean) => {
+      if (!activeRepoPath) return;
+      try {
+        await (remote ? deleteRemoteTag : deleteTag)(activeRepoPath, name);
+      } catch (deleteError) {
+        setNotice({
+          title: `Could not delete ${remote ? "remote " : ""}tag ${name}`,
+          detail: deleteError instanceof Error ? deleteError.message : String(deleteError),
+          id: Date.now(),
+        });
+      }
+      await reloadActiveRepo();
+    },
+    [activeRepoPath, reloadActiveRepo],
+  );
+  const handleMenuDeleteTag = useCallback(
+    (name: string, remote: boolean) => {
+      closeContextMenu();
+      setPendingConfirm({
+        title: remote ? `Delete remote tag ${name}?` : `Delete tag ${name}?`,
+        body: remote ? (
+          <p>
+            This removes <span className="font-semibold text-ink">{name}</span> from the remote
+            for everyone, not just you. Your local tag stays.
+          </p>
+        ) : (
+          <p>
+            This removes <span className="font-semibold text-ink">{name}</span> from your machine.
+            A copy already pushed to the remote stays there.
+          </p>
+        ),
+        confirmLabel: "Delete tag",
+        danger: true,
+        run: () => runDeleteTag(name, remote),
+      });
+    },
+    [closeContextMenu, runDeleteTag],
+  );
+
   const handleMenuCheckoutCommit = useCallback(
     (hash: string) => {
       closeContextMenu();
@@ -1622,6 +1710,9 @@ function App() {
           onCheckoutRemote={handleMenuCheckoutRemote}
           onCreateBranch={handleMenuCreateBranch}
           onDeleteBranch={handleMenuDeleteBranch}
+          onCreateTag={handleMenuCreateTag}
+          onDeleteTag={handleMenuDeleteTag}
+          onPushTag={(name) => void handleMenuPushTag(name)}
           onCheckoutCommit={handleMenuCheckoutCommit}
           onStashAction={handleMenuStashAction}
           // The offer exists only on the checked-out tip itself, only while it is unpushed
@@ -1660,6 +1751,15 @@ function App() {
           exists={(name) => localBranchExists(activeRepoPath, name)}
           onCreate={(name, checkout) => void runCreateBranch(createBranchHash, name, checkout)}
           onClose={() => setCreateBranchHash(null)}
+        />
+      )}
+
+      {createTagHash !== null && activeRepoPath && (
+        <CreateTagDialog
+          hash={createTagHash}
+          exists={(name) => tagExists(activeRepoPath, name)}
+          onCreate={(name, message) => void runCreateTag(createTagHash, name, message)}
+          onClose={() => setCreateTagHash(null)}
         />
       )}
 
