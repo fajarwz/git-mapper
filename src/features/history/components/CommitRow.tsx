@@ -35,6 +35,7 @@ interface CommitRowProps {
   commitChip?: (commit: Commit) => PullChipData | null;
   onSelect: (hash: string) => void;
   onCheckoutBranch?: (branch: string) => void;
+  onCheckoutRemote?: (remoteRef: string) => void;
   onContextMenu?: (commit: Commit, x: number, y: number) => void;
   onRefContextMenu?: (commit: Commit, ref: CommitRef, x: number, y: number) => void;
 }
@@ -58,6 +59,7 @@ export const CommitRow = memo(function CommitRow({
   commitChip,
   onSelect,
   onCheckoutBranch,
+  onCheckoutRemote,
   onContextMenu,
   onRefContextMenu,
 }: CommitRowProps) {
@@ -96,6 +98,7 @@ export const CommitRow = memo(function CommitRow({
                 pullRequest={pullsByBranch && pullRequestForRef(ref, pullsByBranch)}
                 color={commit.branchColor}
                 onCheckout={onCheckoutBranch}
+                onCheckoutRemote={onCheckoutRemote}
                 onContextMenu={onRefContextMenu ? (pill, x, y) => onRefContextMenu(commit, pill, x, y) : undefined}
               />
             ))

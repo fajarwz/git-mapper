@@ -120,3 +120,27 @@ test("RefPill: a branch without a PR wears no chip", () => {
   const { container } = render(<RefPill ref={{ type: "branch", name: "feat/x" }} color={0} />);
   assert.equal(container.querySelector("[data-pr-badge]"), null);
 });
+
+test("RefPill double-click on a remote branch asks for the remote checkout, never origin/HEAD", () => {
+  const remoteCalls: string[] = [];
+  const first = render(
+    <RefPill
+      ref={{ type: "remote", name: "origin/feature/x" } as CommitRef}
+      color={0}
+      onCheckoutRemote={(name) => remoteCalls.push(name)}
+    />,
+  );
+  fireEvent.doubleClick(first.container.querySelector("span") as HTMLElement);
+  assert.deepEqual(remoteCalls, ["origin/feature/x"]);
+  cleanup();
+
+  const head = render(
+    <RefPill
+      ref={{ type: "remote", name: "origin/HEAD" } as CommitRef}
+      color={0}
+      onCheckoutRemote={(name) => remoteCalls.push(name)}
+    />,
+  );
+  fireEvent.doubleClick(head.container.querySelector("span") as HTMLElement);
+  assert.equal(remoteCalls.length, 1, "origin/HEAD is not a branch to check out");
+});

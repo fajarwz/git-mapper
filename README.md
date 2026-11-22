@@ -140,12 +140,6 @@ parsers in each `src/features/*/lib/` folder turn that text into the types in `s
 `src/data/gitLoader.ts`, so components never invoke the backend themselves. `npm run dev` serves
 the same commands at `POST /api/git`, which is why the app also runs in a plain browser.
 
-## Not there yet
-
-- Searching history beyond the loaded 500-commit window.
-- Rebasing and cherry-picking.
-- Pull request diffs, and closing or merging them from the app (the badges and list are read-only).
-
 ## Support
 
 Git Mapper is free and GPL, and it stays free. If it saves you time, you can

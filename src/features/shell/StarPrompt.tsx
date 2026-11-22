@@ -1,4 +1,5 @@
 import { StarIcon } from "../../shared/components/icons";
+import { Button, ButtonVariant } from "../../shared/components/Button";
 import { Toast } from "../../shared/components/Toast";
 
 export function StarPrompt({
@@ -21,13 +22,9 @@ export function StarPrompt({
       {(close) => (
         <div className="mt-2 flex items-center gap-3">
           {/* Starring leaves for the browser, so it closes at once rather than fading. */}
-          <button
-            type="button"
-            onClick={onStar}
-            className="whitespace-nowrap rounded-lg bg-primary px-3 py-1.5 text-[12px] font-semibold text-white hover:opacity-90 focus-visible:ring-2 focus-visible:ring-primary focus-visible:ring-offset-2"
-          >
+          <Button variant={ButtonVariant.Primary} onClick={onStar} className="whitespace-nowrap focus-visible:ring-offset-2">
             Star on GitHub
-          </button>
+          </Button>
           <button
             type="button"
             onClick={close}

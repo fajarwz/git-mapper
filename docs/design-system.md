@@ -23,3 +23,5 @@
    ~300 lines or mixing domains splits the next time work touches it — not "someday".
 
 - **design references:** target look is a frosted-glass commit feed (Dribbble-style, violet/rose/warm palette). The user judges ugliness by: row density, font-scale hierarchy, background saturation. "Ours should be close to the reference" means those three.
+
+- **Labelled action buttons use `shared/components/Button.tsx`** with a `ButtonVariant` (`Primary`, `Secondary`, `Danger`); layout extras (`h-7`, `w-full`, `shrink-0`) go in `className`. Toggle segments, icon buttons, the title-bar pills and text-only links (`Later`, `Discard all…`) stay bespoke.

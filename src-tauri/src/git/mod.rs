@@ -171,6 +171,22 @@ pub async fn read_stashes(dir: String) -> Result<String, String> {
 pub async fn checkout_branch(dir: String, branch: String) -> Result<(), String> {
     run_blocking("checkout", move || checkout_branch_in(&dir, &branch)).await
 }
+#[tauri::command]
+pub async fn local_branch_exists(dir: String, name: String) -> Result<bool, String> {
+    run_blocking("branch probe", move || local_branch_exists_in(&dir, &name)).await
+}
+#[tauri::command]
+pub async fn checkout_remote_branch(
+    dir: String,
+    remote_ref: String,
+    local_name: String,
+    mode: RemoteCheckoutMode,
+) -> Result<(), String> {
+    run_blocking("remote checkout", move || {
+        checkout_remote_branch_in(&dir, &remote_ref, &local_name, mode)
+    })
+    .await
+}
 /// Detaches HEAD onto a commit. The app asks first — the dialog warns that new commits made
 /// on a detached HEAD are lost unless a branch is created — so this never runs unconfirmed.
 #[tauri::command]

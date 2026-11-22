@@ -1,6 +1,77 @@
-use super::shell::run_git;
+use super::shell::{run_git, run_git_no_prompt};
+use serde::Deserialize;
+
 pub fn checkout_branch_in(dir: &str, branch: &str) -> Result<(), String> {
     run_git(dir, &["checkout", branch]).map(|_| ())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Deserialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum RemoteCheckoutMode {
+    Create,
+    Existing,
+}
+
+pub fn local_branch_exists_in(dir: &str, name: &str) -> Result<bool, String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Ok(false);
+    }
+    Ok(run_git(dir, &["show-ref", "--verify", "--quiet", &format!("refs/heads/{name}")]).is_ok())
+}
+
+// A remote name may itself hold a slash, so the longest configured remote that prefixes the ref wins.
+fn split_remote_ref(dir: &str, remote_ref: &str) -> Result<(String, String), String> {
+    let remotes = run_git(dir, &["remote"])?;
+    remotes
+        .lines()
+        .map(str::trim)
+        .filter(|remote| !remote.is_empty())
+        .filter_map(|remote| {
+            remote_ref
+                .strip_prefix(remote)
+                .and_then(|rest| rest.strip_prefix('/'))
+                .filter(|branch| !branch.is_empty())
+                .map(|branch| (remote.to_string(), branch.to_string()))
+        })
+        .max_by_key(|(remote, _)| remote.len())
+        .ok_or_else(|| format!("\"{remote_ref}\" is not a remote branch"))
+}
+
+// A diverged `Existing` branch stays checked out and the pull's error comes back: never merge unasked.
+pub fn checkout_remote_branch_in(
+    dir: &str,
+    remote_ref: &str,
+    local_name: &str,
+    mode: RemoteCheckoutMode,
+) -> Result<(), String> {
+    let remote_ref = remote_ref.trim();
+    let local_name = local_name.trim();
+    run_git(dir, &["show-ref", "--verify", "--quiet", &format!("refs/remotes/{remote_ref}")])
+        .map_err(|_| format!("\"{remote_ref}\" is not a remote branch"))?;
+    run_git(dir, &["check-ref-format", "--branch", local_name])
+        .map_err(|_| format!("\"{local_name}\" is not a valid branch name"))?;
+    let exists = local_branch_exists_in(dir, local_name)?;
+    match mode {
+        RemoteCheckoutMode::Create => {
+            if exists {
+                return Err(format!("A branch named \"{local_name}\" already exists"));
+            }
+            run_git(dir, &["checkout", "-b", local_name, "--track", remote_ref]).map(|_| ())
+        }
+        RemoteCheckoutMode::Existing => {
+            if !exists {
+                return Err(format!("There is no local branch named \"{local_name}\""));
+            }
+            let (remote, branch) = split_remote_ref(dir, remote_ref)?;
+            run_git(dir, &["checkout", local_name])?;
+            run_git_no_prompt(dir, &["pull", "--ff-only", "--no-edit", &remote, &branch])
+                .map(|_| ())
+                .map_err(|pull_error| {
+                    format!("Checked out {local_name}, but it could not be pulled: {pull_error}")
+                })
+        }
+    }
 }
 
 /// Detaches HEAD onto a commit. The app asks first — the dialog warns that new commits made

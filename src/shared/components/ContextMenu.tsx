@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from "react";
 import type { Commit, CommitRef } from "../../types";
 import { UNCOMMITTED_HASH } from "../../data/gitLoader";
 import { copyText } from "../lib/clipboard";
+import { isCheckoutableRemote } from "../lib/remoteBranch";
 
 export type StashAction = "apply" | "pop" | "drop";
 
@@ -15,6 +16,7 @@ export interface ContextMenuTarget {
 interface ContextMenuProps {
   target: ContextMenuTarget;
   onCheckout: (branch: string) => void;
+  onCheckoutRemote?: (remoteRef: string) => void;
   onCheckoutCommit: (hash: string) => void;
   onStashAction: (index: number, action: StashAction) => void;
   /** Undoing the tip commit: the menu entry exists only when the target IS the tip, the
@@ -50,6 +52,7 @@ const COPY_LABELS: Record<CommitRef["type"], string> = {
 export function ContextMenu({
   target,
   onCheckout,
+  onCheckoutRemote,
   onCheckoutCommit,
   onStashAction,
   undoable = false,
@@ -92,6 +95,8 @@ export function ContextMenu({
 
   const branch = target.ref?.type === "branch" ? target.ref : null;
   const checkoutable = branch !== null && !branch.isCurrent;
+  const remoteBranch =
+    target.ref && isCheckoutableRemote(target.ref) && Boolean(onCheckoutRemote) ? target.ref : null;
   const mergeable = checkoutable && branch !== null && Boolean(onMerge) && Boolean(currentBranch);
   const pullBranch =
     target.ref?.type === "branch"
@@ -115,6 +120,7 @@ export function ContextMenu({
   // The menu is ~32px an entry; the estimate grows with it so it never opens off-screen.
   const entries =
     (checkoutable ? 1 : 0) +
+    (remoteBranch ? 1 : 0) +
     (mergeable ? 1 : 0) +
     (pullable ? 1 : 0) +
     (commitCheckoutable ? 1 : 0) +
@@ -146,6 +152,17 @@ export function ContextMenu({
           }}
         >
           Check out {branch.name}
+        </button>
+      )}
+      {remoteBranch && (
+        <button type="button" role="menuitem" className={ITEM}
+          title="Makes a local branch that tracks this one — you pick its name first"
+          onClick={() => {
+            onClose();
+            onCheckoutRemote?.(remoteBranch.name);
+          }}
+        >
+          Check out {remoteBranch.name}…
         </button>
       )}
       {mergeable && branch && (

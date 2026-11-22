@@ -39,6 +39,8 @@ pub fn run() {
             git::read_image_versions,
             git::checkout_branch,
             git::checkout_commit,
+            git::checkout_remote_branch,
+            git::local_branch_exists,
             git::merge_branch,
             git::resolve_conflicts,
             git::abort_merge,

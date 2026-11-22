@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { Button, ButtonVariant } from "../../shared/components/Button";
 import { ConfirmDialog } from "../../shared/components/ConfirmDialog";
 import { BranchIcon, CloseIcon, MinusIcon, PlusIcon, TrashIcon } from "../../shared/components/icons";
 import { STATUS_TONES, fileDirTone, fileNameTone, fileTitle, statusLetter } from "../../shared/lib/format";
@@ -448,15 +449,15 @@ export function StagePanel({
                 ? `${unresolved} conflict${unresolved === 1 ? "" : "s"} left to resolve.`
                 : "All conflicts resolved. Git prepared the merge message."}
             </p>
-            <button
-              type="button"
+            <Button
+              variant={ButtonVariant.Primary}
               disabled={busy || unresolved > 0}
               onClick={onCompleteMerge}
               title="Commits the resolved merge with git's own prepared message"
-              className="h-8 w-full rounded-lg bg-primary px-3 text-[12px] font-semibold text-white transition-filter hover:brightness-110 focus-visible:ring-2 focus-visible:ring-primary-ink/70 disabled:opacity-50"
+              className="h-8 w-full"
             >
               Complete merge
-            </button>
+            </Button>
           </>
         ) : (
           <>
@@ -478,8 +479,8 @@ export function StagePanel({
             className="block w-full resize-none rounded-lg border border-transparent bg-glass-soft px-2.5 py-1.5 text-[12px] leading-normal text-ink placeholder:text-ink-dim focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
           />
           <div className="mt-2 flex flex-wrap items-center gap-2">
-            <button
-              type="button"
+            <Button
+              variant={ButtonVariant.Primary}
               disabled={staged.length === 0 || message.trim() === "" || busy}
               onClick={handleCommit}
               title={
@@ -492,10 +493,10 @@ export function StagePanel({
                       : withShortcut("Commit the staged files", Shortcut.Commit)
               }
               aria-keyshortcuts="Control+Enter"
-              className="h-7 rounded-lg bg-primary px-3 text-[12px] font-semibold text-white transition-filter hover:brightness-110 focus-visible:ring-2 focus-visible:ring-primary-ink/70 disabled:opacity-60"
+              className="h-7"
             >
               Commit
-            </button>
+            </Button>
             {messageFocused && <KeyCombo keys={SHORTCUTS[Shortcut.Commit].keys} />}
             <span className="font-mono text-[10.5px] text-ink-dim">
               {busy ? "…" : staged.length > 0 ? `${staged.length} staged` : ""}

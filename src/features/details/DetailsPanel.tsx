@@ -45,6 +45,7 @@ interface DetailsPanelProps {
   commitChip?: (commit: Commit) => PullChipData | null;
   terms?: string[];
   onCheckoutBranch?: (branch: string) => void;
+  onCheckoutRemote?: (remoteRef: string) => void;
   onRefContextMenu?: (ref: CommitRef, x: number, y: number) => void;
   isWorktree?: boolean;
   /** Asks App for one file's patch (patches are lazy; the file list arrives without them). */
@@ -81,6 +82,7 @@ export function DetailsPanel({
   commitChip,
   terms,
   onCheckoutBranch,
+  onCheckoutRemote,
   onRefContextMenu,
   isWorktree = false,
   onPatchNeeded,
@@ -274,6 +276,7 @@ export function DetailsPanel({
                             pullRequest={pullsByBranch && pullRequestForRef(pillRef, pullsByBranch)}
                             color={commit.branchColor}
                             onCheckout={onCheckoutBranch}
+                            onCheckoutRemote={onCheckoutRemote}
                             onContextMenu={onRefContextMenu}
                           />
                         ))}

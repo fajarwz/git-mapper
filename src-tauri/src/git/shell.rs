@@ -47,6 +47,22 @@ pub fn run_git(dir: &str, args: &[&str]) -> Result<String, String> {
         })
 }
 
+/// A credential-hungry remote errors instead of hanging on a prompt nobody can answer.
+pub fn run_git_no_prompt(dir: &str, args: &[&str]) -> Result<String, String> {
+    git_command(dir)
+        .env("GIT_TERMINAL_PROMPT", "0")
+        .args(args)
+        .output()
+        .map_err(|e| format!("failed to run git: {e}"))
+        .and_then(|out| {
+            if out.status.success() {
+                Ok(String::from_utf8_lossy(&out.stdout).to_string())
+            } else {
+                Err(String::from_utf8_lossy(&out.stderr).trim().to_string())
+            }
+        })
+}
+
 /// A git read that stats the worktree. `git diff HEAD` refreshes the index opportunistically
 /// (taking index.lock), and the wip view runs three of those side by side, so the env var
 /// turns that opportunistic write off and the concurrent reads cannot lock-race. Everything

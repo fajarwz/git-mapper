@@ -117,3 +117,91 @@ fn checkout_commit_rejects_everything_but_a_hash() {
         "HEAD did not move"
     );
 }
+
+fn clone_with_remote_branch(label: &str) -> (TempRepo, TempRepo) {
+    let remote = TempRepo::new(&format!("{label}-remote"));
+    remote.commit("a.txt", "a\n", "first");
+    git(&remote.0, &["checkout", "-q", "-b", "feature/x"]);
+    remote.commit("x.txt", "x\n", "feature work");
+    git(&remote.0, &["checkout", "-q", "main"]);
+    let repo = TempRepo::new(label);
+    repo.commit("b.txt", "b\n", "local");
+    git(&repo.0, &["remote", "add", "origin", remote.path()]);
+    fetch_remote_in(repo.path()).expect("fetched");
+    (remote, repo)
+}
+
+#[test]
+fn checkout_remote_branch_creates_a_tracking_branch() {
+    let (_remote, repo) = clone_with_remote_branch("remote-create");
+    assert!(!local_branch_exists_in(repo.path(), "feature/x").unwrap());
+
+    checkout_remote_branch_in(repo.path(), "origin/feature/x", "feature/x", RemoteCheckoutMode::Create)
+        .expect("the branch is created");
+
+    assert_eq!(git_out(&repo.0, &["rev-parse", "--abbrev-ref", "HEAD"]), "feature/x");
+    assert_eq!(
+        git_out(&repo.0, &["rev-parse", "--abbrev-ref", "feature/x@{upstream}"]),
+        "origin/feature/x",
+        "the new branch tracks the remote one"
+    );
+    assert!(local_branch_exists_in(repo.path(), "feature/x").unwrap());
+}
+
+#[test]
+fn checkout_remote_branch_refuses_a_taken_or_invalid_name() {
+    let (_remote, repo) = clone_with_remote_branch("remote-guard");
+    git(&repo.0, &["branch", "taken"]);
+
+    let err = checkout_remote_branch_in(repo.path(), "origin/feature/x", "taken", RemoteCheckoutMode::Create)
+        .unwrap_err();
+    assert!(err.contains("already exists"), "got: {err}");
+    let err = checkout_remote_branch_in(repo.path(), "origin/feature/x", "bad name", RemoteCheckoutMode::Create)
+        .unwrap_err();
+    assert!(err.contains("not a valid branch name"), "got: {err}");
+    let err = checkout_remote_branch_in(repo.path(), "origin/nope", "nope", RemoteCheckoutMode::Create)
+        .unwrap_err();
+    assert!(err.contains("not a remote branch"), "got: {err}");
+    let err = checkout_remote_branch_in(repo.path(), "origin/feature/x", "missing", RemoteCheckoutMode::Existing)
+        .unwrap_err();
+    assert!(err.contains("no local branch"), "got: {err}");
+    assert_eq!(git_out(&repo.0, &["rev-parse", "--abbrev-ref", "HEAD"]), "main");
+}
+
+#[test]
+fn checkout_remote_branch_existing_switches_and_fast_forwards() {
+    let (remote, repo) = clone_with_remote_branch("remote-existing");
+    git(&repo.0, &["branch", "feature/x", "origin/feature/x"]);
+    git(&remote.0, &["checkout", "-q", "feature/x"]);
+    remote.commit("y.txt", "y\n", "more feature work");
+    git(&remote.0, &["checkout", "-q", "main"]);
+    fetch_remote_in(repo.path()).expect("fetched");
+
+    checkout_remote_branch_in(repo.path(), "origin/feature/x", "feature/x", RemoteCheckoutMode::Existing)
+        .expect("checked out and pulled");
+
+    assert_eq!(git_out(&repo.0, &["rev-parse", "--abbrev-ref", "HEAD"]), "feature/x");
+    assert_eq!(
+        git_out(&repo.0, &["rev-parse", "HEAD"]),
+        git_out(&repo.0, &["rev-parse", "origin/feature/x"]),
+        "the local branch caught up"
+    );
+}
+
+#[test]
+fn checkout_remote_branch_existing_keeps_a_diverged_branch_checked_out() {
+    let (remote, repo) = clone_with_remote_branch("remote-diverged");
+    git(&repo.0, &["branch", "feature/x", "origin/feature/x"]);
+    git(&repo.0, &["checkout", "-q", "feature/x"]);
+    repo.commit("mine.txt", "m\n", "local only");
+    git(&repo.0, &["checkout", "-q", "main"]);
+    git(&remote.0, &["checkout", "-q", "feature/x"]);
+    remote.commit("theirs.txt", "t\n", "remote only");
+    git(&remote.0, &["checkout", "-q", "main"]);
+    fetch_remote_in(repo.path()).expect("fetched");
+
+    let err = checkout_remote_branch_in(repo.path(), "origin/feature/x", "feature/x", RemoteCheckoutMode::Existing)
+        .unwrap_err();
+    assert!(err.contains("could not be pulled"), "got: {err}");
+    assert_eq!(git_out(&repo.0, &["rev-parse", "--abbrev-ref", "HEAD"]), "feature/x");
+}
