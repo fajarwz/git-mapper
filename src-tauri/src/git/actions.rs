@@ -240,3 +240,71 @@ pub fn delete_remote_tag_in(dir: &str, name: &str) -> Result<(), String> {
     }
     run_git_no_prompt(dir, &["push", "origin", "--delete", &format!("refs/tags/{name}")]).map(|_| ())
 }
+
+/// The remote a branch pushes to and the branch name it maps to there; `None` without an upstream.
+fn upstream_target_in(dir: &str, branch: &str) -> Option<(String, String)> {
+    let remote = run_git(dir, &["config", "--get", &format!("branch.{branch}.remote")]).ok()?;
+    let merge = run_git(dir, &["config", "--get", &format!("branch.{branch}.merge")]).ok()?;
+    let remote = remote.trim();
+    let merge = merge.trim().strip_prefix("refs/heads/")?;
+    (!remote.is_empty() && remote != ".").then(|| (remote.to_string(), merge.to_string()))
+}
+
+/// What `push_branch` hands git: the branch's own upstream when it has one, else `origin`.
+pub fn push_args_in(dir: &str) -> Vec<String> {
+    let branch = run_git(dir, &["symbolic-ref", "--short", "-q", "HEAD"]).unwrap_or_default();
+    let branch = branch.trim();
+    match upstream_target_in(dir, branch) {
+        Some((remote, target)) if !branch.is_empty() => {
+            vec!["push".into(), "-u".into(), remote, format!("HEAD:refs/heads/{target}")]
+        }
+        _ => vec!["push".into(), "-u".into(), "origin".into(), "HEAD".into()],
+    }
+}
+
+fn require_remote_branch_name(dir: &str, name: &str) -> Result<(), String> {
+    if name.starts_with('-') || run_git(dir, &["check-ref-format", "--branch", name]).is_err() {
+        return Err(format!("\"{name}\" is not a valid branch name"));
+    }
+    Ok(())
+}
+
+fn require_known_remote(dir: &str, remote: &str) -> Result<(), String> {
+    if run_git(dir, &["remote"])?.lines().any(|known| known.trim() == remote) {
+        Ok(())
+    } else {
+        Err(format!("There is no remote named \"{remote}\""))
+    }
+}
+
+/// Points a local branch at `<remote>/<remote_branch>`; that remote branch has to exist already.
+pub fn set_upstream_in(dir: &str, branch: &str, remote: &str, remote_branch: &str) -> Result<(), String> {
+    let (branch, remote, remote_branch) = (branch.trim(), remote.trim(), remote_branch.trim());
+    if !local_branch_exists_in(dir, branch)? {
+        return Err(format!("There is no local branch named \"{branch}\""));
+    }
+    require_known_remote(dir, remote)?;
+    require_remote_branch_name(dir, remote_branch)?;
+    run_git(dir, &["show-ref", "--verify", "--quiet", &format!("refs/remotes/{remote}/{remote_branch}")])
+        .map_err(|_| format!("\"{remote}/{remote_branch}\" does not exist; fetch or push it first"))?;
+    run_git(
+        dir,
+        &["branch", &format!("--set-upstream-to={remote}/{remote_branch}"), "--", branch],
+    )
+    .map(|_| ())
+}
+
+/// Publishes a local branch to a chosen remote as `remote_branch` and makes that its upstream.
+pub fn push_branch_to_in(dir: &str, branch: &str, remote: &str, remote_branch: &str) -> Result<(), String> {
+    let (branch, remote, remote_branch) = (branch.trim(), remote.trim(), remote_branch.trim());
+    if !local_branch_exists_in(dir, branch)? {
+        return Err(format!("There is no local branch named \"{branch}\""));
+    }
+    require_known_remote(dir, remote)?;
+    require_remote_branch_name(dir, remote_branch)?;
+    run_git_no_prompt(
+        dir,
+        &["push", "-u", remote, &format!("refs/heads/{branch}:refs/heads/{remote_branch}")],
+    )
+    .map(|_| ())
+}

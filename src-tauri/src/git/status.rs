@@ -14,6 +14,8 @@ pub struct StatusInfo {
     pub branch: String,
     pub ahead: u32,
     pub behind: u32,
+    /// The tracking branch (`origin/main`), empty when the branch has none.
+    pub upstream: String,
     /// True when the working tree has any change (staged, unstaged or untracked).
     pub dirty: bool,
     /// True while `MERGE_HEAD` exists — the merge resolution slice's banner state.
@@ -137,6 +139,7 @@ pub fn read_status_in(dir: &str) -> Result<StatusInfo, String> {
             branch: String::new(),
             ahead: 0,
             behind: 0,
+            upstream: String::new(),
             dirty: changed > 0,
             merging: run_git(dir, &["rev-parse", "-q", "--verify", "MERGE_HEAD"]).is_ok(),
             conflicts,
@@ -149,6 +152,7 @@ pub fn read_status_in(dir: &str) -> Result<StatusInfo, String> {
             // Branch name may contain dots; the upstream is after "..." and the counts in brackets.
             let (branch_part, tail) = head.split_once("...").unwrap_or((head, ""));
             info.branch = branch_part.to_string();
+            info.upstream = tail.split_once(" [").map_or(tail, |(name, _)| name).to_string();
             let bracket = tail.split_once('[').map(|(_, r)| r).unwrap_or(tail);
             if let Some(close) = bracket.split_once(']') {
                 for part in close.0.split(", ") {
