@@ -41,6 +41,8 @@ pub fn run() {
             git::checkout_commit,
             git::checkout_remote_branch,
             git::local_branch_exists,
+            git::create_branch,
+            git::delete_branch,
             git::merge_branch,
             git::resolve_conflicts,
             git::abort_merge,

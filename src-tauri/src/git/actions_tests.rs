@@ -205,3 +205,70 @@ fn checkout_remote_branch_existing_keeps_a_diverged_branch_checked_out() {
     assert!(err.contains("could not be pulled"), "got: {err}");
     assert_eq!(git_out(&repo.0, &["rev-parse", "--abbrev-ref", "HEAD"]), "feature/x");
 }
+
+#[test]
+fn create_branch_points_at_the_commit_with_or_without_checkout() {
+    let repo = TempRepo::new("create-branch");
+    repo.commit("a.txt", "a\n", "first");
+    let first = git_out(&repo.0, &["rev-parse", "HEAD"]);
+    repo.commit("b.txt", "b\n", "second");
+
+    create_branch_in(repo.path(), "old", &first[..7], false).expect("created");
+    assert_eq!(git_out(&repo.0, &["rev-parse", "old"]), first);
+    assert_eq!(git_out(&repo.0, &["rev-parse", "--abbrev-ref", "HEAD"]), "main", "no checkout asked");
+
+    create_branch_in(repo.path(), "feature/y", &first, true).expect("created and checked out");
+    assert_eq!(git_out(&repo.0, &["rev-parse", "--abbrev-ref", "HEAD"]), "feature/y");
+}
+
+#[test]
+fn create_branch_refuses_a_taken_name_a_bad_name_and_a_non_hash() {
+    let repo = TempRepo::new("create-branch-guard");
+    repo.commit("a.txt", "a\n", "first");
+    let head = git_out(&repo.0, &["rev-parse", "HEAD"]);
+
+    let err = create_branch_in(repo.path(), "main", &head, false).unwrap_err();
+    assert!(err.contains("already exists"), "got: {err}");
+    let err = create_branch_in(repo.path(), "bad name", &head, false).unwrap_err();
+    assert!(err.contains("not a valid branch name"), "got: {err}");
+    let err = create_branch_in(repo.path(), "x", "main", false).unwrap_err();
+    assert!(err.contains("is not a commit hash"), "got: {err}");
+}
+
+#[test]
+fn delete_branch_keeps_an_unmerged_branch_until_forced() {
+    let repo = TempRepo::new("delete-branch");
+    repo.commit("a.txt", "a\n", "first");
+    git(&repo.0, &["branch", "merged"]);
+    git(&repo.0, &["checkout", "-q", "-b", "wip"]);
+    repo.commit("w.txt", "w\n", "unmerged work");
+    git(&repo.0, &["checkout", "-q", "main"]);
+
+    assert_eq!(delete_branch_in(repo.path(), "merged", false, false).unwrap(), DeleteOutcome::Deleted);
+    assert!(!local_branch_exists_in(repo.path(), "merged").unwrap());
+
+    assert_eq!(delete_branch_in(repo.path(), "wip", false, false).unwrap(), DeleteOutcome::NotMerged);
+    assert!(local_branch_exists_in(repo.path(), "wip").unwrap(), "still there");
+    assert_eq!(delete_branch_in(repo.path(), "wip", false, true).unwrap(), DeleteOutcome::Deleted);
+    assert!(!local_branch_exists_in(repo.path(), "wip").unwrap());
+
+    let err = delete_branch_in(repo.path(), "main", false, true).unwrap_err();
+    assert!(!err.is_empty(), "the checked-out branch cannot be deleted");
+    assert!(delete_branch_in(repo.path(), "ghost", false, false).is_err());
+}
+
+#[test]
+fn delete_branch_removes_a_remote_branch_from_the_remote() {
+    let (remote, repo) = clone_with_remote_branch("delete-remote");
+
+    assert_eq!(
+        delete_branch_in(repo.path(), "origin/feature/x", true, false).unwrap(),
+        DeleteOutcome::Deleted
+    );
+    let gone = std::process::Command::new("git")
+        .args(["rev-parse", "--verify", "-q", "refs/heads/feature/x"])
+        .current_dir(&remote.0)
+        .output()
+        .expect("git ran");
+    assert!(!gone.status.success(), "the remote no longer has the branch");
+}

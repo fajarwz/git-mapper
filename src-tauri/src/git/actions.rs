@@ -1,5 +1,12 @@
 use super::shell::{run_git, run_git_no_prompt};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
+
+fn require_commit_hash(hash: &str) -> Result<(), String> {
+    if hash.len() < 4 || hash.len() > 40 || !hash.chars().all(|c| c.is_ascii_hexdigit()) {
+        return Err(format!("\"{hash}\" is not a commit hash"));
+    }
+    Ok(())
+}
 
 pub fn checkout_branch_in(dir: &str, branch: &str) -> Result<(), String> {
     run_git(dir, &["checkout", branch]).map(|_| ())
@@ -82,9 +89,7 @@ pub fn checkout_commit_in(dir: &str, hash: &str) -> Result<(), String> {
     // The arg goes straight into git's CLI: only an abbreviated/full hex hash is accepted, so
     // a branch name or any other string can never turn this into something else. A short hash
     // that matches nothing comes back as git's "does not exist" error, which the toast shows.
-    if hash.len() < 4 || hash.len() > 40 || !hash.chars().all(|c| c.is_ascii_hexdigit()) {
-        return Err(format!("\"{hash}\" is not a commit hash"));
-    }
+    require_commit_hash(hash)?;
     // --detach is the explicit form: it detaches even when the hash sits on a branch tip.
     run_git(dir, &["checkout", "--detach", hash]).map(|_| ())
 }
@@ -119,4 +124,63 @@ pub fn fetch_remote_in(dir: &str) -> Result<(), String> {
         return Ok(());
     }
     run_git(dir, &["fetch", "--all", "--prune", "--quiet"]).map(|_| ())
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize)]
+#[serde(rename_all = "kebab-case")]
+pub enum DeleteOutcome {
+    Deleted,
+    NotMerged,
+}
+
+pub fn create_branch_in(dir: &str, name: &str, hash: &str, checkout: bool) -> Result<(), String> {
+    let name = name.trim();
+    let hash = hash.trim();
+    require_commit_hash(hash)?;
+    run_git(dir, &["check-ref-format", "--branch", name])
+        .map_err(|_| format!("\"{name}\" is not a valid branch name"))?;
+    if local_branch_exists_in(dir, name)? {
+        return Err(format!("A branch named \"{name}\" already exists"));
+    }
+    if checkout {
+        run_git(dir, &["checkout", "-b", name, hash]).map(|_| ())
+    } else {
+        run_git(dir, &["branch", name, hash]).map(|_| ())
+    }
+}
+
+// `git branch -d` words its refusal differently per locale, so merged-ness is decided here
+// with plain ancestry: into HEAD or into the branch's own upstream, the two cases `-d` accepts.
+fn branch_is_merged(dir: &str, name: &str) -> bool {
+    let branch = format!("refs/heads/{name}");
+    run_git(dir, &["merge-base", "--is-ancestor", &branch, "HEAD"]).is_ok()
+        || run_git(
+            dir,
+            &["merge-base", "--is-ancestor", &branch, &format!("{branch}@{{upstream}}")],
+        )
+        .is_ok()
+}
+
+/// Deletes a local branch, or (`remote`) a remote one by its `origin/x` name via `push --delete`.
+/// An unmerged local branch is reported as `NotMerged` and left alone until `force` is set.
+pub fn delete_branch_in(
+    dir: &str,
+    name: &str,
+    remote: bool,
+    force: bool,
+) -> Result<DeleteOutcome, String> {
+    let name = name.trim();
+    if remote {
+        let (remote_name, branch) = split_remote_ref(dir, name)?;
+        run_git_no_prompt(dir, &["push", "--delete", &remote_name, &branch])?;
+        return Ok(DeleteOutcome::Deleted);
+    }
+    if !local_branch_exists_in(dir, name)? {
+        return Err(format!("There is no local branch named \"{name}\""));
+    }
+    if !force && !branch_is_merged(dir, name) {
+        return Ok(DeleteOutcome::NotMerged);
+    }
+    run_git(dir, &["branch", if force { "-D" } else { "-d" }, "--", name])?;
+    Ok(DeleteOutcome::Deleted)
 }
