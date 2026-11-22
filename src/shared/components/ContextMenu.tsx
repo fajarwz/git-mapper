@@ -22,6 +22,8 @@ interface ContextMenuProps {
   onCreateTag?: (hash: string) => void;
   onDeleteTag?: (name: string, remote: boolean) => void;
   onPushTag?: (name: string) => void;
+  onSetUpstream?: (branch: string) => void;
+  onPushBranchTo?: (branch: string) => void;
   onCheckoutCommit:(hash: string) => void;
   onStashAction: (index: number, action: StashAction) => void;
   /** Undoing the tip commit: the menu entry exists only when the target IS the tip, the
@@ -63,6 +65,8 @@ export function ContextMenu({
   onCreateTag,
   onDeleteTag,
   onPushTag,
+  onSetUpstream,
+  onPushBranchTo,
   onCheckoutCommit,
   onStashAction,
   undoable = false,
@@ -141,6 +145,8 @@ export function ContextMenu({
     (branchCreatable ? 1 : 0) +
     (deletableLocal || deletableRemote ? 1 : 0) +
     (taggable ? 1 : 0) +
+    (branch && onSetUpstream ? 1 : 0) +
+    (branch && onPushBranchTo ? 1 : 0) +
     (deletableTag ? 2 : 0) +
     (deletableTag && onPushTag ? 1 : 0) +
     (mergeable ? 1 : 0) +
@@ -229,6 +235,28 @@ export function ContextMenu({
           }}
         >
           Create pull request…
+        </button>
+      )}
+      {branch && onSetUpstream && (
+        <button type="button" role="menuitem" className={ITEM}
+          title="Picks the remote branch this branch pulls from and pushes to"
+          onClick={() => {
+            onClose();
+            onSetUpstream(branch.name);
+          }}
+        >
+          Set upstream…
+        </button>
+      )}
+      {branch && onPushBranchTo && (
+        <button type="button" role="menuitem" className={ITEM}
+          title="Pushes this branch to a remote you pick and tracks it"
+          onClick={() => {
+            onClose();
+            onPushBranchTo(branch.name);
+          }}
+        >
+          Push to…
         </button>
       )}
       {deletableLocal && branch && (

@@ -139,6 +139,8 @@ export interface Repository {
   branch: string;
   ahead: number;
   behind: number;
+  /** The checked-out branch's tracking branch (`origin/main`); empty or absent without one. */
+  upstream?: string;
   head: string;
   changed: number;
   /** Digest of the working tree at load time: notices content edits the count cannot. */
@@ -153,4 +155,10 @@ export interface Repository {
   commits: Commit[];
   defaultCommitHash: string;
   sleeping?: boolean;
+}
+
+export interface RemoteInfo {
+  name: string;
+  /** The fetch URL with any password already masked by the backend. */
+  url: string;
 }

@@ -451,3 +451,39 @@ test("a commit offers Create tag here, and a tag pill offers its own delete", ()
   const stash = render_({ commit: commit({ stashIndex: 0 }) });
   assert.equal(stash.queryByRole("menuitem", { name: "Create tag here…" }), null);
 });
+
+test("a branch pill offers Set upstream and Push to, even for the checked-out branch", () => {
+  const onSetUpstream = vi.fn();
+  const onPushBranchTo = vi.fn();
+  const view = render(
+    <ContextMenu
+      target={target({ ref: { type: "branch", name: "main", isCurrent: true } })}
+      onCheckout={vi.fn()}
+      onSetUpstream={onSetUpstream}
+      onPushBranchTo={onPushBranchTo}
+      onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
+      head={HEAD}
+      onClose={vi.fn()}
+    />,
+  );
+  fireEvent.click(view.getByRole("menuitem", { name: "Set upstream…" }));
+  fireEvent.click(view.getByRole("menuitem", { name: "Push to…" }));
+  assert.deepEqual(onSetUpstream.mock.calls[0], ["main"]);
+  assert.deepEqual(onPushBranchTo.mock.calls[0], ["main"]);
+  cleanup();
+
+  const tag = render(
+    <ContextMenu
+      target={target({ ref: { type: "tag", name: "v1" } })}
+      onCheckout={vi.fn()}
+      onSetUpstream={onSetUpstream}
+      onPushBranchTo={onPushBranchTo}
+      onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
+      head={HEAD}
+      onClose={vi.fn()}
+    />,
+  );
+  assert.equal(tag.queryByRole("menuitem", { name: "Set upstream…" }), null);
+});

@@ -31,6 +31,7 @@ import {
   PlusIcon,
   RefreshIcon,
   RemoteIcon,
+  RemotesIcon,
   RepoIcon,
   SearchIcon,
   SettingsIcon,
@@ -101,6 +102,7 @@ interface TitleBarProps {
   onReorder: (from: number, to: number) => void;
   onRefresh: () => void;
   onFetch: () => void;
+  onOpenRemotes: () => void;
   fetching: boolean;
   onOpenSettings: () => void;
   updateReady?: boolean;
@@ -206,6 +208,7 @@ export function TitleBar({
   onReorder,
   onRefresh,
   onFetch,
+  onOpenRemotes,
   fetching,
   onOpenSettings,
   updateReady = false,
@@ -446,6 +449,17 @@ export function TitleBar({
             <RemoteIcon size={13} className={fetching ? "animate-spin" : undefined} />
           </button>
         )}
+        {repo && (
+          <button
+            type="button"
+            onClick={onOpenRemotes}
+            aria-label="Manage remotes"
+            title="Manage remotes (add, rename, remove)"
+            className={`${GLASS_CONTROL} grid place-items-center text-ink-dim hover:bg-sheet-strong hover:text-ink focus-visible:ring-2 focus-visible:ring-primary/70 size-7`}
+          >
+            <RemotesIcon size={13} />
+          </button>
+        )}
         {repo && repo.branch !== "HEAD detached" && (
           <>
             <button
@@ -470,7 +484,7 @@ export function TitleBar({
               onClick={onPush}
               disabled={syncing}
               aria-label={`Push ${repo.branch}`}
-              title={`Push ${repo.branch} to origin${syncError?.op === "push" ? ` — ${syncError.message}` : ""}`}
+              title={`Push ${repo.branch} to ${repo.upstream || "origin"}${syncError?.op === "push" ? ` — ${syncError.message}` : ""}`}
               className={`${GLASS_CONTROL} inline-flex h-7 min-w-7 place-items-center justify-center gap-0.5 px-1.5 text-[11px] font-semibold leading-none ${
                 syncError?.op === "push"
                   ? "text-danger"

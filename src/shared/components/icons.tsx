@@ -6,6 +6,7 @@ import RawArrowLeftIcon from "../../assets/arrow-left.svg?react";
 import RawArrowRightIcon from "../../assets/arrow-right.svg?react";
 import RawTagIcon from "../../assets/tag.svg?react";
 import RawRemoteIcon from "../../assets/remote.svg?react";
+import RawRemotesIcon from "../../assets/remotes.svg?react";
 import RawStashIcon from "../../assets/stash.svg?react";
 import RawRepoIcon from "../../assets/repo.svg?react";
 import RawPlusIcon from "../../assets/plus.svg?react";
@@ -156,4 +157,8 @@ export function PullRequestClosedIcon({ size = 12, className = "" }: GlyphProps)
 
 export function ExternalIcon({ size = 12, className = "" }: GlyphProps) {
   return <SizedIcon glyph={RawExternalIcon} size={size} className={className} />;
+}
+
+export function RemotesIcon({ size = 12, className = "" }: GlyphProps) {
+  return <SizedIcon glyph={RawRemotesIcon} size={size} className={className} />;
 }
