@@ -200,6 +200,26 @@ pub async fn delete_branch(
 ) -> Result<DeleteOutcome, String> {
     run_blocking("delete branch", move || delete_branch_in(&dir, &name, remote, force)).await
 }
+#[tauri::command]
+pub async fn tag_exists(dir: String, name: String) -> Result<bool, String> {
+    run_blocking("tag probe", move || tag_exists_in(&dir, &name)).await
+}
+#[tauri::command]
+pub async fn create_tag(dir: String, name: String, hash: String, message: String) -> Result<(), String> {
+    run_blocking("create tag", move || create_tag_in(&dir, &name, &hash, &message)).await
+}
+#[tauri::command]
+pub async fn push_tag(dir: String, name: String) -> Result<(), String> {
+    run_blocking("push tag", move || push_tag_in(&dir, &name)).await
+}
+#[tauri::command]
+pub async fn delete_remote_tag(dir: String, name: String) -> Result<(), String> {
+    run_blocking("delete remote tag", move || delete_remote_tag_in(&dir, &name)).await
+}
+#[tauri::command]
+pub async fn delete_tag(dir: String, name: String) -> Result<(), String> {
+    run_blocking("delete tag", move || delete_tag_in(&dir, &name)).await
+}
 /// Detaches HEAD onto a commit. The app asks first — the dialog warns that new commits made
 /// on a detached HEAD are lost unless a branch is created — so this never runs unconfirmed.
 #[tauri::command]

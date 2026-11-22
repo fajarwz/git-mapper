@@ -607,6 +607,27 @@ export async function deleteBranch(
   return call("delete_branch", { dir, name, remote, force }, (raw) => raw as DeleteOutcome);
 }
 
+export async function tagExists(dir: string, name: string): Promise<boolean> {
+  return call("tag_exists", { dir, name }, (raw) => raw as boolean);
+}
+
+/** An empty `message` makes a lightweight tag; anything else an annotated one. */
+export async function createTag(dir: string, name: string, hash: string, message: string): Promise<void> {
+  await call("create_tag", { dir, name, hash, message }, (raw) => raw as void);
+}
+
+export async function deleteTag(dir: string, name: string): Promise<void> {
+  await call("delete_tag", { dir, name }, (raw) => raw as void);
+}
+
+export async function pushTag(dir: string, name: string): Promise<void> {
+  await call("push_tag", { dir, name }, (raw) => raw as void);
+}
+
+export async function deleteRemoteTag(dir: string, name: string): Promise<void> {
+  await call("delete_remote_tag", { dir, name }, (raw) => raw as void);
+}
+
 export async function checkoutCommit(dir: string, hash: string): Promise<void> {
   await call("checkout_commit", { dir, hash }, (raw) => raw as void);
 }

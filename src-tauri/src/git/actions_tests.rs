@@ -272,3 +272,75 @@ fn delete_branch_removes_a_remote_branch_from_the_remote() {
         .expect("git ran");
     assert!(!gone.status.success(), "the remote no longer has the branch");
 }
+
+#[test]
+fn create_tag_is_lightweight_without_a_message_and_annotated_with_one() {
+    let repo = TempRepo::new("create-tag");
+    repo.commit("a.txt", "a\n", "first");
+    let first = git_out(&repo.0, &["rev-parse", "HEAD"]);
+    repo.commit("b.txt", "b\n", "second");
+
+    create_tag_in(repo.path(), "v0", &first[..7], "").expect("lightweight tag");
+    assert_eq!(git_out(&repo.0, &["cat-file", "-t", "v0"]), "commit");
+    assert_eq!(git_out(&repo.0, &["rev-parse", "v0^{commit}"]), first);
+
+    create_tag_in(repo.path(), "v1", &first, "  release one  ").expect("annotated tag");
+    assert_eq!(git_out(&repo.0, &["cat-file", "-t", "v1"]), "tag");
+    assert_eq!(git_out(&repo.0, &["rev-parse", "v1^{commit}"]), first);
+    assert!(git_out(&repo.0, &["tag", "-n1", "v1"]).contains("release one"));
+}
+
+#[test]
+fn create_tag_refuses_a_taken_name_a_bad_name_and_a_non_hash() {
+    let repo = TempRepo::new("create-tag-guard");
+    repo.commit("a.txt", "a\n", "first");
+    let head = git_out(&repo.0, &["rev-parse", "HEAD"]);
+    create_tag_in(repo.path(), "v1", &head, "").expect("first tag");
+
+    let err = create_tag_in(repo.path(), "v1", &head, "").unwrap_err();
+    assert!(err.contains("already exists"), "got: {err}");
+    for bad in ["bad name", "-f", "a..b"] {
+        let err = create_tag_in(repo.path(), bad, &head, "").unwrap_err();
+        assert!(err.contains("not a valid tag name"), "got: {err}");
+    }
+    let err = create_tag_in(repo.path(), "x", "main", "").unwrap_err();
+    assert!(err.contains("is not a commit hash"), "got: {err}");
+}
+
+#[test]
+fn delete_tag_removes_a_local_tag_and_refuses_a_missing_one() {
+    let repo = TempRepo::new("delete-tag");
+    repo.commit("a.txt", "a\n", "first");
+    let head = git_out(&repo.0, &["rev-parse", "HEAD"]);
+    create_tag_in(repo.path(), "v1", &head, "note").expect("tagged");
+
+    delete_tag_in(repo.path(), "v1").expect("deleted");
+    assert!(!tag_exists_in(repo.path(), "v1").unwrap());
+    assert!(delete_tag_in(repo.path(), "v1").is_err());
+}
+
+#[test]
+fn push_tag_and_delete_remote_tag_round_trip_through_origin() {
+    let (remote, repo) = clone_with_remote_branch("push-tag");
+    let head = git_out(&repo.0, &["rev-parse", "HEAD"]);
+    create_tag_in(repo.path(), "v1", &head, "").expect("tagged");
+    let remote_has = || {
+        std::process::Command::new("git")
+            .args(["rev-parse", "--verify", "-q", "refs/tags/v1"])
+            .current_dir(&remote.0)
+            .output()
+            .expect("git ran")
+            .status
+            .success()
+    };
+    assert!(!remote_has());
+
+    push_tag_in(repo.path(), "v1").expect("pushed");
+    assert!(remote_has(), "the remote has the tag");
+
+    delete_remote_tag_in(repo.path(), "v1").expect("deleted on the remote");
+    assert!(!remote_has());
+    assert!(tag_exists_in(repo.path(), "v1").unwrap(), "the local tag stays");
+
+    assert!(push_tag_in(repo.path(), "ghost").is_err());
+}

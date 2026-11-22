@@ -179,7 +179,11 @@
   `delete_branch`: a local branch that is not an ancestor of HEAD or its upstream answers
   `DeleteOutcome.NotMerged` instead of deleting, and a second danger confirm re-runs it forced
   (merged-ness is decided with `merge-base --is-ancestor`, not by parsing `git branch -d`'s localised
-  refusal); a remote delete is `push --delete`. `Check out commit <hash>…`
+  refusal); a remote delete is `push --delete`. `Create tag here…` (same rows; `CreateTagDialog.tsx`, name plus an
+  "annotated" toggle that reveals a required message) runs `create_tag`: an empty message is a lightweight tag,
+  anything else `tag -a -m`; a taken name is an inline error (`tag_exists`). Tag pills also offer `Push tag <name>`
+  (`push_tag`, `push origin refs/tags/<name>`, no force), `Delete tag <name>…` (`delete_tag`, local only) and
+  `Delete remote tag <name>…` (`delete_remote_tag`, `push origin --delete`); both deletes confirm first. `Check out commit <hash>…`
   (real history rows only — not the HEAD row, the `wip` row or a stash row; it opens
   `ConfirmDialog.tsx`, because checking out a commit detaches HEAD and commits made there are
   lost without a branch — the command is `checkout_commit`, hash-format-gated, `--detach`),
