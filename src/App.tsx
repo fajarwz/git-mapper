@@ -16,6 +16,7 @@ import { StarPrompt } from "./features/shell/StarPrompt";
 import { useStarPrompt } from "./features/shell/useStarPrompt";
 import { ConfirmDialog } from "./shared/components/ConfirmDialog";
 import { CheckoutRemoteDialog } from "./features/history/components/CheckoutRemoteDialog";
+import { CreateBranchDialog } from "./features/history/components/CreateBranchDialog";
 import { SettingsModal } from "./features/shell/SettingsModal";
 import { STORAGE_KEYS, usePersistedState } from "./shared/lib/persisted";
 import { openExternal } from "./shared/lib/external";
@@ -36,6 +37,8 @@ import type { Theme } from "./features/shell/theme";
 import { checkoutBranch,
   checkoutCommit,
   checkoutRemoteBranch,
+  createBranch,
+  deleteBranch,
   localBranchExists,
   fetchRemote,
   loadConflictFiles,
@@ -77,7 +80,7 @@ import {
 } from "./features/staging/StagePanel";
 import { ResizeHandle } from "./shared/components/ResizeHandle";
 import type { WorktreeFile } from "./features/staging/staging";
-import { RemoteCheckoutMode, type Repository, type Submodule } from "./types";
+import { DeleteOutcome, RemoteCheckoutMode, type Repository, type Submodule } from "./types";
 import { submoduleParents } from "./features/submodules/submodule";
 import { useCommitFiles } from "./features/diff/hooks/useCommitFiles";
 import { useNavigationHistory } from "./features/shell/useNavigationHistory";
@@ -919,6 +922,96 @@ function App() {
     [closeContextMenu, handleCheckoutRemote],
   );
 
+  const [createBranchHash, setCreateBranchHash] = useState<string | null>(null);
+  const handleMenuCreateBranch = useCallback(
+    (hash: string) => {
+      closeContextMenu();
+      if (!activeRepoPath || opening) return;
+      setCreateBranchHash(hash);
+    },
+    [closeContextMenu, activeRepoPath, opening],
+  );
+  const reloadActiveRepo = useCallback(async () => {
+    if (!activeRepoPath) return;
+    try {
+      const refreshed = await loadRepository(activeRepoPath);
+      setRepos((previous) => previous.map((item) => (item.id === refreshed.id ? refreshed : item)));
+    } catch (loadError) {
+      console.error("Could not reload after the branch change", loadError);
+    }
+  }, [activeRepoPath]);
+  const runCreateBranch = useCallback(
+    async (hash: string, name: string, checkout: boolean) => {
+      if (!activeRepoPath) return;
+      setCreateBranchHash(null);
+      try {
+        await createBranch(activeRepoPath, name, hash, checkout);
+      } catch (createError) {
+        setNotice({
+          title: `Could not create ${name}`,
+          detail: createError instanceof Error ? createError.message : String(createError),
+          id: Date.now(),
+        });
+      }
+      await reloadActiveRepo();
+    },
+    [activeRepoPath, reloadActiveRepo],
+  );
+  const runDeleteBranch = useCallback(
+    async (name: string, remote: boolean, force: boolean) => {
+      if (!activeRepoPath) return;
+      try {
+        const outcome = await deleteBranch(activeRepoPath, name, remote, force);
+        if (outcome === DeleteOutcome.NotMerged) {
+          setPendingConfirm({
+            title: `Delete unmerged branch ${name}?`,
+            body: (
+              <p>
+                <span className="font-semibold text-ink">{name}</span> has commits that are not
+                merged anywhere else. Deleting it makes them unreachable.
+              </p>
+            ),
+            confirmLabel: "Delete anyway",
+            danger: true,
+            run: () => runDeleteBranch(name, remote, true),
+          });
+          return;
+        }
+      } catch (deleteError) {
+        setNotice({
+          title: `Could not delete ${name}`,
+          detail: deleteError instanceof Error ? deleteError.message : String(deleteError),
+          id: Date.now(),
+        });
+      }
+      await reloadActiveRepo();
+    },
+    [activeRepoPath, reloadActiveRepo],
+  );
+  const handleMenuDeleteBranch = useCallback(
+    (name: string, remote: boolean) => {
+      closeContextMenu();
+      setPendingConfirm({
+        title: remote ? `Delete remote branch ${name}?` : `Delete branch ${name}?`,
+        body: remote ? (
+          <p>
+            This removes <span className="font-semibold text-ink">{name}</span> from the remote
+            itself, so everyone who uses it loses it too.
+          </p>
+        ) : (
+          <p>
+            The local branch <span className="font-semibold text-ink">{name}</span> is deleted;
+            you are warned first if it holds commits that exist nowhere else.
+          </p>
+        ),
+        confirmLabel: "Delete branch",
+        danger: true,
+        run: () => runDeleteBranch(name, remote, false),
+      });
+    },
+    [closeContextMenu, runDeleteBranch],
+  );
+
   const handleMenuCheckoutCommit = useCallback(
     (hash: string) => {
       closeContextMenu();
@@ -1531,6 +1624,8 @@ function App() {
           target={contextMenu}
           onCheckout={handleMenuCheckout}
           onCheckoutRemote={handleMenuCheckoutRemote}
+          onCreateBranch={handleMenuCreateBranch}
+          onDeleteBranch={handleMenuDeleteBranch}
           onCheckoutCommit={handleMenuCheckoutCommit}
           onStashAction={handleMenuStashAction}
           // The offer exists only on the checked-out tip itself, only while it is unpushed
@@ -1560,6 +1655,15 @@ function App() {
           exists={(name) => localBranchExists(activeRepoPath, name)}
           onCheckout={(name, mode) => void runRemoteCheckout(remoteCheckout, name, mode)}
           onClose={() => setRemoteCheckout(null)}
+        />
+      )}
+
+      {createBranchHash !== null && activeRepoPath && (
+        <CreateBranchDialog
+          hash={createBranchHash}
+          exists={(name) => localBranchExists(activeRepoPath, name)}
+          onCreate={(name, checkout) => void runCreateBranch(createBranchHash, name, checkout)}
+          onClose={() => setCreateBranchHash(null)}
         />
       )}
 

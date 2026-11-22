@@ -17,6 +17,8 @@ interface ContextMenuProps {
   target: ContextMenuTarget;
   onCheckout: (branch: string) => void;
   onCheckoutRemote?: (remoteRef: string) => void;
+  onCreateBranch?: (hash: string) => void;
+  onDeleteBranch?: (name: string, remote: boolean) => void;
   onCheckoutCommit: (hash: string) => void;
   onStashAction: (index: number, action: StashAction) => void;
   /** Undoing the tip commit: the menu entry exists only when the target IS the tip, the
@@ -53,6 +55,8 @@ export function ContextMenu({
   target,
   onCheckout,
   onCheckoutRemote,
+  onCreateBranch,
+  onDeleteBranch,
   onCheckoutCommit,
   onStashAction,
   undoable = false,
@@ -97,6 +101,10 @@ export function ContextMenu({
   const checkoutable = branch !== null && !branch.isCurrent;
   const remoteBranch =
     target.ref && isCheckoutableRemote(target.ref) && Boolean(onCheckoutRemote) ? target.ref : null;
+  const branchCreatable =
+    Boolean(onCreateBranch) && target.commit.stashIndex === undefined && target.commit.hash !== UNCOMMITTED_HASH;
+  const deletableLocal = checkoutable && branch !== null && Boolean(onDeleteBranch);
+  const deletableRemote = remoteBranch !== null && Boolean(onDeleteBranch);
   const mergeable = checkoutable && branch !== null && Boolean(onMerge) && Boolean(currentBranch);
   const pullBranch =
     target.ref?.type === "branch"
@@ -121,6 +129,8 @@ export function ContextMenu({
   const entries =
     (checkoutable ? 1 : 0) +
     (remoteBranch ? 1 : 0) +
+    (branchCreatable ? 1 : 0) +
+    (deletableLocal || deletableRemote ? 1 : 0) +
     (mergeable ? 1 : 0) +
     (pullable ? 1 : 0) +
     (commitCheckoutable ? 1 : 0) +
@@ -165,6 +175,17 @@ export function ContextMenu({
           Check out {remoteBranch.name}…
         </button>
       )}
+      {branchCreatable && (
+        <button type="button" role="menuitem" className={ITEM}
+          title="Makes a new branch at this commit"
+          onClick={() => {
+            onClose();
+            onCreateBranch?.(target.commit.hash);
+          }}
+        >
+          Create branch here…
+        </button>
+      )}
       {mergeable && branch && (
         <button type="button" role="menuitem" className={ITEM}
           title={`Merges ${branch.name} into ${currentBranch} — a confirm shows first`}
@@ -185,6 +206,28 @@ export function ContextMenu({
           }}
         >
           Create pull request…
+        </button>
+      )}
+      {deletableLocal && branch && (
+        <button type="button" role="menuitem" className={ITEM}
+          title="Deletes the local branch — a confirm shows first"
+          onClick={() => {
+            onClose();
+            onDeleteBranch?.(branch.name, false);
+          }}
+        >
+          Delete branch {branch.name}…
+        </button>
+      )}
+      {deletableRemote && remoteBranch && (
+        <button type="button" role="menuitem" className={ITEM}
+          title="Deletes the branch on the remote itself — a confirm shows first"
+          onClick={() => {
+            onClose();
+            onDeleteBranch?.(remoteBranch.name, true);
+          }}
+        >
+          Delete remote branch {remoteBranch.name}…
         </button>
       )}
       {commitCheckoutable && (
