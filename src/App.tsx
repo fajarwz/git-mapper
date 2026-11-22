@@ -1001,7 +1001,6 @@ function App() {
         ) : (
           <p>
             This removes <span className="font-semibold text-ink">{name}</span> from your machine.
-            If it has commits that are not merged anywhere, you will be asked once more.
           </p>
         ),
         confirmLabel: "Delete branch",
