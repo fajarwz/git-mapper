@@ -1079,7 +1079,7 @@ function App() {
         setPendingConfirm({
           title: action === "drop" ? `Drop ${label}?` : `Apply and drop ${label}?`,
           body: action === "drop" ? (
-            <p>The stash is deleted without being applied, and its changes are gone.</p>
+            <p>This deletes the stash without applying it, and its changes are lost.</p>
           ) : (
             <>
               <p>The entry comes back into the working tree, and is deleted once it applies cleanly.</p>
