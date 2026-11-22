@@ -1079,10 +1079,7 @@ function App() {
         setPendingConfirm({
           title: action === "drop" ? `Drop ${label}?` : `Apply and drop ${label}?`,
           body: action === "drop" ? (
-            <>
-              <p>The entry is deleted without applying it; its changes stay parked for good.</p>
-              <p>The working tree is untouched. Undo means a terminal and the reflog.</p>
-            </>
+            <p>The stash is deleted without being applied, and its changes are gone.</p>
           ) : (
             <>
               <p>The entry comes back into the working tree, and is deleted once it applies cleanly.</p>
