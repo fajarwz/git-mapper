@@ -1,6 +1,6 @@
 # AGENTS.md — Git Mapper
 
-Standalone Git history viewer for Windows (Tauri 2 + React 19 + TypeScript + Tailwind CSS v4 + Vite). This file is an index only: the guidance lives in `docs/`. Read the document that matches the work before changing code.
+Standalone Git history viewer for Windows, macOS and Linux (Tauri 2 + React 19 + TypeScript + Tailwind CSS v4 + Vite). This file is an index only: the guidance lives in `docs/`. Read the document that matches the work before changing code.
 
 | Working on | Read |
 | --- | --- |

@@ -119,7 +119,7 @@ test("row actions emit the exact git payloads", () => {
 test("commit emits the trimmed message only when the index has rows and a message exists", () => {
   const wrap = renderPanel();
   const message = within(wrap.container).getByLabelText("Commit message") as HTMLTextAreaElement;
-  const commit = within(wrap.container).getByText("Commit") as HTMLButtonElement;
+  const commit = within(wrap.container).getByRole("button", { name: /^Commit/ }) as HTMLButtonElement;
 
   assert.equal(commit.disabled, true, "no message yet");
   fireEvent.change(message, { target: { value: "  Add the staging rail  " } });
@@ -130,18 +130,18 @@ test("commit emits the trimmed message only when the index has rows and a messag
   const emptyMessage = within(empty.container).getByLabelText("Commit message") as HTMLTextAreaElement;
   fireEvent.change(emptyMessage, { target: { value: "cannot commit" } });
   assert.equal(
-    (within(empty.container).getByText("Commit") as HTMLButtonElement).disabled,
+    (within(empty.container).getByRole("button", { name: /^Commit/ }) as HTMLButtonElement).disabled,
     true,
     "an empty index cannot commit",
   );
-  fireEvent.click(within(empty.container).getByText("Commit"));
+  fireEvent.click(within(empty.container).getByRole("button", { name: /^Commit/ }));
   assert.equal(empty.commit(), null);
 });
 
 test("busy waits the buttons; the dock affordances stay honest", () => {
   const busyWrap = renderPanel(FILES, true);
   assert.equal(
-    (within(busyWrap.container).getByText("Commit") as HTMLButtonElement).disabled,
+    (within(busyWrap.container).getByRole("button", { name: /^Commit/ }) as HTMLButtonElement).disabled,
     true,
     "busy disables commit",
   );
@@ -172,7 +172,7 @@ test("a merge in progress renders the Conflicts section with its actions", () =>
   assert.ok(within(wrap.container).getByText("Conflicts"));
   assert.ok(within(wrap.container).getByLabelText("Keep current version of app.ts"));
   assert.ok(within(wrap.container).getByLabelText("Keep incoming version of app.ts"));
-  assert.throws(() => within(wrap.container).getByText("Commit"), "a merge swaps Commit for Complete merge");
+  assert.throws(() => within(wrap.container).getByRole("button", { name: /^Commit/ }), "a merge swaps Commit for Complete merge");
   const complete = within(wrap.container).getByText("Complete merge") as HTMLButtonElement;
   assert.equal(complete.disabled, true, "completing waits for every conflict to be resolved");
 
@@ -260,4 +260,13 @@ test("a selection from App decides the highlight, side included", () => {
     />,
   );
   assert.deepEqual(marks(), ["true", "false"]);
+});
+
+test("the staged count lives inside the Commit button, so the footer row never gains an element", () => {
+  const staged = renderPanel();
+  assert.equal(within(staged.container).getByRole("button", { name: "Commit 2" }).textContent, "Commit 2");
+  assert.equal(within(staged.container).queryByText(/staged$/), null, "no separate count text");
+
+  const none = renderPanel(FILES.filter((file) => !file.staged));
+  assert.equal(within(none.container).getByRole("button", { name: "Commit" }).textContent?.trim(), "Commit");
 });

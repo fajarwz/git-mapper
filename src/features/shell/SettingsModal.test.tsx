@@ -70,6 +70,7 @@ test("the shortcut list starts collapsed and expands on demand", () => {
   fireEvent.click(toggle);
 
   assert.ok(screen.getByLabelText("Ctrl+T"));
-  assert.ok(screen.getByLabelText("Ctrl+Enter"));
+  const commit = screen.getByLabelText("Ctrl+Enter");
+  assert.equal(commit.textContent, "Ctrl↵", "Enter is drawn as an arrow, the label still spells it out");
   assert.equal(toggle.getAttribute("aria-expanded"), "true");
 });

@@ -478,7 +478,7 @@ export function StagePanel({
             title={withShortcut("Commit the staged files", Shortcut.Commit)}
             className="block w-full resize-none rounded-lg border border-transparent bg-glass-soft px-2.5 py-1.5 text-[12px] leading-normal text-ink placeholder:text-ink-dim focus-visible:border-primary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary/60"
           />
-          <div className="mt-2 flex flex-wrap items-center gap-2">
+          <div className="mt-2 flex h-7 flex-nowrap items-center gap-1.5">
             <Button
               variant={ButtonVariant.Primary}
               disabled={staged.length === 0 || message.trim() === "" || busy}
@@ -493,14 +493,16 @@ export function StagePanel({
                       : withShortcut("Commit the staged files", Shortcut.Commit)
               }
               aria-keyshortcuts="Control+Enter"
-              className="h-7"
+              className="h-7 shrink-0"
             >
-              Commit
+              Commit{" "}
+              {(busy || staged.length > 0) && (
+                <span className="ml-0.5 font-mono text-[10.5px] opacity-80">{busy ? "…" : staged.length}</span>
+              )}
             </Button>
-            {messageFocused && <KeyCombo keys={SHORTCUTS[Shortcut.Commit].keys} />}
-            <span className="font-mono text-[10.5px] text-ink-dim">
-              {busy ? "…" : staged.length > 0 ? `${staged.length} staged` : ""}
-            </span>
+            {messageFocused && (
+              <KeyCombo keys={SHORTCUTS[Shortcut.Commit].keys} className="min-w-0 overflow-hidden whitespace-nowrap" />
+            )}
             <button
               type="button"
               onClick={() => setPendingDiscard("all")}
