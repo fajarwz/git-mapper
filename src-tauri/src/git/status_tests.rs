@@ -113,7 +113,6 @@ fn open_repository_rejects_a_worktreeless_directory() {
 fn read_status_counts_modified_plus_untracked_and_sees_ahead() {
     let repo = TempRepo::new("status");
     repo.commit("tracked.txt", "one\n", "c1");
-    repo.0.join("untracked.txt");
 
     let clean = read_status_in(repo.path()).expect("status read");
     assert_eq!(

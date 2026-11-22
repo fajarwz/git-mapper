@@ -166,10 +166,6 @@ fn discard_classifies_untracked_index_adds_and_tracked_paths() {
     std::fs::write(repo.0.join("b.txt"), "precious\n").expect("new file");
     stage_files_in(repo.path(), &["b.txt".into()]).expect("add");
     discard_files_in(repo.path(), &["b.txt".into()]).expect("discard");
-    let listing: Vec<_> = std::fs::read_dir(&repo.0)
-        .unwrap()
-        .map(|e| e.unwrap().file_name().to_string_lossy().to_string())
-        .collect();
     assert!(
         repo.0.join("b.txt").exists(),
         "the staged-only add is not wiped from disk"
