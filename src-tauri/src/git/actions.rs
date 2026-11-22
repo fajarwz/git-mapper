@@ -184,3 +184,59 @@ pub fn delete_branch_in(
     run_git(dir, &["branch", if force { "-D" } else { "-d" }, "--", name])?;
     Ok(DeleteOutcome::Deleted)
 }
+
+pub fn tag_exists_in(dir: &str, name: &str) -> Result<bool, String> {
+    let name = name.trim();
+    if name.is_empty() {
+        return Ok(false);
+    }
+    Ok(run_git(dir, &["show-ref", "--verify", "--quiet", &format!("refs/tags/{name}")]).is_ok())
+}
+
+/// Tags a commit. A non-blank `message` makes an annotated tag, otherwise a lightweight one.
+pub fn create_tag_in(dir: &str, name: &str, hash: &str, message: &str) -> Result<(), String> {
+    let name = name.trim();
+    let hash = hash.trim();
+    require_commit_hash(hash)?;
+    // A leading dash would read as an option; check-ref-format alone lets it through.
+    if name.starts_with('-') || run_git(dir, &["check-ref-format", &format!("refs/tags/{name}")]).is_err() {
+        return Err(format!("\"{name}\" is not a valid tag name"));
+    }
+    if tag_exists_in(dir, name)? {
+        return Err(format!("A tag named \"{name}\" already exists"));
+    }
+    let message = message.trim();
+    if message.is_empty() {
+        run_git(dir, &["tag", "--", name, hash]).map(|_| ())
+    } else {
+        run_git(dir, &["tag", "-a", "-m", message, "--", name, hash]).map(|_| ())
+    }
+}
+
+/// Deletes a local tag. A pushed copy on the remote is left alone.
+pub fn delete_tag_in(dir: &str, name: &str) -> Result<(), String> {
+    let name = name.trim();
+    if !tag_exists_in(dir, name)? {
+        return Err(format!("There is no tag named \"{name}\""));
+    }
+    run_git(dir, &["tag", "-d", "--", name]).map(|_| ())
+}
+
+/// Pushes one tag to origin, the remote the app's own push uses. An existing remote tag that
+/// differs is refused by git (no force), and that error surfaces.
+pub fn push_tag_in(dir: &str, name: &str) -> Result<(), String> {
+    let name = name.trim();
+    if !tag_exists_in(dir, name)? {
+        return Err(format!("There is no tag named \"{name}\""));
+    }
+    run_git_no_prompt(dir, &["push", "origin", &format!("refs/tags/{name}")]).map(|_| ())
+}
+
+/// Deletes a tag from origin only; the local tag stays.
+pub fn delete_remote_tag_in(dir: &str, name: &str) -> Result<(), String> {
+    let name = name.trim();
+    if name.is_empty() || name.starts_with('-') {
+        return Err(format!("\"{name}\" is not a valid tag name"));
+    }
+    run_git_no_prompt(dir, &["push", "origin", "--delete", &format!("refs/tags/{name}")]).map(|_| ())
+}
