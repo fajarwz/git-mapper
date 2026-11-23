@@ -63,6 +63,12 @@ if (location.hash.includes("motion")) {
       { delay: start, duration: END - start, easing: "ease-in-out" }
     );
   };
+  const text = (sel, delay, el = document.querySelector(sel)) => el.animate([{ opacity: 0, translate: "-50px 0" }, { opacity: 1, translate: "0 0" }], { delay, duration: 700, easing: ease, fill: "backwards" });
+  text(".brand", 0);
+  text("h1", 250);
+  text("p.sub", 700);
+  document.querySelectorAll(".chips span").forEach((el, i) => text(null, 1100 + i * 200, el));
+  text(".meta", 1800);
   intro(".main", 0, 900, { translate: "0 70px", scale: 0.96 }, ease);
   intro(".hunk", 700, 900, { translate: "260px 120px", scale: 1 }, ease, 0);
   intro(".menu", 1100, 900, { translate: "-240px 80px", scale: 1 }, ease, 1);

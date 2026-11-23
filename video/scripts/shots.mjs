@@ -2,6 +2,7 @@
 //   npm run shots            capture from the app, then render all outputs
 //   npm run shots -- render  skip the capture, re-render from docs/media/sources
 //   npm run shots -- video   render only the 8 s hero loop (transparent WebM for the site, MP4 for posts)
+//   npm run shots -- social  render only the captioned social video (docs/media/social-video.mp4)
 // Starts `npm run dev` in the repo root itself when nothing answers on :1420. Needs Edge or Chrome and ffmpeg.
 import { chromium } from "playwright-core";
 import { execFileSync, spawn } from "node:child_process";
@@ -109,10 +110,10 @@ async function render(browser) {
 const FPS = 30;
 const SECONDS = 8;
 
-async function video(browser) {
+async function video(browser, only) {
   const frames = mkdtempSync(join(tmpdir(), "gm-frames-"));
-  const pass = async (hash, transparent) => {
-    const context = await browser.newContext({ viewport: { width: 2400, height: 1070 }, deviceScaleFactor: 2 / 3 });
+  const pass = async (hash, transparent, height = 1070) => {
+    const context = await browser.newContext({ viewport: { width: 2400, height }, deviceScaleFactor: 2 / 3 });
     const page = await context.newPage();
     await page.goto(COMPOSE + hash);
     await page.evaluate(() => document.fonts.ready);
@@ -123,19 +124,23 @@ async function video(browser) {
     await context.close();
   };
   const input = ["-y", "-v", "error", "-framerate", String(FPS), "-i", join(frames, "f%04d.png")];
+  if (only !== "social") {
   await pass("#bare-clear-motion", true);
   execFileSync("ffmpeg", [...input, "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "34", "-auto-alt-ref", "0", join(SCREENS, "hero-floating.webm")]);
   await pass("#bare-motion", false);
   execFileSync("ffmpeg", [...input, "-vf", "crop=1600:712:0:0", "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p", "-movflags", "+faststart", join(MEDIA, "floating-screenshot.mp4")]);
+  }
+  await pass("#og-motion", false, 1260);
+  execFileSync("ffmpeg", [...input, "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p", "-movflags", "+faststart", join(MEDIA, "social-video.mp4")]);
   rmSync(frames, { recursive: true, force: true });
 }
 
 const mode = process.argv[2];
-const renderOnly = mode === "render" || mode === "video";
+const renderOnly = mode === "render" || mode === "video" || mode === "social";
 const dev = renderOnly ? null : await ensureDevServer();
 const browser = await launch();
 try {
-  if (mode === "video") await video(browser);
+  if (mode === "video" || mode === "social") await video(browser, mode);
   else {
     if (!renderOnly) await capture(browser);
     await render(browser);
