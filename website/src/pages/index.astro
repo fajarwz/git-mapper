@@ -200,8 +200,28 @@ const systems = [
       </p>
     </section>
 
+    <!-- Floating composition -->
+    <section class="site-rise mx-auto max-w-6xl pb-16">
+      <img
+        src="/screens/hero-floating.webp"
+        width="2400"
+        height="1070"
+        alt="Git Mapper's commit graph and staging view, with the branch context menu, a line-by-line diff and branch pills floating over the window"
+        class="h-auto w-full"
+        fetchpriority="high"
+      />
+    </section>
+
     <!-- Theme comparison dragger -->
     <section class="site-rise mx-auto max-w-5xl pb-10">
+      <div class="mx-auto mb-8 max-w-2xl text-center">
+        <h2 class="text-balance text-[clamp(1.6rem,3vw,2.2rem)] font-bold leading-[1.1] tracking-[-0.025em]">
+          Light or dark, same calm canvas.
+        </h2>
+        <p class="mt-3 text-lg text-ink-soft">
+          Pick the theme that suits your eyes. The graph, lane colours and diffs stay just as readable in both.
+        </p>
+      </div>
       <div class="panel-shadow rounded-3xl border border-hairline p-2.5 backdrop-blur-xl md:p-3.5" style="background-color: var(--color-glass / 0.55)">
         <ThemeSlider
           client:visible
