@@ -1,7 +1,7 @@
 <!doctype html><html><head><meta charset="utf-8"><style>
-@font-face{font-family:PJS;src:url("../../website/public/fonts/plus-jakarta-sans.woff2");font-weight:200 800}
+@font-face{font-family:"Plus Jakarta Sans";src:url("../../website/public/fonts/plus-jakarta-sans.woff2");font-weight:200 800}
 *{box-sizing:border-box;margin:0}
-body{width:2400px;height:1400px;overflow:hidden;font-family:PJS,sans-serif;color:#17151f;position:relative;
+body{width:2400px;height:1400px;overflow:hidden;font-family:"Plus Jakarta Sans",sans-serif;color:#17151f;position:relative;
 background:
 radial-gradient(900px 700px at 8% 55%,rgba(110,86,207,.38),transparent 70%),
 radial-gradient(900px 600px at 95% 8%,rgba(71,127,184,.38),transparent 70%),
@@ -47,6 +47,29 @@ body.clear{background:none}body.bare{height:1070px}body.bare h1,body.bare p.sub{
 <div class="card menu"><img src="sources/menu.png"></div>
 <div class="pill filled p-main" style="left:2020px;top:400px;transform:rotate(4deg)"><svg viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="8" r="2"/><path d="M6 7v10M18 10c0 5-12 2-12 7"/></svg>main</div>
 <div class="pill p-auth" style="left:1960px;top:530px;color:#2fa186;border-color:#2fa186;transform:rotate(-3deg)"><svg viewBox="0 0 24 24"><circle cx="6" cy="5" r="2"/><circle cx="6" cy="19" r="2"/><circle cx="18" cy="8" r="2"/><path d="M6 7v10M18 10c0 5-12 2-12 7"/></svg>feature/auth</div>
-<div class="pill p-files" style="left:1900px;top:640px;color:#dd9438;border-color:#dd9438;transform:rotate(2deg)">2 files changed</div>
+<div class="pill p-files" style="left:1900px;top:640px;color:#8a5a11;border-color:#dd9438;transform:rotate(2deg)">2 files changed</div>
 <div class="pill p-tag" style="left:40px;top:480px;color:#6e56cf;border-color:#6e56cf;transform:rotate(-5deg)"><svg viewBox="0 0 24 24"><path d="M3 12V4h8l10 10-8 8z"/><circle cx="7.5" cy="8.5" r="1"/></svg>v0.2</div>
+<script>
+// Hash "#…motion…" builds the 8 s hero loop; shots.mjs calls window.seek(ms) per frame. Everything starts and ends invisible so the loop is seamless.
+if (location.hash.includes("motion")) {
+  const END = 7500, ease = "cubic-bezier(.2,.8,.2,1)", pop = "cubic-bezier(.3,1.5,.5,1)";
+  const intro = (sel, delay, duration, from, easing, idx) => {
+    const el = document.querySelector(sel);
+    el.animate([{ opacity: 0, ...from }, { opacity: 1, translate: "0 0", scale: 1 }], { delay, duration, easing, fill: "backwards" });
+    if (idx === undefined) return;
+    const start = delay + duration, amp = 8 + idx * 2;
+    el.animate(
+      [{ translate: "0 0" }, { translate: `0 -${amp}px` }, { translate: "0 0" }, { translate: `0 ${amp - 2}px` }, { translate: "0 0" }],
+      { delay: start, duration: END - start, easing: "ease-in-out" }
+    );
+  };
+  intro(".main", 0, 900, { translate: "0 70px", scale: 0.96 }, ease);
+  intro(".hunk", 700, 900, { translate: "260px 120px", scale: 1 }, ease, 0);
+  intro(".menu", 1100, 900, { translate: "-240px 80px", scale: 1 }, ease, 1);
+  [".p-main", ".p-auth", ".p-files", ".p-tag"].forEach((s, i) => intro(s, 1700 + i * 200, 600, { translate: "0 30px", scale: 0.5 }, pop, i + 2));
+  document.body.animate([{ opacity: 1 }, { opacity: 0 }], { delay: END, duration: 500, fill: "forwards" });
+  document.getAnimations().forEach((a) => a.pause());
+  window.seek = (ms) => document.getAnimations().forEach((a) => { a.pause(); a.currentTime = ms; });
+}
+</script>
 </body></html>
