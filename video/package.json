@@ -7,6 +7,7 @@
     "music": "node scripts/make-music.mjs",
     "sfx": "node scripts/prepare-sfx.mjs",
     "record": "node scripts/record.mjs",
+    "shots": "node scripts/shots.mjs",
     "studio": "npm run sync && remotion studio",
     "render": "npm run sync && remotion render src/index.ts Showcase out/git-mapper-showcase.mp4"
   },

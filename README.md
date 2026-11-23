@@ -28,6 +28,8 @@ commit and merge with a click. No account, no setup.
 ![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?labelColor=17151f&logo=typescript&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?labelColor=17151f&logo=tailwindcss&logoColor=06B6D4)
 
+<img src="docs/media/floating-screenshot-bare.png" alt="Git Mapper: the commit graph, staging view, branch menu and line-by-line diff" width="100%">
+
 </div>
 
 ## Download
@@ -41,8 +43,6 @@ Grab the latest installer from [the releases page](https://github.com/fajarwz/gi
 | Linux | [`Git.Mapper_amd64.AppImage`](https://github.com/fajarwz/git-mapper/releases/latest/download/Git.Mapper_amd64.AppImage) (runs without installing) |
 
 The links above always resolve to the newest release.
-
-<img src="docs/assets/screenshot.png" alt="Commit list, light theme" width="100%">
 
 ## Features
 
