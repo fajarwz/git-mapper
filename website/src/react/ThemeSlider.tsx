@@ -135,12 +135,16 @@ export default function ThemeSlider({ lightSrc, darkSrc, altLight, altDark }: Pr
         src={lightSrc}
         alt={altLight}
         draggable={false}
+        loading="lazy"
+        decoding="async"
         className="absolute inset-0 h-full w-full object-cover object-top"
       />
       <img
         src={darkSrc}
         alt={altDark}
         draggable={false}
+        loading="lazy"
+        decoding="async"
         className="absolute inset-0 h-full w-full object-cover object-top"
         style={{ clipPath: `inset(0 0 0 ${pos}%)` }}
       />

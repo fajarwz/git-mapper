@@ -112,8 +112,8 @@ const SECONDS = 8;
 
 async function video(browser, only) {
   const frames = mkdtempSync(join(tmpdir(), "gm-frames-"));
-  const pass = async (hash, transparent, height = 1070) => {
-    const context = await browser.newContext({ viewport: { width: 2400, height }, deviceScaleFactor: 2 / 3 });
+  const pass = async (hash, transparent, height = 1070, scale = 1) => {
+    const context = await browser.newContext({ viewport: { width: 2400, height }, deviceScaleFactor: scale });
     const page = await context.newPage();
     await page.goto(COMPOSE + hash);
     await page.evaluate(() => document.fonts.ready);
@@ -126,12 +126,12 @@ async function video(browser, only) {
   const input = ["-y", "-v", "error", "-framerate", String(FPS), "-i", join(frames, "f%04d.png")];
   if (only !== "social") {
   await pass("#bare-clear-motion", true);
-  execFileSync("ffmpeg", [...input, "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "34", "-auto-alt-ref", "0", join(SCREENS, "hero-floating.webm")]);
+  execFileSync("ffmpeg", [...input, "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "38", "-auto-alt-ref", "0", join(SCREENS, "hero-floating.webm")]);
   await pass("#bare-motion", false);
-  execFileSync("ffmpeg", [...input, "-vf", "crop=1600:712:0:0", "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p", "-movflags", "+faststart", join(MEDIA, "floating-screenshot.mp4")]);
+  execFileSync("ffmpeg", [...input, "-c:v", "libx264", "-crf", "17", "-pix_fmt", "yuv420p", "-movflags", "+faststart", join(MEDIA, "floating-screenshot.mp4")]);
   }
-  await pass("#og-motion", false, 1260);
-  execFileSync("ffmpeg", [...input, "-c:v", "libx264", "-crf", "20", "-pix_fmt", "yuv420p", "-movflags", "+faststart", join(MEDIA, "social-video.mp4")]);
+  await pass("#og-motion", false, 1260, 0.8);
+  execFileSync("ffmpeg", [...input, "-c:v", "libx264", "-crf", "17", "-pix_fmt", "yuv420p", "-movflags", "+faststart", join(MEDIA, "social-video.mp4")]);
   rmSync(frames, { recursive: true, force: true });
 }
 
