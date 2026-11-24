@@ -557,13 +557,34 @@ export async function loadMoreCommits(
   return { repo: { ...repo, refsDigest: hashText(refsRaw), commits: withLanes(list) }, done };
 }
 
-export async function pickAndLoadRepository(): Promise<Repository | null> {
+/** The folder the user picked, or null when they cancelled. */
+export async function pickRepositoryPath(): Promise<string | null> {
   // The native folder dialog exists only in the Tauri window; browser tabs prompt for the path.
   const dir = isTauri()
     ? await pickDirectory({ directory: true, multiple: false })
     : window.prompt("Folder path of a git repository (e.g. C:/Users/you/projects/my-repo):");
-  if (!dir) return null;
-  return loadRepository(dir);
+  return dir || null;
+}
+
+/** An empty tab for a folder still being read: the history shows skeleton rows until it lands. */
+export function pendingRepository(dir: string): Repository {
+  const trimmed = dir.replace(/[\\/]+$/, "");
+  return {
+    id: trimmed,
+    name: trimmed.split(/[\\/]/).pop() || trimmed,
+    path: trimmed,
+    branch: "",
+    ahead: 0,
+    behind: 0,
+    head: "",
+    changed: 0,
+    worktree: "",
+    refsDigest: "",
+    stashDigest: "",
+    commits: [],
+    defaultCommitHash: "",
+    sleeping: true,
+  };
 }
 
 interface RawFilePayload {
@@ -643,6 +664,11 @@ export async function pullBranch(dir: string): Promise<string> {
 
 export async function stashAction(dir: string, index: number, action: "apply" | "pop" | "drop"): Promise<void> {
   await call("stash_action", { dir, index, action }, (raw) => raw as void);
+}
+
+/** Shelves all uncommitted work, untracked files included; a blank message keeps git's default name. */
+export async function stashPush(dir: string, message: string): Promise<void> {
+  await call("stash_push", { dir, message }, (raw) => raw as void);
 }
 
 export async function fetchRemote(dir: string): Promise<void> {

@@ -330,7 +330,7 @@ export function pullLinkUrl(link: PullLinkBase, number: number): string {
 /**
  * The request a commit's own text names, for commits whose request is not loaded: GitHub's squash
  * subject "(#14)" and merge subject "Merge pull request #14", and GitLab's "See merge request g/p!7"
- * in the body. A guess from text, so it carries no state.
+ * in the body. Hosts write those only when a request lands, so a named request reads as merged.
  */
 export function requestNamedInCommit(subject: string, body = ""): { provider: PullRequestProvider; number: number } | null {
   const squash = /\(#(\d+)\)\s*$/.exec(subject) ?? /^Merge pull request #(\d+)\b/.exec(subject);
@@ -343,7 +343,7 @@ export interface PullChipData {
   provider: PullRequestProvider;
   number: number;
   url: string;
-  /** null when only the commit's text says so: nothing is known of its state. */
+  /** null only for a chip with no known state; a commit that names a request reads as merged. */
   state: PullRequestState | null;
   tooltip: string;
   ariaLabel: string;
@@ -376,8 +376,8 @@ export function commitChip(
     provider: named.provider,
     number: named.number,
     url: pullLinkUrl(link, named.number),
-    state: null,
-    tooltip: `${label}, named in this commit's message\nClick to open on ${PROVIDER_NAME[named.provider]}`,
+    state: PullRequestState.Merged,
+    tooltip: `${label}, merged — named in this commit's message\nClick to open on ${PROVIDER_NAME[named.provider]}`,
     ariaLabel: `${requestNoun(named.provider)} ${label}, named in this commit's message`,
   };
 }

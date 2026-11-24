@@ -37,3 +37,10 @@ lto = true
 opt-level = 3
 panic = "abort"
 strip = true
+
+# Smaller debug builds: less debug info means a much smaller target folder
+[profile.dev]
+debug = "line-tables-only"
+
+[profile.dev.package."*"]
+debug = false

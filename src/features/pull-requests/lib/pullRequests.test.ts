@@ -312,7 +312,7 @@ describe("the commit a request made", () => {
     expect(exact?.tooltip).toContain("Add chips");
 
     const named = commitChip({ hash: "b".repeat(40), subject: "older work (#9)" }, byCommit, link);
-    expect(named).toMatchObject({ number: 9, state: null, url: "https://github.com/o/r/pull/9" });
+    expect(named).toMatchObject({ number: 9, state: PullRequestState.Merged, url: "https://github.com/o/r/pull/9" });
     expect(named?.tooltip).toContain("named in this commit's message");
   });
 

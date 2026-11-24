@@ -111,6 +111,18 @@ pub fn stash_action_in(dir: &str, index: u32, action: &str) -> Result<(), String
     run_git(dir, &["stash", verb, &format!("stash@{{{index}}}")]).map(|_| ())
 }
 
+/// Shelves every uncommitted change — staged, unstaged and untracked (`-u`) — as a new stash
+/// entry and returns the worktree to HEAD. Nothing is lost: the entry applies back later.
+/// A non-blank `message` names the entry (`-m`, its own spawn argument); blank keeps git's default.
+pub fn stash_push_in(dir: &str, message: &str) -> Result<(), String> {
+    let message = message.trim();
+    let mut args = vec!["stash", "push", "--include-untracked"];
+    if !message.is_empty() {
+        args.extend(["-m", message]);
+    }
+    run_git(dir, &args).map(|_| ())
+}
+
 /// Takes the checked-out tip back one commit: `reset --soft HEAD~1` returns the tip's tree
 /// to the index, so the work comes back staged and the next refresh re-lands the uncommitted
 /// row. Nothing is deleted — the Git Mapper twin of the staging rail's commit. The UI only

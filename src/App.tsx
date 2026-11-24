@@ -18,6 +18,7 @@ import { ConfirmDialog } from "./shared/components/ConfirmDialog";
 import { CheckoutRemoteDialog } from "./features/history/components/CheckoutRemoteDialog";
 import { CreateBranchDialog } from "./features/history/components/CreateBranchDialog";
 import { CreateTagDialog } from "./features/history/components/CreateTagDialog";
+import { StashDialog } from "./features/history/components/StashDialog";
 import { SettingsModal } from "./features/shell/SettingsModal";
 import { RemotesDialog } from "./features/shell/RemotesDialog";
 import { TagRemoteDialog, TagRemoteMode } from "./features/history/components/TagRemoteDialog";
@@ -62,7 +63,8 @@ import { checkoutBranch,
   loadRepository,
   mergeBranch,
   loadPullRequestUrl,
-  pickAndLoadRepository,
+  pickRepositoryPath,
+  pendingRepository,
   pullBranch,
   pushBranch,
   readStoredPaths,
@@ -78,6 +80,7 @@ import { checkoutBranch,
   storePaths,
   commitStaged,
   discardEverything,
+  stashPush,
   discardPaths,
   loadWorktree,
   stagePaths,
@@ -165,6 +168,7 @@ function App() {
 
   const [flashHashes, setFlashHashes] = useState<string[]>([]);
   const [contextMenu, setContextMenu] = useState<ContextMenuTarget | null>(null);
+  const [stashDialogOpen, setStashDialogOpen] = useState(false);
   // Find over the loaded window: hashes, subjects, authors, ref pills. It highlights and steps,
   // it never filters. Not synced per tab — switching repos closes and clears it, because a
   // highlight carried into another tab would look like a bug. Closing keeps the text, so a
@@ -364,17 +368,39 @@ function App() {
     });
   }, []);
 
+  // The tab opens as soon as the folder is picked, as an empty sleeping placeholder, so the
+  // history area shows skeleton rows while git reads; a failed read removes it again.
   async function handleAdd() {
     setOpening(true);
+    const previousActive = activeRepoId;
+    let placeholderId: string | null = null;
     try {
-      const opened = await pickAndLoadRepository();
-      if (!opened) return;
+      const dir = await pickRepositoryPath();
+      if (!dir) return;
+      const placeholder = pendingRepository(dir);
+      placeholderId = placeholder.id;
+      const existing = repos.find((item) => item.path === placeholder.path);
+      if (existing) {
+        setActiveRepoId(existing.id);
+        return;
+      }
+      setRepos((previous) => [...previous, placeholder]);
+      setActiveRepoId(placeholder.id);
+      setWakingId(placeholder.id);
+      const opened = await loadRepository(dir);
       setRepos((previous) =>
-        previous.some((item) => item.path === opened.path) ? previous : [...previous, opened],
+        previous.some((item) => item.id !== placeholder.id && item.path === opened.path)
+          ? previous.filter((item) => item.id !== placeholder.id)
+          : previous.map((item) => (item.id === placeholder.id ? opened : item)),
       );
       setActiveRepoId(opened.id);
       void fetchAndRefresh(opened);
     } catch (openError) {
+      if (placeholderId !== null) {
+        const doomed = placeholderId;
+        setRepos((previous) => previous.filter((item) => item.id !== doomed));
+        setActiveRepoId((current) => (current === doomed ? previousActive : current));
+      }
       setNotice({
         title: "Could not open that folder",
         detail: openError instanceof Error ? openError.message : String(openError),
@@ -382,6 +408,7 @@ function App() {
       });
     } finally {
       setOpening(false);
+      setWakingId((current) => (current === placeholderId ? null : current));
     }
   }
 
@@ -583,7 +610,8 @@ function App() {
   );
 
   async function handleNearBottom() {
-    if (!repo || loadingMoreByRepo[repo.id] || allLoadedByRepo[repo.id]) return;
+    // A slept or still-waking tab has no commits to page past yet.
+    if (!repo || repo.sleeping || repo.commits.length === 0 || loadingMoreByRepo[repo.id] || allLoadedByRepo[repo.id]) return;
     setLoadingMoreByRepo((previous) => ({ ...previous, [repo.id]: true }));
     try {
       const result = await loadMoreCommits(repo);
@@ -1370,7 +1398,8 @@ function App() {
 
   const workspaceStyle = {
     "--details-height": detailsHeight === null ? "44%" : `${detailsHeight}px`,
-    gridTemplateRows: detailsOpen
+    // No details row until a commit is selected: a loading tab's skeleton gets the full height.
+    gridTemplateRows: detailsOpen && selectedCommit !== null
       ? "minmax(150px, 1fr) min(var(--details-height), calc(100% - 160px))"
       : "minmax(0, 1fr)",
   } as CSSProperties;
@@ -1485,6 +1514,32 @@ function App() {
     () => void runStaging((dir) => discardEverything(dir)),
     [runStaging],
   );
+
+  const handleMenuStashChanges = useCallback(() => setStashDialogOpen(true), []);
+  const runStashChanges = useCallback(
+    (message: string) => {
+      setStashDialogOpen(false);
+      void runStaging((dir) => stashPush(dir, message));
+    },
+    [runStaging],
+  );
+  const handleMenuDiscardAll = useCallback(() => {
+    setPendingConfirm({
+      title: "Discard all uncommitted changes?",
+      body: (
+        <p>
+          Every change — staged and unstaged — returns to the last commit, and untracked files
+          are deleted from disk. Stash them instead if you might want them back.
+        </p>
+      ),
+      confirmLabel: "Discard",
+      danger: true,
+      run: async () => {
+        setPendingConfirm(null);
+        handleDiscardAll();
+      },
+    });
+  }, [handleDiscardAll]);
 
   const handleResolveConflicts = useCallback(
     (paths: string[], side: "ours" | "theirs") =>
@@ -1680,9 +1735,6 @@ function App() {
               onCheckoutBranch={handleCheckoutBranch}
               onCheckoutRemote={handleCheckoutRemote}
               onContextMenu={(commit, ref, x, y) => {
-                // The uncommitted row owns no menu (empty pseudo hash, no refs): a right-click
-                // there would only ever draw an empty box, so it draws nothing.
-                if (commit.hash === UNCOMMITTED_HASH) return;
                 setContextMenu({ commit, ref, x, y });
               }}
             />
@@ -1794,6 +1846,8 @@ function App() {
           head={repo?.head ?? ""}
           onMerge={handleMergeBranch}
           onCreatePullRequest={handleCreatePullRequest}
+          onStashChanges={handleMenuStashChanges}
+          onDiscardAll={handleMenuDiscardAll}
           currentBranch={
             repo !== null && !repo.branch.startsWith("HEAD") ? repo.branch : undefined
           }
@@ -1817,6 +1871,10 @@ function App() {
           onCreate={(name, checkout) => void runCreateBranch(createBranchHash, name, checkout)}
           onClose={() => setCreateBranchHash(null)}
         />
+      )}
+
+      {stashDialogOpen && (
+        <StashDialog onStash={runStashChanges} onClose={() => setStashDialogOpen(false)} />
       )}
 
       {remotesOpen && activeRepoPath && (
