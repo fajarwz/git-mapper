@@ -230,15 +230,21 @@ const systems = [
         ></video>
       </div>
       <script is:inline>
-        // The still image is the first paint. Wide screens without reduced motion swap in the 1 MB clip once the page has loaded; phones keep the still.
+        // Phones and reduced motion keep the still. Wide screens play the 1 MB clip, which builds the composition up from an empty frame, so the still is hidden before first paint (no still-then-vanish flash) and only comes back if the clip has not started in time.
         (function () {
           var v = document.getElementById("hero-video");
-          if (!v || matchMedia("(prefers-reduced-motion: reduce)").matches || !matchMedia("(min-width: 768px)").matches) return;
-          // The clip is transparent, so the still must go or both show through each other.
-          v.addEventListener("playing", function () { v.classList.remove("opacity-0"); document.getElementById("hero-still").classList.add("opacity-0"); }, { once: true });
-          var go = function () { v.src = v.dataset.src; v.play().catch(function () {}); };
+          var still = document.getElementById("hero-still");
+          if (!v || !still || matchMedia("(prefers-reduced-motion: reduce)").matches || !matchMedia("(min-width: 768px)").matches) return;
+          still.classList.add("opacity-0");
+          var started = false;
+          v.addEventListener("playing", function () { started = true; v.classList.remove("opacity-0"); still.classList.add("opacity-0"); }, { once: true });
+          var go = function () {
+            v.src = v.dataset.src;
+            v.play().catch(function () {});
+            setTimeout(function () { if (!started) still.classList.remove("opacity-0"); }, 4000);
+          };
           if (document.readyState === "complete") go();
-          else addEventListener("load", function () { setTimeout(go, 300); });
+          else addEventListener("load", go);
         })();
       </script>
     </section>
