@@ -358,6 +358,9 @@ const systems = [
           The installer for your system lives on GitHub Releases. The app checks
           for updates on launch and stays current on its own.
         </p>
+        <p data-download-count class="mt-3 hidden text-sm font-semibold text-primary-ink">
+          <span data-download-count-num></span> downloads
+        </p>
       </div>
 
       <div id="downloads" class="mt-10">
@@ -421,6 +424,24 @@ const systems = [
       if (os) {
         document.querySelector(`[data-os-card="${os}"]`)?.classList.remove("hidden");
         document.querySelector(`[data-os-row="${os}"]`)?.classList.add("hidden");
+      }
+
+      // Total release downloads (the README badge's source), shown as a rounded-down "500+".
+      // Stays hidden below 100 or when the request fails.
+      const countEl = document.querySelector<HTMLElement>("[data-download-count]");
+      if (countEl) {
+        fetch("https://img.shields.io/github/downloads/fajarwz/git-mapper/total.json")
+          .then((r) => (r.ok ? r.json() : Promise.reject()))
+          .then((d: { value?: string }) => {
+            const n = Number(String(d.value ?? "").replace(/[^\d]/g, ""));
+            if (!Number.isFinite(n) || n < 100) return;
+            const step = n >= 10000 ? 1000 : 100;
+            const label = (Math.floor(n / step) * step).toLocaleString("en-US");
+            const num = countEl.querySelector("[data-download-count-num]");
+            if (num) num.textContent = `${label}+`;
+            countEl.classList.remove("hidden");
+          })
+          .catch(() => {});
       }
     </script>
   </main>
