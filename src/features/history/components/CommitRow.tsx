@@ -42,7 +42,7 @@ interface CommitRowProps {
 
 function CommitChip({ commit, commitChip }: { commit: Commit; commitChip?: (commit: Commit) => PullChipData | null }) {
   const chip = commitChip?.(commit) ?? null;
-  return chip && <PullRequestChip chip={chip} className="ring-hairline" />;
+  return chip && <PullRequestChip chip={chip} />;
 }
 
 export const CommitRow = memo(function CommitRow({

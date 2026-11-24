@@ -93,7 +93,7 @@ export function RefPill({ ref, pullRequest, color, onCheckout, onCheckoutRemote,
         <PullRequestChip
           chip={chipOf(pullRequest)}
           style={ref.isCurrent ? undefined : { marginRight: "calc(-0.375rem - 1.5px)" }}
-          className="-mr-1.5 ml-0.5 ring-transparent"
+          className="-mr-1.5 ml-0.5"
         />
       )}
     </span>

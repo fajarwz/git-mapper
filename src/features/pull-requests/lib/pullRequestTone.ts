@@ -4,11 +4,11 @@ import { ChecksState, PullRequestProvider, PullRequestState, ReviewState, type P
  * Wording and tone per PR state, shared by the pill chip and the list rows. Draft stays quiet
  * (grey); open, merged and closed each get their own hue so closed is never mistaken for draft.
  */
-export const PR_STATE: Record<PullRequestState, { label: string; text: string; tile: string }> = {
-  [PullRequestState.Open]: { label: "Open", text: "text-success-ink", tile: "bg-success/15" },
-  [PullRequestState.Draft]: { label: "Draft", text: "text-ink-dim", tile: "bg-ink/10" },
-  [PullRequestState.Merged]: { label: "Merged", text: "text-primary-ink", tile: "bg-primary/15" },
-  [PullRequestState.Closed]: { label: "Closed", text: "text-danger-ink", tile: "bg-danger/15" },
+export const PR_STATE: Record<PullRequestState, { label: string; text: string; tile: string; ring: string }> = {
+  [PullRequestState.Open]: { label: "Open", text: "text-success-ink", tile: "bg-success/15", ring: "ring-success/70" },
+  [PullRequestState.Draft]: { label: "Draft", text: "text-ink-dim", tile: "bg-ink/10", ring: "ring-ink/35" },
+  [PullRequestState.Merged]: { label: "Merged", text: "text-primary-ink", tile: "bg-primary/15", ring: "ring-primary/70" },
+  [PullRequestState.Closed]: { label: "Closed", text: "text-danger-ink", tile: "bg-danger/15", ring: "ring-danger/70" },
 };
 
 export const CHECK_TONE = {
