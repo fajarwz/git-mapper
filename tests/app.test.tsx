@@ -401,7 +401,7 @@ test("Esc closes the details panel from a commit row; a text field keeps its own
     assert.ok(container.querySelector("[data-details]"), "a row click summons it back");
   });
   fireEvent.keyDown(window, { key: "f", ctrlKey: true });
-  fireEvent.keyDown(within(container).getByRole("textbox", { name: "Find in history" }), {
+  fireEvent.keyDown(await within(container).findByRole("textbox", { name: "Find in history" }), {
     key: "Escape",
   });
   assert.ok(
@@ -421,7 +421,7 @@ test("Ctrl+F opens a find bar that dims non-matches, steps on Enter and closes o
   assert.equal(within(container).queryByRole("textbox", { name: "Search history" }), null, "no box in the title bar");
 
   fireEvent.keyDown(window, { key: "f", ctrlKey: true });
-  const box = within(container).getByRole("textbox", { name: "Find in history" }) as HTMLInputElement;
+  const box = (await within(container).findByRole("textbox", { name: "Find in history" })) as HTMLInputElement;
   assert.equal(document.activeElement, box, "the box takes focus");
 
   // The text of the first and second rows, to build a query that hits some rows, not all.
