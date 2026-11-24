@@ -210,7 +210,8 @@ const systems = [
           width="2400"
           height="1070"
           alt="Git Mapper's commit graph and staging view, with the branch context menu, a line-by-line diff and branch pills floating over the window"
-          class="block h-auto w-full"
+          id="hero-still"
+          class="block h-auto w-full transition-opacity duration-300"
           fetchpriority="high"
           decoding="async"
         />
@@ -233,7 +234,8 @@ const systems = [
         (function () {
           var v = document.getElementById("hero-video");
           if (!v || matchMedia("(prefers-reduced-motion: reduce)").matches || !matchMedia("(min-width: 768px)").matches) return;
-          v.addEventListener("playing", function () { v.classList.remove("opacity-0"); }, { once: true });
+          // The clip is transparent, so the still must go or both show through each other.
+          v.addEventListener("playing", function () { v.classList.remove("opacity-0"); document.getElementById("hero-still").classList.add("opacity-0"); }, { once: true });
           var go = function () { v.src = v.dataset.src; v.play().catch(function () {}); };
           if (document.readyState === "complete") go();
           else addEventListener("load", function () { setTimeout(go, 300); });
