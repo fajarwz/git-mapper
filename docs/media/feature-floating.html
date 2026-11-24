@@ -46,6 +46,21 @@ const CONFIG = {
       { text: "3 matches", filled: true, left: 2020, top: 600, rot: 3 },
     ],
   },
+  graph: {
+    title: 'Every branch in <span>its own colour.</span>',
+    sub: 'Forks and merges bend at their own commit, so the history reads at a glance.',
+    main: { x: 600, y: 90, w: 1580, h: 770, s: 1, left: 410, top: 330 },
+    cards: [
+      { x: 738, y: 345, w: 702, h: 65, s: 1.5, left: 1290, top: 250, rot: 2 },
+      { x: 738, y: 409, w: 512, h: 64, s: 1.6, left: 60, top: 300, rot: -3 },
+      { x: 738, y: 729, w: 702, h: 65, s: 1.5, left: 1290, top: 1150, rot: -2 },
+      { x: 600, y: 150, w: 140, h: 706, s: 1.2, left: 110, top: 470, rot: -2 },
+    ],
+    pills: [
+      { text: "main", filled: true, left: 2040, top: 700, rot: 3 },
+      { text: "feature/auth", color: "#cf6a92", border: "#cf6a92", left: 1980, top: 840, rot: -3 },
+    ],
+  },
   lines: {
     title: 'Stage exactly <span>the lines you want.</span>',
     sub: 'Tick lines in the diff, then stage or discard just those and leave the rest of the file alone.',
@@ -65,7 +80,10 @@ document.getElementById("t").innerHTML = c.title;
 document.getElementById("s").textContent = c.sub;
 const src = `sources/features/${name}.png`;
 const add = (html) => document.body.insertAdjacentHTML("beforeend", html);
-add(`<img class="main" src="${src}">`);
+if (c.main) {
+  const k = c.main;
+  add(`<div class="card" style="left:${k.left}px;top:${k.top}px;width:${k.w * k.s}px;height:${k.h * k.s}px;border-radius:34px;box-shadow:0 60px 120px -40px rgba(48,36,100,.55),0 0 0 1.5px rgba(23,21,31,.1)"><img src="${src}" style="width:${W * k.s}px;left:${-k.x * k.s}px;top:${-k.y * k.s}px"></div>`);
+} else add(`<img class="main" src="${src}">`);
 for (const k of c.cards) {
   add(`<div class="card" style="left:${k.left}px;top:${k.top}px;width:${k.w * k.s}px;height:${k.h * k.s}px;transform:rotate(${k.rot}deg)"><img src="${src}" style="width:${W * k.s}px;left:${-k.x * k.s}px;top:${-k.y * k.s}px"></div>`);
 }

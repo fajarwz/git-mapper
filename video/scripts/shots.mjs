@@ -129,6 +129,11 @@ async function captureFeatures(browser) {
   await page.context().close();
 
   page = await openApp(browser, [demo(false)], 1100, 760);
+  await rest(page);
+  await page.screenshot({ path: join(out, "graph.png") });
+  await page.context().close();
+
+  page = await openApp(browser, [demo(false)], 1100, 760);
   await page.getByText("server.ts").first().click();
   await sleep(500);
   const picks = page.getByLabel(/^Pick/);
@@ -162,7 +167,7 @@ async function render(browser) {
 async function renderFeatures(browser) {
   const out = join(MEDIA, "features");
   mkdirSync(out, { recursive: true });
-  for (const name of ["conflict", "find", "lines"]) {
+  for (const name of ["conflict", "find", "lines", "graph"]) {
     const context = await browser.newContext({ viewport: { width: 2400, height: 1350 }, deviceScaleFactor: 2 / 3 });
     const page = await context.newPage();
     await page.goto(FEATURES + "#" + name);

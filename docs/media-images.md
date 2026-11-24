@@ -21,7 +21,7 @@ Needs Edge or Chrome and `ffmpeg` on PATH; starts `npm run dev` itself when :142
 | `docs/media/floating-screenshot.mp4` (opaque, 1600×712) | social posts and release notes; X, LinkedIn and Reddit do not take transparency |
 | `docs/media/social-video.mp4` (1600×840, with logo, headline, subtitle and badges) | the video to post on X, LinkedIn and Reddit; headline text animates in with the window |
 | `website/public/screens/og-image.png` (1200×630) | social preview, `Site.astro` |
-| `docs/media/features/{conflict,find,lines}.png` and `.webp` (1600×900, with headline) | feature posts and, if wanted, the site's feature rows; compose page is `feature-floating.html` |
+| `docs/media/features/{conflict,find,lines,graph}.png` and `.webp` (1600×900, with headline) | feature posts and, if wanted, the site's feature rows; compose page is `feature-floating.html` |
 | `docs/media/floating-screenshot-bare.png` | README header |
 | `docs/media/floating-screenshot.png`, `…-transparent.png` | spare: with headline / lossless transparent |
 
