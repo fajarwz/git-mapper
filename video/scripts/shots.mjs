@@ -3,6 +3,7 @@
 //   npm run shots -- render  skip the capture, re-render from docs/media/sources
 //   npm run shots -- video   render only the 8 s hero loop (transparent WebM for the site, MP4 for posts)
 //   npm run shots -- social  render only the captioned social video (docs/media/social-video.mp4)
+//   npm run shots -- features  retake and render only the per-feature images (docs/media/features)
 // Starts `npm run dev` in the repo root itself when nothing answers on :1420. Needs Edge or Chrome and ffmpeg.
 import { chromium } from "playwright-core";
 import { execFileSync, spawn } from "node:child_process";
@@ -17,6 +18,7 @@ const MEDIA = join(ROOT, "docs", "media");
 const SOURCES = join(MEDIA, "sources");
 const SCREENS = join(ROOT, "website", "public", "screens");
 const COMPOSE = pathToFileURL(join(MEDIA, "floating-screenshot.html")).href;
+const FEATURES = pathToFileURL(join(MEDIA, "feature-floating.html")).href;
 
 const launch = async () => {
   for (const channel of ["msedge", "chrome"]) {
@@ -38,25 +40,29 @@ async function ensureDevServer() {
   return dev;
 }
 
+async function openApp(browser, repos, width, height) {
+  const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2 });
+  await context.addInitScript((list) => {
+    localStorage.setItem("git-mapper:open-repos", JSON.stringify(list));
+    localStorage.setItem("git-mapper:active-repo", JSON.stringify(list[0]));
+    localStorage.setItem("git-mapper:theme", "light");
+    localStorage.setItem("git-mapper:update-mode", JSON.stringify("manual"));
+    localStorage.setItem("git-mapper:star-prompt", JSON.stringify("dismissed"));
+  }, repos);
+  const page = await context.newPage();
+  await page.goto(URL_APP);
+  await page.getByRole("button", { name: "Open settings" }).waitFor();
+  await sleep(2500);
+  return page;
+}
+
 async function capture(browser) {
   mkdirSync(SOURCES, { recursive: true });
   const dir = mkdtempSync(join(tmpdir(), "gm-shots-"));
   const repo = join(dir, "orbit-demo");
-  const open = async (width, height) => {
+  const open = (width, height) => {
     execFileSync(process.execPath, [join(VIDEO, "scripts", "make-demo-repo.mjs"), repo], { stdio: "ignore" });
-    const context = await browser.newContext({ viewport: { width, height }, deviceScaleFactor: 2 });
-    await context.addInitScript((r) => {
-      localStorage.setItem("git-mapper:open-repos", JSON.stringify([r]));
-      localStorage.setItem("git-mapper:active-repo", JSON.stringify(r));
-      localStorage.setItem("git-mapper:theme", "light");
-      localStorage.setItem("git-mapper:update-mode", JSON.stringify("manual"));
-      localStorage.setItem("git-mapper:star-prompt", JSON.stringify("dismissed"));
-    }, repo);
-    const page = await context.newPage();
-    await page.goto(URL_APP);
-    await page.getByRole("button", { name: "Open settings" }).waitFor();
-    await sleep(2500);
-    return page;
+    return openApp(browser, [repo], width, height);
   };
   const rest = (page) => page.mouse.move(5, 5).then(() => sleep(500));
 
@@ -87,6 +93,56 @@ async function capture(browser) {
   await page.context().close();
 }
 
+// One window per feature, kept in docs/media/sources/features for feature-floating.html.
+async function captureFeatures(browser) {
+  const out = join(SOURCES, "features");
+  mkdirSync(out, { recursive: true });
+  const dir = mkdtempSync(join(tmpdir(), "gm-feat-"));
+  const demo = (conflict) => {
+    const repo = join(dir, conflict ? "c" : "n", "orbit-demo");
+    execFileSync(process.execPath, [join(VIDEO, "scripts", "make-demo-repo.mjs"), repo], { stdio: "ignore" });
+    if (conflict) {
+      try {
+        execFileSync("git", ["merge", "feature/dark-theme"], { cwd: repo, stdio: "ignore" });
+      } catch {
+        /* the conflict is the point */
+      }
+    }
+    return repo;
+  };
+  const rest = (page) => page.mouse.move(5, 5).then(() => sleep(500));
+
+  let page = await openApp(browser, [demo(true)], 1100, 760);
+  await page.getByText("theme.ts").first().click();
+  await sleep(800);
+  await rest(page);
+  await page.screenshot({ path: join(out, "conflict.png") });
+  await page.context().close();
+
+  page = await openApp(browser, [demo(false)], 1100, 760);
+  await page.mouse.move(600, 400);
+  await page.keyboard.press("Control+f");
+  await sleep(500);
+  await page.keyboard.type("search", { delay: 80 });
+  await sleep(700);
+  await page.screenshot({ path: join(out, "find.png") });
+  await page.context().close();
+
+  page = await openApp(browser, [demo(false)], 1100, 760);
+  await rest(page);
+  await page.screenshot({ path: join(out, "graph.png") });
+  await page.context().close();
+
+  page = await openApp(browser, [demo(false)], 1100, 760);
+  await page.getByText("server.ts").first().click();
+  await sleep(500);
+  const picks = page.getByLabel(/^Pick/);
+  for (let i = 0; i < Math.min(3, await picks.count()); i++) await picks.nth(i).click();
+  await rest(page);
+  await page.screenshot({ path: join(out, "lines.png") });
+  await page.context().close();
+}
+
 async function render(browser) {
   const shoot = async (hash, size, out, { scale = 1, transparent = false } = {}) => {
     const context = await browser.newContext({ viewport: size, deviceScaleFactor: scale });
@@ -106,6 +162,22 @@ async function render(browser) {
   // Social preview: composed at 2400x1260, shot at half scale for 1200x630.
   await shoot("#og", { width: 2400, height: 1260 }, join(SCREENS, "og-image.png"), { scale: 0.5 });
   copyFileSync(join(SCREENS, "og-image.png"), join(MEDIA, "og-image.png"));
+}
+
+async function renderFeatures(browser) {
+  const out = join(MEDIA, "features");
+  mkdirSync(out, { recursive: true });
+  for (const name of ["conflict", "find", "lines", "graph"]) {
+    const context = await browser.newContext({ viewport: { width: 2400, height: 1350 }, deviceScaleFactor: 2 / 3 });
+    const page = await context.newPage();
+    await page.goto(FEATURES + "#" + name);
+    await page.evaluate(() => document.fonts.ready);
+    await sleep(400);
+    const png = join(out, `${name}.png`);
+    await page.screenshot({ path: png });
+    execFileSync("ffmpeg", ["-y", "-v", "error", "-i", png, "-c:v", "libwebp", "-quality", "90", join(out, `${name}.webp`)]);
+    await context.close();
+  }
 }
 
 const FPS = 30;
@@ -142,9 +214,16 @@ const dev = renderOnly ? null : await ensureDevServer();
 const browser = await launch();
 try {
   if (mode === "video" || mode === "social") await video(browser, mode);
-  else {
-    if (!renderOnly) await capture(browser);
+  else if (mode === "features") {
+    await captureFeatures(browser);
+    await renderFeatures(browser);
+  } else {
+    if (!renderOnly) {
+      await capture(browser);
+      await captureFeatures(browser);
+    }
     await render(browser);
+    await renderFeatures(browser);
   }
   console.log("done");
 } finally {

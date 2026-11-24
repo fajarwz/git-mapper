@@ -1,0 +1,95 @@
+<!doctype html>
+<html><head><meta charset="utf-8"><style>
+@font-face{font-family:"Plus Jakarta Sans";src:url("../../website/public/fonts/plus-jakarta-sans.woff2");font-weight:200 800}
+*{box-sizing:border-box;margin:0}
+body{width:2400px;height:1350px;overflow:hidden;position:relative;font-family:"Plus Jakarta Sans",sans-serif;color:#17151f;
+background:
+radial-gradient(900px 700px at 8% 55%,rgba(110,86,207,.38),transparent 70%),
+radial-gradient(900px 600px at 95% 8%,rgba(71,127,184,.38),transparent 70%),
+radial-gradient(700px 500px at 50% -5%,rgba(47,161,134,.28),transparent 70%),
+radial-gradient(1000px 600px at 60% 105%,rgba(207,106,146,.42),transparent 70%),#fff}
+h1{position:absolute;top:60px;left:0;width:100%;text-align:center;font-size:92px;line-height:1.05;font-weight:800;letter-spacing:-2.5px}
+h1 span{color:#6e56cf}
+p.sub{position:absolute;top:185px;width:100%;text-align:center;font-size:34px;color:#413d51;font-weight:500}
+.main{position:absolute;left:420px;top:300px;width:1560px;border-radius:34px;box-shadow:0 60px 120px -40px rgba(48,36,100,.55),0 0 0 1.5px rgba(23,21,31,.1)}
+.card{position:absolute;overflow:hidden;background:#fff;border-radius:26px;box-shadow:0 40px 80px -24px rgba(48,36,100,.6),0 0 0 1.5px rgba(23,21,31,.12)}
+.card img{position:absolute}
+.pill{position:absolute;display:flex;align-items:center;gap:10px;height:62px;padding:0 28px;border-radius:99px;font-size:30px;font-weight:600;background:rgba(255,255,255,.92);backdrop-filter:blur(20px);border:3px solid;box-shadow:0 24px 40px -16px rgba(48,36,100,.5)}
+.pill.filled{background:#6e56cf;color:#fff;border-color:#6e56cf;font-weight:700}
+</style></head><body>
+<h1 id="t"></h1><p class="sub" id="s"></p>
+<script>
+// Crops are given in the source screenshot's own pixels (2200x1520); scale s sets how big the crop is drawn.
+const W = 2200;
+const CONFIG = {
+  conflict: {
+    title: 'Merge conflicts, <span>resolved in a click.</span>',
+    sub: 'Keep current, keep incoming or keep both for each block, then complete the merge.',
+    cards: [
+      { x: 600, y: 1040, w: 1580, h: 460, s: 0.8, left: 1070, top: 900, rot: 2 },
+      { x: 20, y: 205, w: 560, h: 130, s: 1.5, left: 60, top: 620, rot: -4 },
+    ],
+    pills: [
+      { text: "1 conflict left", color: "#8a5a11", border: "#dd9438", left: 1990, top: 420, rot: 3 },
+      { text: "Complete merge", filled: true, left: 120, top: 880, rot: -3 },
+    ],
+  },
+  find: {
+    title: 'Find any commit, <span>instantly.</span>',
+    sub: 'Ctrl+F highlights every match and fades the rest, so the one you want stands out.',
+    cards: [
+      { x: 1470, y: 155, w: 690, h: 100, s: 1.5, left: 1250, top: 420, rot: 2 },
+      { x: 738, y: 470, w: 882, h: 140, s: 1.1, left: 60, top: 720, rot: -3 },
+    ],
+    pills: [
+      { text: "Ctrl + F", color: "#17151f", border: "rgba(23,21,31,.25)", left: 130, top: 560, rot: -4 },
+      { text: "3 matches", filled: true, left: 2020, top: 600, rot: 3 },
+    ],
+  },
+  graph: {
+    title: 'Every branch in <span>its own colour.</span>',
+    sub: 'Forks and merges bend at their own commit, so the history reads at a glance.',
+    main: { x: 600, y: 90, w: 1580, h: 770, s: 1, left: 410, top: 330 },
+    cards: [
+      { x: 738, y: 345, w: 702, h: 65, s: 1.5, left: 1290, top: 250, rot: 2 },
+      { x: 738, y: 409, w: 512, h: 64, s: 1.6, left: 60, top: 300, rot: -3 },
+      { x: 738, y: 729, w: 702, h: 65, s: 1.5, left: 1290, top: 1150, rot: -2 },
+      { x: 600, y: 150, w: 140, h: 706, s: 1.2, left: 110, top: 470, rot: -2 },
+    ],
+    pills: [
+      { text: "main", filled: true, left: 2040, top: 700, rot: 3 },
+      { text: "feature/auth", color: "#cf6a92", border: "#cf6a92", left: 1980, top: 840, rot: -3 },
+    ],
+  },
+  lines: {
+    title: 'Stage exactly <span>the lines you want.</span>',
+    sub: 'Tick lines in the diff, then stage or discard just those and leave the rest of the file alone.',
+    cards: [
+      { x: 600, y: 1040, w: 1580, h: 460, s: 0.8, left: 1070, top: 900, rot: 2 },
+      { x: 1720, y: 1045, w: 440, h: 58, s: 2, left: 1400, top: 420, rot: -2 },
+    ],
+    pills: [
+      { text: "3 lines picked", filled: true, left: 120, top: 640, rot: -4 },
+      { text: "+2  −1", color: "#218358", border: "#30a46c", left: 160, top: 780, rot: 3 },
+    ],
+  },
+};
+const name = location.hash.slice(1) || "conflict";
+const c = CONFIG[name];
+document.getElementById("t").innerHTML = c.title;
+document.getElementById("s").textContent = c.sub;
+const src = `sources/features/${name}.png`;
+const add = (html) => document.body.insertAdjacentHTML("beforeend", html);
+if (c.main) {
+  const k = c.main;
+  add(`<div class="card" style="left:${k.left}px;top:${k.top}px;width:${k.w * k.s}px;height:${k.h * k.s}px;border-radius:34px;box-shadow:0 60px 120px -40px rgba(48,36,100,.55),0 0 0 1.5px rgba(23,21,31,.1)"><img src="${src}" style="width:${W * k.s}px;left:${-k.x * k.s}px;top:${-k.y * k.s}px"></div>`);
+} else add(`<img class="main" src="${src}">`);
+for (const k of c.cards) {
+  add(`<div class="card" style="left:${k.left}px;top:${k.top}px;width:${k.w * k.s}px;height:${k.h * k.s}px;transform:rotate(${k.rot}deg)"><img src="${src}" style="width:${W * k.s}px;left:${-k.x * k.s}px;top:${-k.y * k.s}px"></div>`);
+}
+for (const p of c.pills) {
+  const style = p.filled ? "" : `color:${p.color};border-color:${p.border};`;
+  add(`<div class="pill${p.filled ? " filled" : ""}" style="left:${p.left}px;top:${p.top}px;transform:rotate(${p.rot}deg);${style}">${p.text}</div>`);
+}
+</script>
+</body></html>
