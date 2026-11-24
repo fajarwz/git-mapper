@@ -155,7 +155,7 @@ function SortableTab({ item, active, suppressed, onSelect, onClose }: SortableTa
         transform: CSS.Transform.toString(transform),
         transition,
       }}
-      className={`inline-flex h-7 min-w-0 items-center gap-1 rounded-lg border border-transparent bg-glass-soft pl-2.5 text-left text-ink-soft backdrop-blur-md transition-[background-color,border-color,color,box-shadow,opacity] hover:bg-glass hover:text-ink hover:soft-shadow data-[active=true]:border-hairline data-[active=true]:bg-glass-strong data-[active=true]:text-ink data-[active=true]:soft-shadow data-[dragging=true]:opacity-30 data-[sleeping=true]:opacity-55 data-[sleeping=true]:hover:opacity-100`}
+      className={`inline-flex h-7 min-w-0 items-center gap-1 rounded-lg border border-transparent bg-glass-soft pl-2.5 text-left text-ink-soft backdrop-blur-md transition-[background-color,border-color,color,box-shadow,opacity] hover:bg-glass hover:text-ink hover:soft-shadow data-[active=true]:border-primary/45 data-[active=true]:bg-selected-glass data-[active=true]:font-semibold data-[active=true]:text-ink data-[active=true]:soft-shadow data-[dragging=true]:opacity-30 data-[sleeping=true]:opacity-55 data-[sleeping=true]:hover:opacity-100`}
     >
       <button
         type="button"
@@ -173,7 +173,7 @@ function SortableTab({ item, active, suppressed, onSelect, onClose }: SortableTa
         }}
         className="flex h-full min-w-0 flex-1 cursor-grab touch-none items-center gap-1.5 bg-transparent p-0 pr-1 text-left text-inherit active:cursor-grabbing"
       >
-        <span className="shrink-0 text-ink-dim">
+        <span className={`shrink-0 ${active ? "text-primary-ink" : "text-ink-dim"}`}>
           <RepoIcon size={12} />
         </span>
         <TabLabel text={item.name} />
