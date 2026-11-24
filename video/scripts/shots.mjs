@@ -102,6 +102,7 @@ async function render(browser) {
   const clear = join(MEDIA, "floating-screenshot-transparent.png");
   await shoot("#bare-clear", { width: 2400, height: 1070 }, clear, { transparent: true });
   execFileSync("ffmpeg", ["-y", "-v", "error", "-i", clear, "-c:v", "libwebp", "-quality", "88", "-pix_fmt", "yuva420p", join(SCREENS, "hero-floating.webp")]);
+  for (const w of [800, 1600]) execFileSync("ffmpeg", ["-y", "-v", "error", "-i", clear, "-vf", `scale=${w}:-1:flags=lanczos`, "-c:v", "libwebp", "-quality", "88", "-pix_fmt", "yuva420p", join(SCREENS, `hero-floating-${w}.webp`)]);
   // Social preview: composed at 2400x1260, shot at half scale for 1200x630.
   await shoot("#og", { width: 2400, height: 1260 }, join(SCREENS, "og-image.png"), { scale: 0.5 });
   copyFileSync(join(SCREENS, "og-image.png"), join(MEDIA, "og-image.png"));

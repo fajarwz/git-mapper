@@ -201,40 +201,44 @@ const systems = [
     </section>
 
     <!-- Floating composition -->
-    <section class="site-rise mx-auto max-w-6xl pb-16">
-      <video
-        class="h-auto w-full motion-reduce:hidden"
-        width="2400"
-        height="1070"
-        poster="/screens/hero-floating.webp"
-        autoplay
-        muted
-        loop
-        playsinline
-        preload="none"
-        id="hero-video"
-        data-src="/screens/hero-floating.webm"
-        aria-label="Git Mapper's commit graph and staging view, with the branch context menu, a line-by-line diff and branch pills floating over the window"
-      ></video>
+    <section class="mx-auto max-w-6xl pb-16">
+      <div class="relative">
+        <img
+          src="/screens/hero-floating-1600.webp"
+          srcset="/screens/hero-floating-800.webp 800w, /screens/hero-floating-1600.webp 1600w, /screens/hero-floating.webp 2400w"
+          sizes="(min-width: 1152px) 1152px, 100vw"
+          width="2400"
+          height="1070"
+          alt="Git Mapper's commit graph and staging view, with the branch context menu, a line-by-line diff and branch pills floating over the window"
+          class="block h-auto w-full"
+          fetchpriority="high"
+          decoding="async"
+        />
+        <video
+          id="hero-video"
+          class="pointer-events-none absolute inset-0 h-full w-full opacity-0 transition-opacity duration-500"
+          width="2400"
+          height="1070"
+          data-src="/screens/hero-floating.webm"
+          aria-hidden="true"
+          autoplay
+          muted
+          loop
+          playsinline
+          preload="none"
+        ></video>
+      </div>
       <script is:inline>
-        // The poster is the first paint; the 1 MB clip starts only after the page has loaded.
+        // The still image is the first paint. Wide screens without reduced motion swap in the 1 MB clip once the page has loaded; phones keep the still.
         (function () {
           var v = document.getElementById("hero-video");
-          if (!v || matchMedia("(prefers-reduced-motion: reduce)").matches) return;
+          if (!v || matchMedia("(prefers-reduced-motion: reduce)").matches || !matchMedia("(min-width: 768px)").matches) return;
+          v.addEventListener("playing", function () { v.classList.remove("opacity-0"); }, { once: true });
           var go = function () { v.src = v.dataset.src; v.play().catch(function () {}); };
           if (document.readyState === "complete") go();
           else addEventListener("load", function () { setTimeout(go, 300); });
         })();
       </script>
-      <img
-        src="/screens/hero-floating.webp"
-        width="2400"
-        height="1070"
-        alt="Git Mapper's commit graph and staging view, with the branch context menu, a line-by-line diff and branch pills floating over the window"
-        class="hidden h-auto w-full motion-reduce:block"
-        loading="lazy"
-        decoding="async"
-      />
     </section>
 
     <!-- Theme comparison dragger -->
@@ -251,6 +255,9 @@ const systems = [
         <ThemeSlider
           client:visible
           lightSrc="/screens/main-light.webp"
+          lightSrcSet="/screens/main-light-900.webp 900w, /screens/main-light.webp 2200w"
+          darkSrcSet="/screens/main-dark-900.webp 900w, /screens/main-dark.webp 2200w"
+          sizes="(min-width: 1024px) 1024px, 100vw"
           darkSrc="/screens/main-dark.webp"
           altLight="Git Mapper with a repository open, light theme: glass commit feed, lane-coloured graph, diff panel"
           altDark="The same repository in the dark theme: deep canvas with white halos, smoked glass panes"
