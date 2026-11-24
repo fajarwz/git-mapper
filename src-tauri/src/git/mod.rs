@@ -265,6 +265,12 @@ pub async fn stash_action(dir: String, index: u32, action: String) -> Result<(),
     })
     .await
 }
+/// Stashes all uncommitted work (untracked files included); the uncommitted row becomes a
+/// stash row. Reversible, so the app runs it without a confirm.
+#[tauri::command]
+pub async fn stash_push(dir: String, message: String) -> Result<(), String> {
+    run_blocking("stash push", move || stash_push_in(&dir, &message)).await
+}
 /// Takes the checked-out tip back one commit: `reset --soft HEAD~1` returns the tip's tree
 /// to the index, so the work comes back staged and the next refresh re-lands the uncommitted
 /// row. Nothing is deleted — the Git Mapper twin of the staging rail's commit. The UI only

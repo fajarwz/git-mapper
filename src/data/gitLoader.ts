@@ -645,6 +645,11 @@ export async function stashAction(dir: string, index: number, action: "apply" | 
   await call("stash_action", { dir, index, action }, (raw) => raw as void);
 }
 
+/** Shelves all uncommitted work, untracked files included; a blank message keeps git's default name. */
+export async function stashPush(dir: string, message: string): Promise<void> {
+  await call("stash_push", { dir, message }, (raw) => raw as void);
+}
+
 export async function fetchRemote(dir: string): Promise<void> {
   await call("fetch_remote", { dir }, (raw) => raw as void);
 }

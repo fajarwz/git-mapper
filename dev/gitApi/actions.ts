@@ -26,6 +26,11 @@ export const actionsHandlers: Handlers = {
     run(String(dir), ["stash", verb, `stash@{${n}}`]);
     return null;
   },
+  stash_push: ({ dir, message }) => {
+    const m = String(message ?? "").trim();
+    run(String(dir), ["stash", "push", "--include-untracked", ...(m ? ["-m", m] : [])]);
+    return null;
+  },
   fetch_remote: ({ dir }) => {
     const remotes = String(run(String(dir), ["remote"])).trim();
     if (!remotes) return null;

@@ -34,6 +34,31 @@ fn fetch_remote_tracks_the_upstream_and_skips_remoless_repos() {
 }
 
 #[test]
+fn stash_push_shelves_staged_unstaged_and_untracked_work() {
+    let repo = TempRepo::new("stash-push");
+    repo.commit("a.txt", "a\n", "first");
+    std::fs::write(repo.0.join("a.txt"), "edited\n").expect("edit");
+    std::fs::write(repo.0.join("new.txt"), "new\n").expect("untracked");
+
+    stash_push_in(repo.path(), "  my parked work ").expect("the stash ran");
+
+    let list = git_out(&repo.0, &["stash", "list"]);
+    assert_eq!(list.lines().count(), 1);
+    assert!(list.contains("my parked work"), "the name landed: {list}");
+    assert!(git_out(&repo.0, &["status", "--porcelain"]).trim().is_empty());
+    assert!(!repo.0.join("new.txt").exists(), "untracked file was shelved too");
+
+    // A blank name keeps git's default, and a leading dash is a name, not a flag.
+    std::fs::write(repo.0.join("a.txt"), "again\n").expect("edit");
+    stash_push_in(repo.path(), "  ").expect("blank stash ran");
+    std::fs::write(repo.0.join("a.txt"), "third\n").expect("edit");
+    stash_push_in(repo.path(), "--all").expect("dash name ran");
+    let list = git_out(&repo.0, &["stash", "list"]);
+    assert_eq!(list.lines().count(), 3);
+    assert!(list.lines().next().expect("newest").contains("--all"));
+}
+
+#[test]
 fn stash_actions_apply_pop_and_drop_the_entry() {
     let repo = TempRepo::new("stash-actions");
     repo.commit("a.txt", "a\n", "first");
