@@ -8,6 +8,9 @@ import iconHandle from "../assets/icons/drag-handle.svg?raw";
 type Props = {
   lightSrc: string;
   darkSrc: string;
+  lightSrcSet?: string;
+  darkSrcSet?: string;
+  sizes?: string;
   altLight: string;
   altDark: string;
 };
@@ -22,7 +25,7 @@ const MAX = 98;
  * and a one-shot sweep from the right teaches the interaction on load —
  * suppressed entirely for reduced-motion users, who get the neutral 50%.
  */
-export default function ThemeSlider({ lightSrc, darkSrc, altLight, altDark }: Props) {
+export default function ThemeSlider({ lightSrc, darkSrc, lightSrcSet, darkSrcSet, sizes, altLight, altDark }: Props) {
   const [pos, setPos] = useState(50);
   const frameRef = useRef<HTMLDivElement | null>(null);
   const draggingRef = useRef(false);
@@ -133,14 +136,22 @@ export default function ThemeSlider({ lightSrc, darkSrc, altLight, altDark }: Pr
     >
       <img
         src={lightSrc}
+        srcSet={lightSrcSet}
+        sizes={sizes}
         alt={altLight}
         draggable={false}
+        loading="lazy"
+        decoding="async"
         className="absolute inset-0 h-full w-full object-cover object-top"
       />
       <img
         src={darkSrc}
+        srcSet={darkSrcSet}
+        sizes={sizes}
         alt={altDark}
         draggable={false}
+        loading="lazy"
+        decoding="async"
         className="absolute inset-0 h-full w-full object-cover object-top"
         style={{ clipPath: `inset(0 0 0 ${pos}%)` }}
       />

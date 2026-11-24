@@ -7,3 +7,19 @@
 # No [[redirects]] here: the Astro build ships 404.html and the host serves it
 # for not-found paths natively.
 
+
+# Hashed build output never changes; the rest is re-rendered rarely, so a week is safe and still lets a new image show up.
+[[headers]]
+  for = "/_astro/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/fonts/*"
+  [headers.values]
+    Cache-Control = "public, max-age=31536000, immutable"
+
+[[headers]]
+  for = "/screens/*"
+  [headers.values]
+    Cache-Control = "public, max-age=604800"
