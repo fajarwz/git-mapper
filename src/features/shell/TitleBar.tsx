@@ -399,7 +399,7 @@ export function TitleBar({
             <SearchIcon size={13} />
           </button>
         )}
-        {repo && (
+        {repo && repo.branch !== "" && (
           // The edge takes primary-ink, not primary: primary-ink is re-pointed in .dark
           // (violet -> lavender), so the hairline stays visible on the dark glass too.
           <span className="inline-flex max-w-47.5 items-center gap-1.25 rounded-full border border-primary-ink/35 bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary-ink">
@@ -460,7 +460,7 @@ export function TitleBar({
             <RemotesIcon size={13} />
           </button>
         )}
-        {repo && repo.branch !== "HEAD detached" && (
+        {repo && repo.branch !== "" && repo.branch !== "HEAD detached" && (
           <>
             <button
               type="button"

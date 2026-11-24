@@ -118,6 +118,23 @@ function HeaderCell({
   );
 }
 
+const SKELETON_SUBJECT_WIDTHS = ["w-3/5", "w-2/5", "w-4/5", "w-1/2", "w-3/4", "w-2/3"];
+
+/** Placeholder rows at the real row height, so the list does not jump when the history lands. */
+function SkeletonRows({ count, label }: { count: number; label: string }) {
+  return (
+    <div role="status" aria-label={label}>
+      {Array.from({ length: count }, (_, index) => (
+        <div key={index} aria-hidden="true" className="flex h-8 items-center gap-3 border-b border-rule/70 motion-safe:animate-pulse">
+          <span className={`h-2.5 rounded-full bg-ink/10 ${SKELETON_SUBJECT_WIDTHS[index % SKELETON_SUBJECT_WIDTHS.length]}`} />
+          <span className="ml-auto h-2.5 w-16 shrink-0 rounded-full bg-ink/[0.07]" />
+          <span className="h-2.5 w-12 shrink-0 rounded-full bg-ink/[0.07]" />
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export function CommitList({ repo, commits, find = null, selectedHash, flashHashes, onSelect, loadingMore, waking = false, showAvatars, onNearBottom, pullsByBranch, commitChip, onCheckoutBranch, onCheckoutRemote, onContextMenu }: CommitListProps) {
   const layout = useMemo(
     () =>
@@ -170,6 +187,8 @@ export function CommitList({ repo, commits, find = null, selectedHash, flashHash
   const onContextMenuRef = useRef(onContextMenu);
   onContextMenuRef.current = onContextMenu;
   const hasContextMenu = onContextMenu !== undefined;
+  // Skeleton rows overshoot the panel on purpose, so the list must not scroll to reveal them.
+  const skeletonOnly = waking && commits.length === 0;
   const handleRowContextMenu = useCallback((row: Commit, x: number, y: number) => {
     const ref = row.refs.find((item) => item.type === "branch") ?? row.refs[0];
     onContextMenuRef.current?.(row, ref, x, y);
@@ -344,7 +363,7 @@ export function CommitList({ repo, commits, find = null, selectedHash, flashHash
 
       <div
         ref={scrollRef}
-        className="flex min-h-0 flex-1 overflow-y-auto overflow-x-hidden"
+        className={`flex min-h-0 flex-1 overflow-x-hidden ${skeletonOnly ? "overflow-y-hidden" : "overflow-y-auto"}`}
         onScroll={(event) => {
           const el = event.currentTarget;
           lastScrollTop.current = el.scrollTop;
@@ -376,12 +395,8 @@ export function CommitList({ repo, commits, find = null, selectedHash, flashHash
               onRefContextMenu={hasContextMenu ? handleRefContextMenu : undefined}
             />
           ))}
-          {waking && commits.length === 0 && (
-            <p className="m-0 py-2 text-center text-[12px] text-ink-dim">Loading history…</p>
-          )}
-          {loadingMore && (
-            <p className="m-0 py-2 text-center text-[12px] text-ink-dim">Loading more history…</p>
-          )}
+          {skeletonOnly && <SkeletonRows count={40} label="Loading history" />}
+          {loadingMore && commits.length > 0 && <SkeletonRows count={3} label="Loading more history" />}
         </div>
       </div>
 

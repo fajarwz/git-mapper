@@ -557,13 +557,34 @@ export async function loadMoreCommits(
   return { repo: { ...repo, refsDigest: hashText(refsRaw), commits: withLanes(list) }, done };
 }
 
-export async function pickAndLoadRepository(): Promise<Repository | null> {
+/** The folder the user picked, or null when they cancelled. */
+export async function pickRepositoryPath(): Promise<string | null> {
   // The native folder dialog exists only in the Tauri window; browser tabs prompt for the path.
   const dir = isTauri()
     ? await pickDirectory({ directory: true, multiple: false })
     : window.prompt("Folder path of a git repository (e.g. C:/Users/you/projects/my-repo):");
-  if (!dir) return null;
-  return loadRepository(dir);
+  return dir || null;
+}
+
+/** An empty tab for a folder still being read: the history shows skeleton rows until it lands. */
+export function pendingRepository(dir: string): Repository {
+  const trimmed = dir.replace(/[\\/]+$/, "");
+  return {
+    id: trimmed,
+    name: trimmed.split(/[\\/]/).pop() || trimmed,
+    path: trimmed,
+    branch: "",
+    ahead: 0,
+    behind: 0,
+    head: "",
+    changed: 0,
+    worktree: "",
+    refsDigest: "",
+    stashDigest: "",
+    commits: [],
+    defaultCommitHash: "",
+    sleeping: true,
+  };
 }
 
 interface RawFilePayload {
