@@ -260,6 +260,44 @@ test("the uncommitted row offers no commit-hash copy — the pseudo hash is not 
   assert.equal(queryByRole("menuitem", { name: /copy commit hash/i }), null);
 });
 
+test("the uncommitted row offers stash and discard-all, and they fire their callbacks", () => {
+  const onStashChanges = vi.fn();
+  const onDiscardAll = vi.fn();
+  const { getByRole } = render(
+    <ContextMenu
+      target={target({ commit: commit({ hash: "wip", subject: "Uncommitted changes" }) })}
+      onCheckout={vi.fn()}
+      onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
+      onStashChanges={onStashChanges}
+      onDiscardAll={onDiscardAll}
+      head={HEAD}
+      onClose={vi.fn()}
+    />,
+  );
+  fireEvent.click(getByRole("menuitem", { name: /stash changes/i }));
+  fireEvent.click(getByRole("menuitem", { name: /discard all changes/i }));
+  assert.equal(onStashChanges.mock.calls.length, 1);
+  assert.equal(onDiscardAll.mock.calls.length, 1);
+});
+
+test("a normal commit row offers neither stash nor discard-all", () => {
+  const { queryByRole } = render(
+    <ContextMenu
+      target={target({})}
+      onCheckout={vi.fn()}
+      onCheckoutCommit={vi.fn()}
+      onStashAction={vi.fn()}
+      onStashChanges={vi.fn()}
+      onDiscardAll={vi.fn()}
+      head={HEAD}
+      onClose={vi.fn()}
+    />,
+  );
+  assert.equal(queryByRole("menuitem", { name: /stash changes/i }), null);
+  assert.equal(queryByRole("menuitem", { name: /discard all/i }), null);
+});
+
 test("a stash row offers no commit checkout", () => {
   const { queryByRole } = render(
     <ContextMenu

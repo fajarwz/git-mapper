@@ -37,8 +37,15 @@ interface ContextMenuProps {
   /** Opens the provider's new pull request page for a branch (a remote ref passes its bare
    * name). Offered for any branch or remote pill; the branch must already be pushed. */
   onCreatePullRequest?: (branch: string) => void;
+  /** The uncommitted row's own entries: shelve everything as a stash, or throw it away. */
+  onStashChanges?: () => void;
+  onDiscardAll?: () => void;
   onClose: () => void;
 }
+
+// Groups are separated by a hairline, drawn only between two groups that actually render.
+const GROUPS =
+  "[&>[data-group]:not(:empty)~[data-group]:not(:empty)]:mt-0.5 [&>[data-group]:not(:empty)~[data-group]:not(:empty)]:border-t [&>[data-group]:not(:empty)~[data-group]:not(:empty)]:border-hairline [&>[data-group]:not(:empty)~[data-group]:not(:empty)]:pt-1.5";
 
 const ITEM =
   "flex w-full items-center gap-2 rounded-lg px-2.5 py-1.5 text-left text-[12.5px] text-ink hover:bg-hover-glass";
@@ -75,6 +82,8 @@ export function ContextMenu({
   currentBranch,
   onMerge,
   onCreatePullRequest,
+  onStashChanges,
+  onDiscardAll,
   onClose,
 }: ContextMenuProps) {
   const [copiedKey, setCopiedKey] = useState<string | null>(null);
@@ -136,6 +145,7 @@ export function ContextMenu({
   // A local copy the callbacks can close over (TS will not narrow the prop inside them).
   const activeRef = target.ref;
 
+  const isWip = target.commit.hash === UNCOMMITTED_HASH;
   const left = Math.max(4, Math.min(target.x, window.innerWidth - 240));
   const stashIndex = target.commit.stashIndex;
   // The menu is ~32px an entry; the estimate grows with it so it never opens off-screen.
@@ -154,8 +164,10 @@ export function ContextMenu({
     (commitCheckoutable ? 1 : 0) +
     (undoable ? 1 : 0) +
     (stashIndex !== undefined ? 3 : 0) +
+    (onStashChanges && isWip ? 1 : 0) +
+    (onDiscardAll && isWip ? 1 : 0) +
     1 + 1 + (activeRef ? 1 : 0);
-  const top = Math.max(4, Math.min(target.y, window.innerHeight - entries * 32 - 20));
+  const top = Math.max(4, Math.min(target.y, window.innerHeight - entries * 32 - 60));
 
   function copy(key: string, text: string) {
     setCopiedKey(key);
@@ -169,9 +181,23 @@ export function ContextMenu({
       role="menu"
       aria-label={`Actions for ${target.commit.hash}`}
       onPointerDown={(event) => event.stopPropagation()}
-      className="fixed z-50 flex w-60 flex-col gap-0.5 rounded-xl border border-hairline bg-glass p-1.5 panel-shadow backdrop-blur-sm pop-in-menu"
+      className={`fixed z-50 flex w-60 flex-col gap-0.5 rounded-xl border border-hairline bg-glass p-1.5 panel-shadow backdrop-blur-sm pop-in-menu ${GROUPS}`}
       style={{ left, top }}
     >
+      <div data-group className="flex flex-col gap-0.5">
+      {isWip && onStashChanges && (
+        <button type="button" role="menuitem" className={ITEM}
+          title="Shelves every uncommitted change, untracked files included, as a stash you can apply later"
+          onClick={() => {
+            onClose();
+            onStashChanges();
+          }}
+        >
+          Stash changes…
+        </button>
+      )}
+      </div>
+      <div data-group className="flex flex-col gap-0.5">
       {checkoutable && branch && (
         <button type="button" role="menuitem" className={ITEM}
           onClick={() => {
@@ -193,6 +219,19 @@ export function ContextMenu({
           Check out {remoteBranch.name}…
         </button>
       )}
+      {commitCheckoutable && (
+        <button type="button" role="menuitem" className={ITEM}
+          title="Detaches HEAD onto this commit — a warning shows first"
+          onClick={() => {
+            onClose();
+            onCheckoutCommit(target.commit.hash);
+          }}
+        >
+          Check out commit {target.commit.hash.slice(0, 8)}
+        </button>
+      )}
+      </div>
+      <div data-group className="flex flex-col gap-0.5">
       {branchCreatable && (
         <button type="button" role="menuitem" className={ITEM}
           title="Makes a new branch at this commit"
@@ -215,6 +254,8 @@ export function ContextMenu({
           Create tag here…
         </button>
       )}
+      </div>
+      <div data-group className="flex flex-col gap-0.5">
       {mergeable && branch && (
         <button type="button" role="menuitem" className={ITEM}
           title={`Merges ${branch.name} into ${currentBranch} — a confirm shows first`}
@@ -259,28 +300,6 @@ export function ContextMenu({
           Push to…
         </button>
       )}
-      {deletableLocal && branch && (
-        <button type="button" role="menuitem" className={ITEM}
-          title="Deletes the local branch — a confirm shows first"
-          onClick={() => {
-            onClose();
-            onDeleteBranch?.(branch.name, false);
-          }}
-        >
-          Delete branch {branch.name}…
-        </button>
-      )}
-      {deletableRemote && remoteBranch && (
-        <button type="button" role="menuitem" className={ITEM}
-          title="Deletes the branch on the remote itself — a confirm shows first"
-          onClick={() => {
-            onClose();
-            onDeleteBranch?.(remoteBranch.name, true);
-          }}
-        >
-          Delete remote branch {remoteBranch.name}…
-        </button>
-      )}
       {deletableTag && onPushTag && (
         <button type="button" role="menuitem" className={ITEM}
           title="Pushes this tag to origin"
@@ -292,50 +311,8 @@ export function ContextMenu({
           Push tag {deletableTag.name}
         </button>
       )}
-      {deletableTag && (
-        <>
-          <button type="button" role="menuitem" className={ITEM}
-            title="Deletes the local tag — a confirm shows first"
-            onClick={() => {
-              onClose();
-              onDeleteTag?.(deletableTag.name, false);
-            }}
-          >
-            Delete tag {deletableTag.name}…
-          </button>
-          <button type="button" role="menuitem" className={ITEM}
-            title="Deletes the tag on origin itself — a confirm shows first"
-            onClick={() => {
-              onClose();
-              onDeleteTag?.(deletableTag.name, true);
-            }}
-          >
-            Delete remote tag {deletableTag.name}…
-          </button>
-        </>
-      )}
-      {commitCheckoutable && (
-        <button type="button" role="menuitem" className={ITEM}
-          title="Detaches HEAD onto this commit — a warning shows first"
-          onClick={() => {
-            onClose();
-            onCheckoutCommit(target.commit.hash);
-          }}
-        >
-          Check out commit {target.commit.hash.slice(0, 8)}
-        </button>
-      )}
-      {undoable && onUndoCommit && (
-        <button type="button" role="menuitem" className={ITEM}
-          title="Puts the tip commit's files back as staged, uncommitted work — a confirm shows first"
-          onClick={() => {
-            onClose();
-            onUndoCommit();
-          }}
-        >
-          Undo commit {target.commit.hash.slice(0, 8)}
-        </button>
-      )}
+      </div>
+      <div data-group className="flex flex-col gap-0.5">
       {stashIndex !== undefined && (
         <>
           <button type="button" role="menuitem" className={ITEM}
@@ -367,6 +344,76 @@ export function ContextMenu({
           </button>
         </>
       )}
+      </div>
+      <div data-group className="flex flex-col gap-0.5">
+      {isWip && onDiscardAll && (
+        <button type="button" role="menuitem" className={ITEM}
+          title="Throws away every uncommitted change — a confirm shows first"
+          onClick={() => {
+            onClose();
+            onDiscardAll();
+          }}
+        >
+          Discard all changes…
+        </button>
+      )}
+      {deletableLocal && branch && (
+        <button type="button" role="menuitem" className={ITEM}
+          title="Deletes the local branch — a confirm shows first"
+          onClick={() => {
+            onClose();
+            onDeleteBranch?.(branch.name, false);
+          }}
+        >
+          Delete branch {branch.name}…
+        </button>
+      )}
+      {deletableRemote && remoteBranch && (
+        <button type="button" role="menuitem" className={ITEM}
+          title="Deletes the branch on the remote itself — a confirm shows first"
+          onClick={() => {
+            onClose();
+            onDeleteBranch?.(remoteBranch.name, true);
+          }}
+        >
+          Delete remote branch {remoteBranch.name}…
+        </button>
+      )}
+      {deletableTag && (
+        <>
+          <button type="button" role="menuitem" className={ITEM}
+            title="Deletes the local tag — a confirm shows first"
+            onClick={() => {
+              onClose();
+              onDeleteTag?.(deletableTag.name, false);
+            }}
+          >
+            Delete tag {deletableTag.name}…
+          </button>
+          <button type="button" role="menuitem" className={ITEM}
+            title="Deletes the tag on origin itself — a confirm shows first"
+            onClick={() => {
+              onClose();
+              onDeleteTag?.(deletableTag.name, true);
+            }}
+          >
+            Delete remote tag {deletableTag.name}…
+          </button>
+        </>
+      )}
+      {undoable && onUndoCommit && (
+        <button type="button" role="menuitem" className={ITEM}
+          title="Puts the tip commit's files back as staged, uncommitted work — a confirm shows first"
+          onClick={() => {
+            onClose();
+            onUndoCommit();
+          }}
+        >
+          Undo commit {target.commit.hash.slice(0, 8)}
+        </button>
+      )}
+      </div>
+      <div data-group className="flex flex-col gap-0.5">
       {target.commit.hash !== UNCOMMITTED_HASH && (
         <button type="button" role="menuitem" className={ITEM}
           title="The short hash shown in the list"
@@ -382,6 +429,7 @@ export function ContextMenu({
           {copiedKey === "ref" ? "Copied!" : COPY_LABELS[activeRef.type]}
         </button>
       )}
+      </div>
     </div>
   );
 }

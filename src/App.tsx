@@ -18,6 +18,7 @@ import { ConfirmDialog } from "./shared/components/ConfirmDialog";
 import { CheckoutRemoteDialog } from "./features/history/components/CheckoutRemoteDialog";
 import { CreateBranchDialog } from "./features/history/components/CreateBranchDialog";
 import { CreateTagDialog } from "./features/history/components/CreateTagDialog";
+import { StashDialog } from "./features/history/components/StashDialog";
 import { SettingsModal } from "./features/shell/SettingsModal";
 import { RemotesDialog } from "./features/shell/RemotesDialog";
 import { TagRemoteDialog, TagRemoteMode } from "./features/history/components/TagRemoteDialog";
@@ -78,6 +79,7 @@ import { checkoutBranch,
   storePaths,
   commitStaged,
   discardEverything,
+  stashPush,
   discardPaths,
   loadWorktree,
   stagePaths,
@@ -165,6 +167,7 @@ function App() {
 
   const [flashHashes, setFlashHashes] = useState<string[]>([]);
   const [contextMenu, setContextMenu] = useState<ContextMenuTarget | null>(null);
+  const [stashDialogOpen, setStashDialogOpen] = useState(false);
   // Find over the loaded window: hashes, subjects, authors, ref pills. It highlights and steps,
   // it never filters. Not synced per tab — switching repos closes and clears it, because a
   // highlight carried into another tab would look like a bug. Closing keeps the text, so a
@@ -1486,6 +1489,32 @@ function App() {
     [runStaging],
   );
 
+  const handleMenuStashChanges = useCallback(() => setStashDialogOpen(true), []);
+  const runStashChanges = useCallback(
+    (message: string) => {
+      setStashDialogOpen(false);
+      void runStaging((dir) => stashPush(dir, message));
+    },
+    [runStaging],
+  );
+  const handleMenuDiscardAll = useCallback(() => {
+    setPendingConfirm({
+      title: "Discard all uncommitted changes?",
+      body: (
+        <p>
+          Every change — staged and unstaged — returns to the last commit, and untracked files
+          are deleted from disk. Stash them instead if you might want them back.
+        </p>
+      ),
+      confirmLabel: "Discard",
+      danger: true,
+      run: async () => {
+        setPendingConfirm(null);
+        handleDiscardAll();
+      },
+    });
+  }, [handleDiscardAll]);
+
   const handleResolveConflicts = useCallback(
     (paths: string[], side: "ours" | "theirs") =>
       void runStaging((dir) => resolveConflictSides(dir, paths, side)),
@@ -1680,9 +1709,6 @@ function App() {
               onCheckoutBranch={handleCheckoutBranch}
               onCheckoutRemote={handleCheckoutRemote}
               onContextMenu={(commit, ref, x, y) => {
-                // The uncommitted row owns no menu (empty pseudo hash, no refs): a right-click
-                // there would only ever draw an empty box, so it draws nothing.
-                if (commit.hash === UNCOMMITTED_HASH) return;
                 setContextMenu({ commit, ref, x, y });
               }}
             />
@@ -1794,6 +1820,8 @@ function App() {
           head={repo?.head ?? ""}
           onMerge={handleMergeBranch}
           onCreatePullRequest={handleCreatePullRequest}
+          onStashChanges={handleMenuStashChanges}
+          onDiscardAll={handleMenuDiscardAll}
           currentBranch={
             repo !== null && !repo.branch.startsWith("HEAD") ? repo.branch : undefined
           }
@@ -1817,6 +1845,10 @@ function App() {
           onCreate={(name, checkout) => void runCreateBranch(createBranchHash, name, checkout)}
           onClose={() => setCreateBranchHash(null)}
         />
+      )}
+
+      {stashDialogOpen && (
+        <StashDialog onStash={runStashChanges} onClose={() => setStashDialogOpen(false)} />
       )}
 
       {remotesOpen && activeRepoPath && (
