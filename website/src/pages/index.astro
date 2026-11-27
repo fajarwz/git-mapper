@@ -1,17 +1,9 @@
 ---
-import { Image } from "astro:assets";
 import Site from "../layouts/Site.astro";
 import SecondaryButton from "../components/SecondaryButton.astro";
 import ThemeSlider from "../react/ThemeSlider";
 
 // Assets: the real brand file + every icon lives as its own file under src/assets/.
-import shotGraph from "../assets/screens/graph.png";
-import shotStage from "../assets/screens/stage.png";
-import shotHunk from "../assets/screens/hunk.png";
-import shotConflict from "../assets/screens/conflict.png";
-import shotSplit from "../assets/screens/split.png";
-import shotFind from "../assets/screens/find.png";
-import shotPulls from "../assets/screens/pulls.png";
 import logoRaw from "../assets/logo.svg?raw";
 import iconDownload from "../assets/icons/download.svg?raw";
 import iconGithub from "../assets/icons/github-mark.svg?raw";
@@ -41,7 +33,7 @@ const features = [
       "Reorder, resize and hide columns to suit you",
       "Each repository in its own tab, restored on launch",
     ],
-    img: shotGraph,
+    img: "graph", size: [1560, 1160],
     alt: "The commit graph: five branches in their own colours forking and merging back into main, with branch, tag and stash pills on the rows",
     layout: "side",
   },
@@ -54,7 +46,7 @@ const features = [
       "Staged and unstaged sides shown one at a time, like VS Code",
       "A hunk that moved underneath you is refused, never misapplied",
     ],
-    img: shotHunk,
+    img: "lines", size: [1560, 1180],
     alt: "An uncommitted diff with five changed lines ticked, and the hunk header now offering Stage +4 -1, Discard +4 -1 and Clear",
     layout: "side-reverse",
   },
@@ -67,7 +59,7 @@ const features = [
       "Works with GitHub and GitLab remotes",
       "Read-only: Git Mapper never changes your pull requests",
     ],
-    img: shotPulls,
+    img: "pulls", size: [1560, 1380],
     alt: "The right-click menu on the feat/tabs branch pill, offering Check out, Merge into main, Create pull request, and copy actions",
     layout: "side",
   },
@@ -80,7 +72,7 @@ const features = [
       "Alt+Left and Alt+Right step back and forward through your selections",
       "Ctrl+T, Ctrl+W, Ctrl+1–9 and Ctrl+Tab drive the tabs; every shortcut is listed in Settings",
     ],
-    img: shotFind,
+    img: "find",
     alt: "The find bar open over the commit list with the word lane typed: two matching rows are highlighted and every other row is faded, with a count of 1 of 2 and arrows to step through them",
     layout: "text-first",
   },
@@ -93,7 +85,7 @@ const features = [
       "Destructive actions sit behind a clear confirm",
       "The rail docks itself once the working tree is clean",
     ],
-    img: shotStage,
+    img: "stage",
     alt: "The staging rail listing a staged file and three changes beside the staged diff of src/lib/graph.ts, with an Unstage hunk button",
     layout: "text-first",
   },
@@ -106,7 +98,7 @@ const features = [
       "Finish with git's own prepared message",
       "Or abort and the repository returns to how it was",
     ],
-    img: shotConflict,
+    img: "conflict",
     alt: "A merge conflict in src/config.ts shown inline with Keep current, Keep both and Keep incoming buttons, and a Conflicts section in the staging rail",
     layout: "text-first",
   },
@@ -119,7 +111,7 @@ const features = [
       "Picture diffs for images: 2-up, swipe or onion peel",
       "Hover a file and its patch is already loading",
     ],
-    img: shotSplit,
+    img: "split",
     alt: "A commit selected in the graph with its split diff open: the old lines on the left, the new lines on the right",
     layout: "text-first",
   },
@@ -300,9 +292,7 @@ const systems = [
                   </ul>
                 </div>
                 <div class={f.layout === "side-reverse" ? "min-w-0 md:order-1 md:col-span-7" : "min-w-0 md:col-span-7"}>
-                  <div class="panel-shadow overflow-hidden rounded-2xl border border-hairline bg-sheet-strong p-1.5 md:p-2">
-                    <Image src={f.img} alt={f.alt} widths={[640, 1000, 1400]} sizes="(min-width: 1152px) 640px, (min-width: 768px) 55vw, 100vw" format="webp" quality={85} loading="lazy" class="block h-auto w-full rounded-xl border border-rule" />
-                  </div>
+                  <img src={`/screens/features/${f.img}.webp`} srcset={`/screens/features/${f.img}-800.webp 800w, /screens/features/${f.img}.webp 1600w`} sizes="(min-width: 1152px) 640px, (min-width: 768px) 55vw, 100vw" width={f.size?.[0] ?? 1600} height={f.size?.[1] ?? 867} alt={f.alt} loading="lazy" class="block h-auto w-full" />
                 </div>
               </div>
             ) : (
@@ -316,9 +306,7 @@ const systems = [
                     {f.points.map((pt) => <li class="py-2.5">{pt}</li>)}
                   </ul>
                 </div>
-                <div class="panel-shadow overflow-hidden rounded-2xl border border-hairline bg-sheet-strong p-1.5 md:p-2">
-                  <Image src={f.img} alt={f.alt} widths={[800, 1200, 1800, 2200]} sizes="(min-width: 1152px) 1100px, 100vw" format="webp" quality={85} loading="lazy" class="block h-auto w-full rounded-xl border border-rule" />
-                </div>
+                <img src={`/screens/features/${f.img}.webp`} srcset={`/screens/features/${f.img}-800.webp 800w, /screens/features/${f.img}.webp 1600w`} sizes="(min-width: 1152px) 1100px, 100vw" width={f.size?.[0] ?? 1600} height={f.size?.[1] ?? 867} alt={f.alt} loading="lazy" class="mx-auto block h-auto w-full max-w-5xl" />
               </div>
             )}
           </article>
