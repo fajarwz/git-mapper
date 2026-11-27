@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/logo.svg" alt="Git Mapper logo" width="96">
+<img src="docs/assets/brand/logo.svg" alt="Git Mapper logo" width="96">
 
 # Git Mapper
 
@@ -28,7 +28,7 @@ commit and merge with a click. No account, no setup.
 ![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?labelColor=17151f&logo=typescript&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?labelColor=17151f&logo=tailwindcss&logoColor=06B6D4)
 
-<img src="docs/media/floating-screenshot-bare.png" alt="Git Mapper: the commit graph, staging view, branch menu and line-by-line diff" width="100%">
+<img src="docs/media/hero/floating-screenshot-bare.png" alt="Git Mapper: the commit graph, staging view, branch menu and line-by-line diff" width="100%">
 
 </div>
 

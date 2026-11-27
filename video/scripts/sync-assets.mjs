@@ -8,7 +8,7 @@ const repo = resolve(video, "..");
 const pub = resolve(video, "public");
 
 const copies = [
-  ["docs/assets/logo.svg", "logo.svg"],
+  ["docs/assets/brand/logo.svg", "logo.svg"],
   ["public/fonts/plus-jakarta-sans.woff2", "fonts/plus-jakarta-sans.woff2"],
   ["public/fonts/jetbrains-mono.woff2", "fonts/jetbrains-mono.woff2"],
 ];
