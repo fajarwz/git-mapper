@@ -130,6 +130,19 @@
     filter: blur(24px);
   }
 
+  /* Phones: the desktop glows are sized in rem, so they would cover the whole screen.
+     Size them to the viewport and soften them, so white stays the dominant colour. */
+  @media (max-width: 767px) {
+    body::before {
+      inset: -6%;
+      background-image:
+        radial-gradient(88vw 62vh at 100% 0%, color-mix(in srgb, var(--color-glow-1) 60%, transparent), transparent 70%),
+        radial-gradient(80vw 50vh at 50% 108%, color-mix(in srgb, var(--color-glow-2) 55%, transparent), transparent 70%),
+        radial-gradient(70vw 40vh at 0% 60%, color-mix(in srgb, var(--color-glow-4) 40%, transparent), transparent 70%);
+      filter: blur(16px);
+    }
+  }
+
   ::selection {
     background-color: rgb(110 86 207 / 0.25);
   }

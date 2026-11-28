@@ -14,16 +14,16 @@
         "rule": "radial-spotlight-glow",
         "value": "*",
         "files": [
-          "docs/media/floating-screenshot.html"
+          "docs/media/compose/floating-screenshot.html"
         ],
         "createdAt": "2026-11-23T23:41:00.953Z",
-        "reason": "sanctioned exception: docs/design-system.md rule 4 specifies soft radial corner glows as the brand's canvas, and this page renders that canvas for marketing images"
+        "reason": "sanctioned exception: docs/engineering/design-system.md rule 4 specifies soft radial corner glows as the brand's canvas, and this page renders that canvas for marketing images"
       },
       {
         "rule": "oversized-h1",
         "value": "*",
         "files": [
-          "docs/media/floating-screenshot.html"
+          "docs/media/compose/floating-screenshot.html"
         ],
         "createdAt": "2026-11-23T23:41:01.251Z",
         "reason": "false positive: the h1 is a short headline inside a 2400px image canvas that is scaled to 1200px or less, not a page viewport"

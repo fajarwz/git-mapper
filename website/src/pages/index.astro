@@ -1,17 +1,9 @@
 ---
-import { Image } from "astro:assets";
 import Site from "../layouts/Site.astro";
 import SecondaryButton from "../components/SecondaryButton.astro";
 import ThemeSlider from "../react/ThemeSlider";
 
 // Assets: the real brand file + every icon lives as its own file under src/assets/.
-import shotGraph from "../assets/screens/graph.png";
-import shotStage from "../assets/screens/stage.png";
-import shotHunk from "../assets/screens/hunk.png";
-import shotConflict from "../assets/screens/conflict.png";
-import shotSplit from "../assets/screens/split.png";
-import shotFind from "../assets/screens/find.png";
-import shotPulls from "../assets/screens/pulls.png";
 import logoRaw from "../assets/logo.svg?raw";
 import iconDownload from "../assets/icons/download.svg?raw";
 import iconGithub from "../assets/icons/github-mark.svg?raw";
@@ -41,7 +33,7 @@ const features = [
       "Reorder, resize and hide columns to suit you",
       "Each repository in its own tab, restored on launch",
     ],
-    img: shotGraph,
+    img: "graph", size: [1560, 1160],
     alt: "The commit graph: five branches in their own colours forking and merging back into main, with branch, tag and stash pills on the rows",
     layout: "side",
   },
@@ -54,7 +46,7 @@ const features = [
       "Staged and unstaged sides shown one at a time, like VS Code",
       "A hunk that moved underneath you is refused, never misapplied",
     ],
-    img: shotHunk,
+    img: "lines", size: [1560, 1180],
     alt: "An uncommitted diff with five changed lines ticked, and the hunk header now offering Stage +4 -1, Discard +4 -1 and Clear",
     layout: "side-reverse",
   },
@@ -67,7 +59,7 @@ const features = [
       "Works with GitHub and GitLab remotes",
       "Read-only: Git Mapper never changes your pull requests",
     ],
-    img: shotPulls,
+    img: "pulls", size: [1560, 1380],
     alt: "The right-click menu on the feat/tabs branch pill, offering Check out, Merge into main, Create pull request, and copy actions",
     layout: "side",
   },
@@ -80,7 +72,7 @@ const features = [
       "Alt+Left and Alt+Right step back and forward through your selections",
       "Ctrl+T, Ctrl+W, Ctrl+1–9 and Ctrl+Tab drive the tabs; every shortcut is listed in Settings",
     ],
-    img: shotFind,
+    img: "find",
     alt: "The find bar open over the commit list with the word lane typed: two matching rows are highlighted and every other row is faded, with a count of 1 of 2 and arrows to step through them",
     layout: "text-first",
   },
@@ -93,7 +85,7 @@ const features = [
       "Destructive actions sit behind a clear confirm",
       "The rail docks itself once the working tree is clean",
     ],
-    img: shotStage,
+    img: "stage",
     alt: "The staging rail listing a staged file and three changes beside the staged diff of src/lib/graph.ts, with an Unstage hunk button",
     layout: "text-first",
   },
@@ -106,7 +98,7 @@ const features = [
       "Finish with git's own prepared message",
       "Or abort and the repository returns to how it was",
     ],
-    img: shotConflict,
+    img: "conflict",
     alt: "A merge conflict in src/config.ts shown inline with Keep current, Keep both and Keep incoming buttons, and a Conflicts section in the staging rail",
     layout: "text-first",
   },
@@ -119,7 +111,7 @@ const features = [
       "Picture diffs for images: 2-up, swipe or onion peel",
       "Hover a file and its patch is already loading",
     ],
-    img: shotSplit,
+    img: "split",
     alt: "A commit selected in the graph with its split diff open: the old lines on the left, the new lines on the right",
     layout: "text-first",
   },
@@ -202,7 +194,7 @@ const systems = [
 
     <!-- Floating composition -->
     <section class="mx-auto max-w-6xl pb-16">
-      <div class="relative">
+      <div class="relative max-md:-mx-6 max-md:overflow-hidden">
         <img
           src="/screens/hero-floating-1600.webp"
           srcset="/screens/hero-floating-800.webp 800w, /screens/hero-floating-1600.webp 1600w, /screens/hero-floating.webp 2400w"
@@ -211,7 +203,7 @@ const systems = [
           height="1070"
           alt="Git Mapper's commit graph and staging view, with the branch context menu, a line-by-line diff and branch pills floating over the window"
           id="hero-still"
-          class="block h-auto w-full transition-opacity duration-300"
+          class="block h-auto w-full transition-opacity duration-300 max-md:-ml-[25%] max-md:w-[150%] max-md:max-w-none"
           fetchpriority="high"
           decoding="async"
         />
@@ -300,9 +292,7 @@ const systems = [
                   </ul>
                 </div>
                 <div class={f.layout === "side-reverse" ? "min-w-0 md:order-1 md:col-span-7" : "min-w-0 md:col-span-7"}>
-                  <div class="panel-shadow overflow-hidden rounded-2xl border border-hairline bg-sheet-strong p-1.5 md:p-2">
-                    <Image src={f.img} alt={f.alt} widths={[640, 1000, 1400]} sizes="(min-width: 1152px) 640px, (min-width: 768px) 55vw, 100vw" format="webp" quality={85} loading="lazy" class="block h-auto w-full rounded-xl border border-rule" />
-                  </div>
+                  <img src={`/screens/features/${f.img}.webp`} srcset={`/screens/features/${f.img}-800.webp 800w, /screens/features/${f.img}.webp 1600w`} sizes="(min-width: 1152px) 640px, (min-width: 768px) 55vw, 100vw" width={f.size?.[0] ?? 1600} height={f.size?.[1] ?? 960} alt={f.alt} loading="lazy" class="block h-auto w-full max-md:-mx-6 max-md:w-[calc(100%+3rem)] max-md:max-w-none" />
                 </div>
               </div>
             ) : (
@@ -316,8 +306,8 @@ const systems = [
                     {f.points.map((pt) => <li class="py-2.5">{pt}</li>)}
                   </ul>
                 </div>
-                <div class="panel-shadow overflow-hidden rounded-2xl border border-hairline bg-sheet-strong p-1.5 md:p-2">
-                  <Image src={f.img} alt={f.alt} widths={[800, 1200, 1800, 2200]} sizes="(min-width: 1152px) 1100px, 100vw" format="webp" quality={85} loading="lazy" class="block h-auto w-full rounded-xl border border-rule" />
+                <div class="max-md:-mx-6 max-md:overflow-hidden">
+                  <img src={`/screens/features/${f.img}.webp`} srcset={`/screens/features/${f.img}-800.webp 800w, /screens/features/${f.img}.webp 1600w`} sizes="(min-width: 1152px) 1100px, 100vw" width={f.size?.[0] ?? 1600} height={f.size?.[1] ?? 960} alt={f.alt} loading="lazy" class="mx-auto block h-auto w-full max-w-5xl max-md:-ml-[25%] max-md:w-[150%] max-md:max-w-none" />
                 </div>
               </div>
             )}
@@ -358,8 +348,8 @@ const systems = [
           The installer for your system lives on GitHub Releases. The app checks
           for updates on launch and stays current on its own.
         </p>
-        <p data-download-count class="mt-3 hidden text-sm font-semibold text-primary-ink">
-          <span data-download-count-num></span> downloads
+        <p data-download-count class="mt-3 text-sm font-semibold text-primary-ink opacity-0 transition-opacity duration-500">
+          <span data-download-count-num class="tabular-nums"></span> downloads
         </p>
       </div>
 
@@ -426,22 +416,42 @@ const systems = [
         document.querySelector(`[data-os-row="${os}"]`)?.classList.add("hidden");
       }
 
-      // Total release downloads (the README badge's source), shown as a rounded-down "500+".
-      // Stays hidden below 100 or when the request fails.
+      // Total release downloads (the README badge's source). Fetched lazily, only once the
+      // line is about to scroll into view, so it is never on the critical path. Counts up to
+      // a rounded-down "500+"; stays hidden below 100, on failure, or when the request fails.
       const countEl = document.querySelector<HTMLElement>("[data-download-count]");
-      if (countEl) {
-        fetch("https://img.shields.io/github/downloads/fajarwz/git-mapper/total.json")
-          .then((r) => (r.ok ? r.json() : Promise.reject()))
-          .then((d: { value?: string }) => {
+      const numEl = countEl?.querySelector<HTMLElement>("[data-download-count-num]");
+      if (countEl && numEl) {
+        const reveal = async () => {
+          try {
+            const r = await fetch("https://img.shields.io/github/downloads/fajarwz/git-mapper/total.json");
+            const d: { value?: string } = await r.json();
             const n = Number(String(d.value ?? "").replace(/[^\d]/g, ""));
             if (!Number.isFinite(n) || n < 100) return;
             const step = n >= 10000 ? 1000 : 100;
-            const label = (Math.floor(n / step) * step).toLocaleString("en-US");
-            const num = countEl.querySelector("[data-download-count-num]");
-            if (num) num.textContent = `${label}+`;
-            countEl.classList.remove("hidden");
-          })
-          .catch(() => {});
+            const target = Math.floor(n / step) * step;
+            const fmt = (v: number) => `${Math.round(v).toLocaleString("en-US")}+`;
+            numEl.textContent = fmt(0);
+            countEl.classList.remove("opacity-0");
+            if (matchMedia("(prefers-reduced-motion: reduce)").matches) {
+              numEl.textContent = fmt(target);
+              return;
+            }
+            const t0 = performance.now();
+            const tick = (now: number) => {
+              const p = Math.min((now - t0) / 1200, 1);
+              numEl.textContent = fmt(target * (1 - Math.pow(1 - p, 3)));
+              if (p < 1) requestAnimationFrame(tick);
+            };
+            requestAnimationFrame(tick);
+          } catch {}
+        };
+        new IntersectionObserver((entries, io) => {
+          if (entries.some((e) => e.isIntersecting)) {
+            io.disconnect();
+            reveal();
+          }
+        }, { rootMargin: "300px" }).observe(countEl);
       }
     </script>
   </main>

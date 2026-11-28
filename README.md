@@ -1,6 +1,6 @@
 <div align="center">
 
-<img src="docs/assets/logo.svg" alt="Git Mapper logo" width="96">
+<img src="docs/assets/brand/logo.svg" alt="Git Mapper logo" width="96">
 
 # Git Mapper
 
@@ -28,7 +28,7 @@ commit and merge with a click. No account, no setup.
 ![TypeScript](https://img.shields.io/badge/TypeScript-6-3178C6?labelColor=17151f&logo=typescript&logoColor=white)
 ![Tailwind CSS](https://img.shields.io/badge/Tailwind_CSS-4-06B6D4?labelColor=17151f&logo=tailwindcss&logoColor=06B6D4)
 
-<img src="docs/media/floating-screenshot-bare.png" alt="Git Mapper: the commit graph, staging view, branch menu and line-by-line diff" width="100%">
+<img src="docs/media/hero/floating-screenshot-bare.png" alt="Git Mapper: the commit graph, staging view, branch menu and line-by-line diff" width="100%">
 
 </div>
 
@@ -46,74 +46,140 @@ The links above always resolve to the newest release.
 
 ## Features
 
-**Read history**
+<table>
+<tr>
+<td width="45%" valign="middle">
+<h3>The graph, in lane colours</h3>
+<p>Every branch owns a hue from tip to root. Forks bend exactly at their commit, merges join back cleanly, and dense lanes stay readable hundreds of rows in.</p>
+<ul>
+<li>Branch, remote and tag pills on every row; double-click to check out</li>
+<li>Stashes sit as rows above the commit they were taken on</li>
+<li>Reorder, resize and hide columns to suit you</li>
+<li>Each repository in its own tab, restored on launch</li>
+</ul>
+</td>
+<td width="55%" valign="middle">
+<img src="website/public/screens/features/graph-800.webp" alt="The commit graph in lane colours with branch, tag and stash pills" width="100%">
+</td>
+</tr>
+</table>
 
-<img src="website/src/assets/screens/graph.png" alt="The commit graph in lane colours with branch, tag and stash pills" width="70%">
+<table>
+<tr>
+<td width="55%" valign="middle">
+<img src="website/public/screens/features/lines-800.webp" alt="Picking single lines of a hunk to stage, unstage or discard" width="100%">
+</td>
+<td width="45%" valign="middle">
+<h3>Down to the single line</h3>
+<p>Stage or discard one hunk, or tick just the lines you mean. Commit half of a messy file as two clean commits, no command line needed.</p>
+<ul>
+<li>Tick the gutter, or drag across several lines</li>
+<li>The hunk’s buttons become Stage, Unstage or Discard N lines</li>
+<li>Staged and unstaged sides shown one at a time, like VS Code</li>
+<li>A hunk that moved underneath you is refused, never misapplied</li>
+</ul>
+</td>
+</tr>
+</table>
 
-<img src="website/src/assets/screens/find.png" alt="The Ctrl+F find bar highlighting two matching commits and fading the rest" width="100%">
+<table>
+<tr>
+<td width="45%" valign="middle">
+<h3>Pull requests, one click away</h3>
+<p>Branch pills carry a badge for their GitHub pull request or GitLab merge request, and a list in the title bar shows the open and merged ones. Ready to open one? It is in the branch’s right-click menu.</p>
+<ul>
+<li>Open, merged and closed states, with a searchable list</li>
+<li>Create pull request… opens the new-PR page for that branch in your browser</li>
+<li>Works with GitHub and GitLab remotes</li>
+<li>Read-only: Git Mapper never changes your pull requests</li>
+</ul>
+</td>
+<td width="55%" valign="middle">
+<img src="website/public/screens/features/pulls-800.webp" alt="The branch right-click menu with Create pull request" width="100%">
+</td>
+</tr>
+</table>
 
-- **Lane-coloured graph.** Every branch keeps its colour from tip to root, forks and merges bend at
-  their own commit, and branch, remote and tag pills sit on the rows. Resize the graph gutter,
-  or drag it wider on lane-heavy histories.
-- **Repository tabs.** Each tab remembers its selected commit, file and panel state; drag tabs
-  into any order. Tabs you leave alone go to sleep to save memory and wake on click.
-- **Keyboard first.** Ctrl+T, Ctrl+W, Ctrl+1–9 and Ctrl+Tab drive the tabs, Ctrl+P jumps to any tab
-  by name or number, and Alt+Left / Alt+Right step back and forward through your selections.
-  Every shortcut is listed in Settings, and in the tooltip of the button it belongs to.
-- **Search.** Ctrl+F opens a floating find bar over the loaded history: match by hash, message,
-  author or ref name, the other rows dim, Enter and Shift+Enter step through the hits, Esc closes.
-- **Your columns, your way.** Resize the commit / author / date columns, drag their headers to
-  reorder them, right-click a header to hide one.
-- **Stashes as rows.** Each stash sits above the commit it was taken on. Apply, pop or drop from
-  its menu (pop and drop ask first).
-- **Avatars.** Initials chips by default, Gravatar photos if you like (settings toggle).
+<table>
+<tr>
+<td width="55%" valign="middle">
+<img src="website/public/screens/features/find-800.webp" alt="The find bar highlighting matching commits and fading the rest" width="100%">
+</td>
+<td width="45%" valign="middle">
+<h3>Find it, jump to it</h3>
+<p>Search the history without leaving it, hop between repositories by name, and step back through what you were just looking at. All of it from the keyboard.</p>
+<ul>
+<li>Ctrl+F opens a floating find bar: match by hash, message, author or ref, the rest fade, Enter steps through the hits</li>
+<li>Ctrl+P jumps to any open repository by name, path or number</li>
+<li>Alt+Left and Alt+Right step back and forward through your selections</li>
+<li>Ctrl+T, Ctrl+W, Ctrl+1–9 and Ctrl+Tab drive the tabs; every shortcut is listed in Settings</li>
+</ul>
+</td>
+</tr>
+</table>
 
-**Read changes**
+<table>
+<tr>
+<td width="45%" valign="middle">
+<h3>Stage, commit, undo</h3>
+<p>The uncommitted row opens a staging rail beside the diff. Stage, unstage or discard by file, write the message and commit. Changed your mind? Undo the tip commit and its files come back staged.</p>
+<ul>
+<li>Stage, unstage or discard a whole hunk in one click</li>
+<li>Fetch, pull (fast-forward only) and push from the branch counters</li>
+<li>Ctrl+Enter commits from the message box; destructive actions sit behind a clear confirm</li>
+<li>The rail docks itself once the working tree is clean</li>
+</ul>
+</td>
+<td width="55%" valign="middle">
+<img src="website/public/screens/features/stage-800.webp" alt="The staging rail beside the staged diff" width="100%">
+</td>
+</tr>
+</table>
 
-<img src="website/src/assets/screens/split.png" alt="A commit with its split diff open" width="100%">
+<table>
+<tr>
+<td width="55%" valign="middle">
+<img src="website/public/screens/features/conflict-800.webp" alt="Resolving a merge conflict block by block, inline" width="100%">
+</td>
+<td width="45%" valign="middle">
+<h3>Merge, and settle conflicts in place</h3>
+<p>Merge a local branch from its pill. If git stops on conflicts they land in the rail: take a side per file, or open the file and pick current, incoming or both for each block.</p>
+<ul>
+<li>Conflict blocks inline, with line numbers and syntax colours</li>
+<li>Keep current, keep incoming, or keep both, block by block</li>
+<li>Finish with git’s own prepared message</li>
+<li>Or abort and the repository returns to how it was</li>
+</ul>
+</td>
+</tr>
+</table>
 
-- **Diffs that read.** Line-numbered, syntax-highlighted (lazy per language, three colour
-  schemes), with word-level change marks. Unified or split layout, soft-wrap or scroll.
-- **One file or all of them.** Show the selected file alone, or stack every changed file in one
-  scroll with sticky headers and a jump list.
-- **Flat list or folder tree** for changed files, with status badges and rename hints.
-- **Picture diffs** for images: 2-up, swipe or onion peel, with pixel sizes and byte counts.
-- **Snappy.** Hover a file to prefetch its patch; clicking shows a skeleton while it loads.
+<table>
+<tr>
+<td width="45%" valign="middle">
+<h3>Diffs that read</h3>
+<p>Unified or split like GitHub, syntax highlighted in three colour schemes, with word-level marks showing exactly what changed.</p>
+<ul>
+<li>One file at a time, or every changed file stacked in one scroll</li>
+<li>Flat list or folder tree, with status badges and renames</li>
+<li>Picture diffs for images: 2-up, swipe or onion peel</li>
+<li>Hover a file and its patch is already loading</li>
+</ul>
+</td>
+<td width="55%" valign="middle">
+<img src="website/public/screens/features/split-800.webp" alt="A commit with its split diff open" width="100%">
+</td>
+</tr>
+</table>
 
-**Change things**
+### Also in the box
 
-<img src="website/src/assets/screens/stage.png" alt="The staging rail beside the staged diff" width="100%">
-
-<img src="website/src/assets/screens/hunk.png" alt="Picking single lines of a hunk to stage, unstage or discard" width="100%">
-
-<img src="website/src/assets/screens/conflict.png" alt="Resolving a merge conflict block by block, inline" width="100%">
-
-<img src="website/src/assets/screens/pulls.png" alt="The branch right-click menu with Create pull request" width="70%">
-
-- **Stage, commit, undo.** The `Uncommitted changes` row opens a staging rail: stage, unstage or
-  discard by file, write the message and commit without leaving the window. Undo the tip commit
-  and its files come back staged. Ctrl+Enter commits from the message box. The rail docks itself
-  when the tree goes clean.
-- **Hunks and single lines.** Stage, unstage or discard one hunk, or tick individual `+`/`-`
-  lines and act on just those. Staged and unstaged sides are shown one at a time, like VS Code.
-- **Sync.** Fetch, pull (fast-forward only) and push the checked-out branch from the counters
-  beside its name.
-- **Checkout.** Double-click a branch pill, or right-click for branch and commit checkout
-  (detaching HEAD asks first).
-- **Merge and resolve.** Merge a local branch from its pill's menu. Conflicts land in the rail:
-  take current or incoming per file, or open the file with its conflict blocks inline and choose
-  current, incoming or both per block. Finish with git's own message, or abort.
-- **Pull requests.** GitHub pull requests and GitLab merge requests show as badges on branch
-  pills and in a title-bar list (open, merged, searchable; read-only). Right-click a branch and pick
-  **Create pull request…** to open the provider's new-PR page for it in your browser.
-- **Copy** hashes and branch, remote, tag and stash names from the right-click menu.
-
-**Stays out of your way**
-
-- **Always current.** Refresh on window focus (only new commits get read), a periodic background
-  fetch so ahead/behind counts are honest, or the toolbar button. Rows a refresh touched flash.
-- **Light and dark glass themes**, zoom the whole window with Ctrl/Cmd plus, minus and zero, and
-  window size and position restored on launch.
+- **Stashes as rows.** Each stash sits above the commit it was taken on. Apply, pop or drop from its menu (pop and drop ask first).
+- **Always current.** Refresh on window focus (only new commits get read), a periodic background fetch so ahead/behind counts are honest, or the toolbar button.
+- **Tabs that remember.** Selected commit, file and panel state per repository; drag to reorder, idle tabs sleep to save memory.
+- **Checkout, copy and right-click menus.** Double-click a branch pill to check out; copy hashes and branch, remote, tag and stash names from the menu.
+- **Faces or initials.** Author avatars are initials chips by default; turn on Gravatar photos in settings.
+- **Light and dark glass themes**, whole-window zoom with Ctrl/Cmd plus, minus and zero, and window size and position restored on launch.
 - **Updates itself.** Checks on launch, downloads in the background, restarts when you say so.
 - **Local and private.** No account, no telemetry in the app; it runs your own `git`.
 

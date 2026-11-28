@@ -2,7 +2,7 @@
 //   npm run shots            capture from the app, then render all outputs
 //   npm run shots -- render  skip the capture, re-render from docs/media/sources
 //   npm run shots -- video   render only the 8 s hero loop (transparent WebM for the site, MP4 for posts)
-//   npm run shots -- social  render only the captioned social video (docs/media/social-video.mp4)
+//   npm run shots -- social  render only the captioned social video (docs/media/social/social-video.mp4)
 //   npm run shots -- features  retake and render only the per-feature images (docs/media/features)
 // Starts `npm run dev` in the repo root itself when nothing answers on :1420. Needs Edge or Chrome and ffmpeg.
 import { chromium } from "playwright-core";
@@ -17,8 +17,8 @@ const ROOT = resolve(VIDEO, "..");
 const MEDIA = join(ROOT, "docs", "media");
 const SOURCES = join(MEDIA, "sources");
 const SCREENS = join(ROOT, "website", "public", "screens");
-const COMPOSE = pathToFileURL(join(MEDIA, "floating-screenshot.html")).href;
-const FEATURES = pathToFileURL(join(MEDIA, "feature-floating.html")).href;
+const COMPOSE = pathToFileURL(join(MEDIA, "compose", "floating-screenshot.html")).href;
+const FEATURES = pathToFileURL(join(MEDIA, "compose", "feature-floating.html")).href;
 
 const launch = async () => {
   for (const channel of ["msedge", "chrome"]) {
@@ -57,7 +57,7 @@ async function openApp(browser, repos, width, height) {
 }
 
 async function capture(browser) {
-  mkdirSync(SOURCES, { recursive: true });
+  for (const d of [join(SOURCES, "hero"), join(MEDIA, "hero"), join(MEDIA, "social")]) mkdirSync(d, { recursive: true });
   const dir = mkdtempSync(join(tmpdir(), "gm-shots-"));
   const repo = join(dir, "orbit-demo");
   const open = (width, height) => {
@@ -74,12 +74,12 @@ async function capture(browser) {
   await page.getByRole("button", { name: /^Uncommitted changes/ }).first().click();
   await sleep(500);
   await rest(page);
-  await page.screenshot({ path: join(SOURCES, "stage.png") });
+  await page.screenshot({ path: join(SOURCES, "hero", "stage.png") });
   await page.getByText("feature/dark-theme", { exact: true }).first().click({ button: "right" });
   await sleep(600);
   const m = await page.getByRole("menu").first().boundingBox();
   const pad = 14;
-  await page.screenshot({ path: join(SOURCES, "menu.png"), clip: { x: m.x - pad, y: m.y - pad, width: m.width + pad * 2, height: m.height + pad * 2 } });
+  await page.screenshot({ path: join(SOURCES, "hero", "menu.png"), clip: { x: m.x - pad, y: m.y - pad, width: m.width + pad * 2, height: m.height + pad * 2 } });
   await page.context().close();
 
   // Diff with two picked lines, in a narrow window so the diff panel is compact.
@@ -89,12 +89,12 @@ async function capture(browser) {
   await page.getByLabel(/^Pick/).nth(0).click();
   await page.getByLabel(/^Pick/).nth(1).click();
   await rest(page);
-  await page.screenshot({ path: join(SOURCES, "hunk-full.png") });
+  await page.screenshot({ path: join(SOURCES, "hero", "hunk-full.png") });
   await page.context().close();
 }
 
 // One window per feature, kept in docs/media/sources/features for feature-floating.html.
-async function captureFeatures(browser) {
+async function captureFeatures(browser, only) {
   const out = join(SOURCES, "features");
   mkdirSync(out, { recursive: true });
   const dir = mkdtempSync(join(tmpdir(), "gm-feat-"));
@@ -141,6 +141,31 @@ async function captureFeatures(browser) {
   await rest(page);
   await page.screenshot({ path: join(out, "lines.png") });
   await page.context().close();
+
+  page = await openApp(browser, [demo(false)], 1100, 760);
+  await page.getByText("feature/dark-theme", { exact: true }).first().click({ button: "right" });
+  await sleep(600);
+  await page.screenshot({ path: join(out, "pulls.png") });
+  await page.context().close();
+
+  page = await openApp(browser, [demo(false)], 1100, 760);
+  await page.getByRole("button", { name: /^Stage metrics\.ts/ }).click();
+  await sleep(300);
+  await page.getByText("server.ts").first().click();
+  await page.getByRole("button", { name: /^Uncommitted changes/ }).first().click();
+  await sleep(500);
+  await rest(page);
+  await page.screenshot({ path: join(out, "stage.png") });
+  await page.context().close();
+
+  page = await openApp(browser, [demo(false)], 1100, 760);
+  await page.getByRole("button", { name: /^Read the port from the environment/ }).first().click();
+  await sleep(800);
+  await page.getByText("Split", { exact: true }).first().click();
+  await sleep(500);
+  await rest(page);
+  await page.screenshot({ path: join(out, "split.png") });
+  await page.context().close();
 }
 
 async function render(browser) {
@@ -153,21 +178,28 @@ async function render(browser) {
     await page.screenshot({ path: out, omitBackground: transparent });
     await context.close();
   };
-  await shoot("#full", { width: 2400, height: 1400 }, join(MEDIA, "floating-screenshot.png"));
-  await shoot("#bare", { width: 2400, height: 1070 }, join(MEDIA, "floating-screenshot-bare.png"));
-  const clear = join(MEDIA, "floating-screenshot-transparent.png");
+  await shoot("#full", { width: 2400, height: 1400 }, join(MEDIA, "hero", "floating-screenshot.png"));
+  await shoot("#bare", { width: 2400, height: 1070 }, join(MEDIA, "hero", "floating-screenshot-bare.png"));
+  const clear = join(MEDIA, "hero", "floating-screenshot-transparent.png");
   await shoot("#bare-clear", { width: 2400, height: 1070 }, clear, { transparent: true });
-  execFileSync("ffmpeg", ["-y", "-v", "error", "-i", clear, "-c:v", "libwebp", "-quality", "88", "-pix_fmt", "yuva420p", join(SCREENS, "hero-floating.webp")]);
-  for (const w of [800, 1600]) execFileSync("ffmpeg", ["-y", "-v", "error", "-i", clear, "-vf", `scale=${w}:-1:flags=lanczos`, "-c:v", "libwebp", "-quality", "88", "-pix_fmt", "yuva420p", join(SCREENS, `hero-floating-${w}.webp`)]);
+  // Each width is rendered by Chrome itself (rescaling afterwards blends the shadows with the black of the transparent pixels) and encoded lossless, so the soft shadows stay smooth.
+  for (const [w, file] of [[2400, "hero-floating"], [1600, "hero-floating-1600"], [800, "hero-floating-800"]]) {
+    const png = join(tmpdir(), `${file}.png`);
+    await shoot("#bare-clear", { width: 2400, height: 1070 }, png, { scale: w / 2400, transparent: true });
+    execFileSync("ffmpeg", ["-y", "-v", "error", "-i", png, "-c:v", "libwebp", "-lossless", "1", "-compression_level", "6", "-quality", "75", join(SCREENS, `${file}.webp`)]);
+    rmSync(png);
+  }
   // Social preview: composed at 2400x1260, shot at half scale for 1200x630.
   await shoot("#og", { width: 2400, height: 1260 }, join(SCREENS, "og-image.png"), { scale: 0.5 });
-  copyFileSync(join(SCREENS, "og-image.png"), join(MEDIA, "og-image.png"));
+  copyFileSync(join(SCREENS, "og-image.png"), join(MEDIA, "social", "og-image.png"));
 }
+
+const FEATURE_NAMES = ["conflict", "find", "lines", "graph", "pulls", "stage", "split"];
 
 async function renderFeatures(browser) {
   const out = join(MEDIA, "features");
   mkdirSync(out, { recursive: true });
-  for (const name of ["conflict", "find", "lines", "graph"]) {
+  for (const name of FEATURE_NAMES) {
     const context = await browser.newContext({ viewport: { width: 2400, height: 1350 }, deviceScaleFactor: 2 / 3 });
     const page = await context.newPage();
     await page.goto(FEATURES + "#" + name);
@@ -177,6 +209,33 @@ async function renderFeatures(browser) {
     await page.screenshot({ path: png });
     execFileSync("ffmpeg", ["-y", "-v", "error", "-i", png, "-c:v", "libwebp", "-quality", "90", join(out, `${name}.webp`)]);
     await context.close();
+  }
+  // Website variants: no headline, transparent, 1600x767 + 800w WebP with alpha.
+  const site = join(SCREENS, "features");
+  mkdirSync(site, { recursive: true });
+  // Chrome renders each width natively (never rescaled afterwards: resampling blends the shadows with the black of the transparent pixels and leaves dark fringes), then ffmpeg only encodes it as lossless WebP.
+  const shootSite = async (name, width, file) => {
+    const probe = await browser.newContext({ viewport: { width: 2400, height: 1500 }, deviceScaleFactor: 1 });
+    const probePage = await probe.newPage();
+    await probePage.goto(FEATURES + "#" + name + "-site");
+    await probePage.evaluate(() => document.fonts.ready);
+    const size = await probePage.evaluate(() => ({ width: document.body.offsetWidth, height: document.body.offsetHeight }));
+    await probe.close();
+    const target = Math.min(width, size.width);
+    const context = await browser.newContext({ viewport: size, deviceScaleFactor: target / size.width });
+    const page = await context.newPage();
+    await page.goto(FEATURES + "#" + name + "-site");
+    await page.evaluate(() => document.fonts.ready);
+    await sleep(400);
+    const png = join(site, `${file}.png`);
+    await page.screenshot({ path: png, omitBackground: true });
+    execFileSync("ffmpeg", ["-y", "-v", "error", "-i", png, "-c:v", "libwebp", "-lossless", "1", "-compression_level", "6", "-quality", "75", join(site, `${file}.webp`)]);
+    rmSync(png);
+    await context.close();
+  };
+  for (const name of FEATURE_NAMES) {
+    await shootSite(name, 1600, name);
+    await shootSite(name, 800, `${name}-800`);
   }
 }
 
@@ -199,12 +258,12 @@ async function video(browser, only) {
   const input = ["-y", "-v", "error", "-framerate", String(FPS), "-i", join(frames, "f%04d.png")];
   if (only !== "social") {
   await pass("#bare-clear-motion", true);
-  execFileSync("ffmpeg", [...input, "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "38", "-auto-alt-ref", "0", join(SCREENS, "hero-floating.webm")]);
+  execFileSync("ffmpeg", [...input, "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "30", "-auto-alt-ref", "0", join(SCREENS, "hero-floating.webm")]);
   await pass("#bare-motion", false);
-  execFileSync("ffmpeg", [...input, "-c:v", "libx264", "-crf", "17", "-pix_fmt", "yuv420p", "-movflags", "+faststart", join(MEDIA, "floating-screenshot.mp4")]);
+  execFileSync("ffmpeg", [...input, "-c:v", "libx264", "-crf", "17", "-pix_fmt", "yuv420p", "-movflags", "+faststart", join(MEDIA, "hero", "floating-screenshot.mp4")]);
   }
   await pass("#og-motion", false, 1260, 0.8);
-  execFileSync("ffmpeg", [...input, "-c:v", "libx264", "-crf", "17", "-pix_fmt", "yuv420p", "-movflags", "+faststart", join(MEDIA, "social-video.mp4")]);
+  execFileSync("ffmpeg", [...input, "-c:v", "libx264", "-crf", "17", "-pix_fmt", "yuv420p", "-movflags", "+faststart", join(MEDIA, "social", "social-video.mp4")]);
   rmSync(frames, { recursive: true, force: true });
 }
 

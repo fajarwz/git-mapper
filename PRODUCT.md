@@ -35,13 +35,13 @@ Lightweight zero-config viewer that runs real `git` for its data but looks like 
 - Search filters only the loaded 500-commit window (Ctrl+F); deep search over full history is a separate planned slice.
 - Stash rows are viewed/applied/popped/dropped; history rows offer copy, checkout and stash actions via context menu.
 - Light/dark glass themes; window bounds live outside localStorage (window-state plugin).
-- Technical constraints carried in docs/architecture.md and docs/known-pitfalls.md: WebView2 must never reload the page; git reads are async and parallelized; files/diffs load lazily per commit; worktree digest drives surgical refresh.
+- Technical constraints carried in docs/engineering/architecture.md and docs/engineering/known-pitfalls.md: WebView2 must never reload the page; git reads are async and parallelized; files/diffs load lazily per commit; worktree digest drives surgical refresh.
 
 ## Brand Commitments
 
 - Name: **Git Mapper** (crate `git_mapper_lib`, id `com.fajarwz.git-mapper`).
-- Logo: `docs/assets/logo.svg`; app icon regenerates from `src-tauri/icons/app-icon.svg` and must stay in sync with the title-bar BrandMark.
-- Aesthetic: frosted-glass commit feed, violet/rose/warm palette — and the full design-system rules in **docs/design-system.md** (tokens only, custom shadow utilities, pill language, chrome backing) are binding. No further explicit commitments.
+- Logo: `docs/assets/brand/logo.svg`; app icon regenerates from `src-tauri/icons/app-icon.svg` and must stay in sync with the title-bar BrandMark.
+- Aesthetic: frosted-glass commit feed, violet/rose/warm palette — and the full design-system rules in **docs/engineering/design-system.md** (tokens only, custom shadow utilities, pill language, chrome backing) are binding. No further explicit commitments.
 - Voice: **lightweight and clean**. Copy states what it does in plain words (lightweight, zero-config, no account); proof beats adjectives, facts over flexes. The glass look is demonstrated by imagery, not claimed in headlines.
 
 ## Evidence on Hand
