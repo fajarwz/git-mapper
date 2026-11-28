@@ -6,6 +6,8 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   site: "https://gitmapper.fajarwz.com",
   integrations: [react()],
+  // The stylesheet is ~6 KiB on a one-page site: inline it so it never blocks first paint.
+  build: { inlineStylesheets: "always" },
   vite: {
     plugins: [tailwindcss()],
   },
