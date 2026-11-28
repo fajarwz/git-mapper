@@ -53,11 +53,11 @@ const CONFIG = {
       cards: [
         { x: 738, y: 345, w: 702, h: 65, s: 1.2, left: 640, top: 50, rot: 2 },
         { x: 738, y: 409, w: 512, h: 64, s: 1.4, left: 50, top: 890, rot: -3 },
-        { x: 738, y: 729, w: 702, h: 65, s: 1.2, left: 700, top: 900, rot: -2 },
+        { x: 738, y: 729, w: 702, h: 65, s: 1.2, left: 630, top: 900, rot: -2 },
       ],
       pills: [
-        { text: "main", filled: true, left: 1290, top: 330, rot: 3 },
-        { text: "feature/auth", color: "#cf6a92", border: "#cf6a92", left: 1230, top: 560, rot: -3 },
+        { text: "main", filled: true, left: 1240, top: 330, rot: 3 },
+        { text: "feature/auth", color: "#cf6a92", border: "#cf6a92", left: 1170, top: 560, rot: -3 },
       ],
     },
     title: 'Every branch in <span>its own colour.</span>',
@@ -80,7 +80,7 @@ const CONFIG = {
       main: { x: 600, y: 880, w: 1580, h: 620, s: 0.85, left: 110, top: 400 },
       cards: [
         { x: 1720, y: 1045, w: 440, h: 58, s: 1.7, left: 700, top: 200, rot: 2 },
-        { x: 22, y: 430, w: 556, h: 110, s: 1.3, left: 30, top: 800, rot: -3 },
+        { x: 22, y: 430, w: 556, h: 110, s: 1.3, left: 90, top: 800, rot: -3 },
       ],
       pills: [
         { text: "3 lines picked", filled: true, left: 90, top: 120, rot: -4 },
@@ -126,8 +126,8 @@ const CONFIG = {
     title: 'Stage, commit, <span>undo.</span>',
     sub: 'A staging rail beside the diff: stage by file or hunk, write the message and commit.',
     cards: [
-      { x: 22, y: 205, w: 556, h: 250, s: 1.4, left: 40, top: 760, rot: -3 },
-      { x: 602, y: 1040, w: 1578, h: 460, s: 0.8, left: 1100, top: 960, rot: 2 },
+      { x: 22, y: 205, w: 556, h: 250, s: 1.4, left: 100, top: 760, rot: -3 },
+      { x: 602, y: 1040, w: 1578, h: 460, s: 0.8, left: 1020, top: 960, rot: 2 },
     ],
     pills: [
       { text: "1 staged", filled: true, left: 2010, top: 440, rot: 3 },
@@ -161,7 +161,7 @@ if (site) {
   // Website variant: no headline, transparent backdrop, content lifted into a shorter canvas.
   document.getElementById("t").remove();
   document.getElementById("s").remove();
-  document.body.style.cssText += `;background:none;width:${c.w ?? 2400}px;height:${c.h ?? 1300}px`;
+  document.body.style.cssText += `;background:none;width:${c.w ?? 2400}px;height:${c.h ?? 1440}px`;
   document.body.insertAdjacentHTML("beforeend", `<div id="stage" style="position:absolute;left:0;top:${c.shift ?? -200}px;width:2400px;height:1350px"></div>`);
 }
 const add = (html) => (site ? document.getElementById("stage") : document.body).insertAdjacentHTML("beforeend", html);

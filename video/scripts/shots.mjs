@@ -182,8 +182,13 @@ async function render(browser) {
   await shoot("#bare", { width: 2400, height: 1070 }, join(MEDIA, "hero", "floating-screenshot-bare.png"));
   const clear = join(MEDIA, "hero", "floating-screenshot-transparent.png");
   await shoot("#bare-clear", { width: 2400, height: 1070 }, clear, { transparent: true });
-  execFileSync("ffmpeg", ["-y", "-v", "error", "-i", clear, "-c:v", "libwebp", "-quality", "88", "-pix_fmt", "yuva420p", join(SCREENS, "hero-floating.webp")]);
-  for (const w of [800, 1600]) execFileSync("ffmpeg", ["-y", "-v", "error", "-i", clear, "-vf", `scale=${w}:-1:flags=lanczos`, "-c:v", "libwebp", "-quality", "88", "-pix_fmt", "yuva420p", join(SCREENS, `hero-floating-${w}.webp`)]);
+  // Each width is rendered by Chrome itself (rescaling afterwards blends the shadows with the black of the transparent pixels) and encoded lossless, so the soft shadows stay smooth.
+  for (const [w, file] of [[2400, "hero-floating"], [1600, "hero-floating-1600"], [800, "hero-floating-800"]]) {
+    const png = join(tmpdir(), `${file}.png`);
+    await shoot("#bare-clear", { width: 2400, height: 1070 }, png, { scale: w / 2400, transparent: true });
+    execFileSync("ffmpeg", ["-y", "-v", "error", "-i", png, "-c:v", "libwebp", "-lossless", "1", "-compression_level", "6", "-quality", "75", join(SCREENS, `${file}.webp`)]);
+    rmSync(png);
+  }
   // Social preview: composed at 2400x1260, shot at half scale for 1200x630.
   await shoot("#og", { width: 2400, height: 1260 }, join(SCREENS, "og-image.png"), { scale: 0.5 });
   copyFileSync(join(SCREENS, "og-image.png"), join(MEDIA, "social", "og-image.png"));
@@ -208,23 +213,29 @@ async function renderFeatures(browser) {
   // Website variants: no headline, transparent, 1600x767 + 800w WebP with alpha.
   const site = join(SCREENS, "features");
   mkdirSync(site, { recursive: true });
-  for (const name of FEATURE_NAMES) {
-    // Most images are 2400x1150 shot at 2/3 (1600 wide); the ones in the narrow side column set their own tighter canvas.
-    const context = await browser.newContext({ viewport: { width: 2400, height: 1200 }, deviceScaleFactor: 1 });
+  // Chrome renders each width natively (never rescaled afterwards: resampling blends the shadows with the black of the transparent pixels and leaves dark fringes), then ffmpeg only encodes it as lossless WebP.
+  const shootSite = async (name, width, file) => {
+    const probe = await browser.newContext({ viewport: { width: 2400, height: 1500 }, deviceScaleFactor: 1 });
+    const probePage = await probe.newPage();
+    await probePage.goto(FEATURES + "#" + name + "-site");
+    await probePage.evaluate(() => document.fonts.ready);
+    const size = await probePage.evaluate(() => ({ width: document.body.offsetWidth, height: document.body.offsetHeight }));
+    await probe.close();
+    const target = Math.min(width, size.width);
+    const context = await browser.newContext({ viewport: size, deviceScaleFactor: target / size.width });
     const page = await context.newPage();
     await page.goto(FEATURES + "#" + name + "-site");
     await page.evaluate(() => document.fonts.ready);
     await sleep(400);
-    const size = await page.evaluate(() => ({ width: document.body.offsetWidth, height: document.body.offsetHeight }));
-    await page.setViewportSize(size);
-    await sleep(200);
-    const png = join(site, `${name}.png`);
+    const png = join(site, `${file}.png`);
     await page.screenshot({ path: png, omitBackground: true });
-    for (const [w, file] of [[1600, `${name}.webp`], [800, `${name}-800.webp`]]) {
-      execFileSync("ffmpeg", ["-y", "-v", "error", "-i", png, "-vf", `scale=${Math.min(w, size.width)}:-1:flags=lanczos`, "-c:v", "libwebp", "-quality", "88", "-pix_fmt", "yuva420p", join(site, file)]);
-    }
+    execFileSync("ffmpeg", ["-y", "-v", "error", "-i", png, "-c:v", "libwebp", "-lossless", "1", "-compression_level", "6", "-quality", "75", join(site, `${file}.webp`)]);
     rmSync(png);
     await context.close();
+  };
+  for (const name of FEATURE_NAMES) {
+    await shootSite(name, 1600, name);
+    await shootSite(name, 800, `${name}-800`);
   }
 }
 
@@ -247,7 +258,7 @@ async function video(browser, only) {
   const input = ["-y", "-v", "error", "-framerate", String(FPS), "-i", join(frames, "f%04d.png")];
   if (only !== "social") {
   await pass("#bare-clear-motion", true);
-  execFileSync("ffmpeg", [...input, "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "38", "-auto-alt-ref", "0", join(SCREENS, "hero-floating.webm")]);
+  execFileSync("ffmpeg", [...input, "-c:v", "libvpx-vp9", "-pix_fmt", "yuva420p", "-b:v", "0", "-crf", "30", "-auto-alt-ref", "0", join(SCREENS, "hero-floating.webm")]);
   await pass("#bare-motion", false);
   execFileSync("ffmpeg", [...input, "-c:v", "libx264", "-crf", "17", "-pix_fmt", "yuv420p", "-movflags", "+faststart", join(MEDIA, "hero", "floating-screenshot.mp4")]);
   }
